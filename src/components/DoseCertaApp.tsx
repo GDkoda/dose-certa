@@ -123,7 +123,7 @@ function AuthScreen() {
     if (mode === "login") {
       const u = attemptLogin(s, login, pass);
       if (!u) return setMsg({ ok: false, text: "Login ou senha incorretos. Esqueceu a senha? Use a recuperação abaixo." });
-      setState((st) => ({ ...st, sessionId: u.id, users: st.users.map((x) => (x.id === u.id ? { ...x, mustChange: u.mustChange } : x)) }));
+      setState((st) => ({ ...st, sessionId: u.id, users: st.users.map((x) => (x.id === u.id ? { ...x, mustChange: !!u.mustChange } : x)) }));
     } else if (mode === "signup") {
       if (login.trim().length < 3 || pass.length < 4 || !question.trim() || !answer.trim()) return setMsg({ ok: false, text: "Preencha login (3+), senha (4+), pergunta e resposta." });
       if (pass === RESET_PASSWORD) return setMsg({ ok: false, text: "Escolha outra senha." });
@@ -208,7 +208,7 @@ function ensureTodayDoses(ownerId: string) {
   const add: Dose[] = [];
   for (const m of s.meds.filter((x) => x.ownerId === ownerId)) {
     for (const t of m.times) {
-      const [h, mi] = t.split(":").map(Number); const d = new Date(); d.setHours(h, mi, 0, 0);
+      const [h = 0, mi = 0] = t.split(":").map(Number); const d = new Date(); d.setHours(h, mi, 0, 0);
       const iso = d.toISOString();
       if (!s.doses.some((x) => x.medId === m.id && x.scheduledAt === iso) && new Date(iso).toDateString() === day) {
         add.push({ id: uid(), medId: m.id, patientId: m.patientId, ownerId, scheduledAt: iso, status: "pendente" });
@@ -388,7 +388,7 @@ function Meds({ me }: { me: User }) {
         <form className={cls(card, "grid gap-3 sm:grid-cols-2")} onSubmit={(e) => {
           e.preventDefault(); setErr("");
           const times = f.times.split(",").map((t) => t.trim()).filter((t) => /^\d{2}:\d{2}$/.test(t));
-          const pid = f.patientId || patients[0].id;
+          const pid = f.patientId || patients[0]!.id;
           if (!f.name.trim() || !times.length) return setErr("Informe nome e ao menos um horário (HH:MM).");
           setState((s) => ({ ...s, meds: [...s.meds, { id: uid(), ownerId: me.id, patientId: pid, name: f.name.trim(), dose: f.dose.trim(), times, stock: Number(f.stock) || 0, tolerance: Number(f.tolerance) || 0 }] }));
           setF({ ...f, name: "", dose: "" });
@@ -459,7 +459,7 @@ function Support({ me }: { me: User }) {
   const tickets = useStore((s) => s.tickets); const users = useStore((s) => s.users);
   const mine = me.role === "cuidador" ? tickets.filter((t) => t.userId === me.id) : tickets;
   const [subject, setSubject] = useState(""); const [text, setText] = useState(""); const [open, setOpen] = useState<string | null>(null); const [reply, setReply] = useState("");
-  const faq = [["Dúvida sobre interação medicamentosa", "Converse com o farmacêutico ou abra um chamado."], ["Posso tomar com café?", "Depende do medicamento; consulte a bula."], ["Efeitos colaterais", "Em caso de reação, procure atendimento médico."]];
+  const faq: [string, string][] = [["Dúvida sobre interação medicamentosa", "Converse com o farmacêutico ou abra um chamado."], ["Posso tomar com café?", "Depende do medicamento; consulte a bula."], ["Efeitos colaterais", "Em caso de reação, procure atendimento médico."]];
   return (
     <div className="space-y-6">
       <T k="sup-title" as="h1" className="font-display text-3xl text-foreground">Central de Atendimento</T>
@@ -473,7 +473,7 @@ function Support({ me }: { me: User }) {
           <button className={btnPrimary}>Enviar</button>
         </form>)}
       <div className={card}><h2 className="mb-2 font-display text-lg text-foreground">Perguntas frequentes</h2>
-        {faq.map(([q, a], i) => <details key={q} className="border-b border-border py-2"><summary className="cursor-pointer font-semibold text-foreground"><T k={`faq-q${i}`}>{q}</T></summary><T k={`faq-a${i}`} as="p" className="mt-1 text-sm text-muted-foreground">{a}</T></details>)}</div>
+        {faq.map(([q, a], i) => <details key={q} className="border-b border-border py-2"><summary className="cursor-pointer font-semibold text-foreground"><T k={`faq-q${i}`}>{q!}</T></summary><T k={`faq-a${i}`} as="p" className="mt-1 text-sm text-muted-foreground">{a!}</T></details>)}</div>
       <div className="space-y-3">
         {mine.length === 0 && <p className="text-sm text-muted-foreground">Nenhum chamado ainda.</p>}
         {mine.map((t) => (
@@ -611,7 +611,7 @@ function Shell({ me }: { me: User }) {
         </main>
         <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-border bg-card py-2 md:hidden">
           {items.slice(0, 5).map((i) => <button key={i.id} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
-          {items.length > 5 && <button onClick={() => setPage(items[5].id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === items[5].id ? "text-primary" : "text-muted-foreground")}>{items[5].icon}{items[5].label}</button>}
+          {items[5] && <button onClick={() => setPage(items[5]!.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === items[5].id ? "text-primary" : "text-muted-foreground")}>{items[5].icon}{items[5].label}</button>}
         </nav>
       </div>
       <AlarmEngine me={me} />
