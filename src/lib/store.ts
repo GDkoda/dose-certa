@@ -46,8 +46,14 @@ export function setState(fn: (s: State) => State) {
   listeners.forEach((l) => l());
 }
 const serverSnap = initialState();
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
+const getServerSnapshot = () => serverSnap;
 export function useStore<T>(sel: (s: State) => T): T {
-  return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => sel(getState()), () => sel(serverSnap));
+  const snapshot = useSyncExternalStore(subscribe, getState, getServerSnapshot);
+  return sel(snapshot);
 }
 
 // ---- Pure rules (tested) ----
