@@ -30,6 +30,9 @@ export function initialState(): State {
 let state: State = initialState();
 let loaded = false;
 const listeners = new Set<() => void>();
+let cloudWriter: ((before: State, after: State) => void) | undefined;
+export function connectCloudWriter(writer: (before: State, after: State) => void) { cloudWriter = writer; }
+export function replaceCloudState(next: State) { state = next; loaded = true; listeners.forEach((listener) => listener()); }
 
 function load() {
   if (loaded || typeof window === "undefined") return;
@@ -41,8 +44,10 @@ function load() {
 export function getState() { load(); return state; }
 export function setState(fn: (s: State) => State) {
   load();
+  const before = state;
   state = fn(state);
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota */ }
+  if (cloudWriter) cloudWriter(before, state);
+  else try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota */ }
   listeners.forEach((l) => l());
 }
 const serverSnap = initialState();
