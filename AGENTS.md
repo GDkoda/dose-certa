@@ -10,3 +10,6 @@
 <!-- LOVABLE:END -->
 
 - Subscribe React store consumers to the stable full-state snapshot and apply selectors afterward; allocating filtered arrays inside getSnapshot causes render loops after sign-in.
+- Account identity uses Cloud Auth with normalized usernames mapped to synthetic addresses; do not trust legacy localStorage credentials or roles because accounts and permissions must work across devices.
+- Store roles separately in user_roles and validate Master mutations on the server; client role checks only control presentation.
+- Synchronize app records through RLS-protected Cloud storage; retain the legacy browser copy only for explicit recovery, never automatically trust its roles or overwrite Cloud records.
