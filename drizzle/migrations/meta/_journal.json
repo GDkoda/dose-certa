@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792713977573,
+      "tag": "0000_shared_accounts_and_app_records",
+      "breakpoints": true
+    }
+  ]
 }

@@ -14,16 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_records: {
+        Row: {
+          id: string
+          kind: string
+          owner_id: string
+          payload: Json
+        }
+        Insert: {
+          id: string
+          kind: string
+          owner_id: string
+          payload: Json
+        }
+        Update: {
+          id?: string
+          kind?: string
+          owner_id?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_records_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          must_change: boolean
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          must_change?: boolean
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          must_change?: boolean
+          username?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "cuidador" | "operador" | "mestre"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +220,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["cuidador", "operador", "mestre"],
+    },
   },
 } as const
