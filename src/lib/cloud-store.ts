@@ -8,6 +8,8 @@ let currentId: string | null = null;
 let queue = Promise.resolve();
 let refreshing: Promise<void> | undefined;
 let errorHandler: (message: string) => void = () => {};
+let writeFailed = false;
+export async function flushCloudWrites() { await queue; if (writeFailed) throw new Error('Os registros não foram salvos. Confira a conexão e tente novamente.'); }
 export function onCloudError(handler: (message: string) => void) { errorHandler = handler; }
 
 export async function refreshCloud() {
@@ -54,7 +56,7 @@ export async function initializeCloud() {
   connectCloudWriter((before, after) => {
     const actorId = currentId;
     if (!actorId) return;
-    queue = queue.then(() => saveChanges(before, after, actorId)).catch(async () => { errorHandler('Não foi possível salvar a alteração. Confira sua conexão e permissões.'); await refreshCloud(); });
+    queue = queue.then(async () => { await saveChanges(before, after, actorId); writeFailed = false; }).catch(async () => { writeFailed = true; errorHandler('Não foi possível salvar a alteração. Confira sua conexão e permissões.'); await refreshCloud(); });
   });
   const { data } = await supabase.auth.getSession();
   currentId = data.session?.user.id ?? null;
