@@ -10,7 +10,7 @@ import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions"
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
 import {
-  attemptLogin, canAddPatient, getState, MAX_PATIENTS, recoverPassword, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
+  canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
   type Dose, type Role, type User,
 } from "@/lib/store";
 
@@ -28,7 +28,6 @@ const card = "rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-
 function useMe(): User | null {
   return useStore((s) => s.users.find((u) => u.id === s.sessionId) ?? null);
 }
-function isMaster() { const s = getState(); return s.users.find((u) => u.id === s.sessionId)?.role === "mestre"; }
 
 /* ---------------- master inline editing ---------------- */
 function T({ k, children, as: Tag = "span", className }: { k: string; children: string; as?: "span" | "h1" | "h2" | "h3" | "p"; className?: string }) {
@@ -117,10 +116,8 @@ function beep() {
 function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup" | "recover">("login");
   const [login, setLogin] = useState(""); const [pass, setPass] = useState("");
-  const [question, setQuestion] = useState(""); const [answer, setAnswer] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const bg = useImage("auth-bg", lavender);
-  const recQuestion = useStore((s) => s.users.find((u) => u.login.toLowerCase() === login.trim().toLowerCase())?.question);
 
   const register = useServerFn(registerAccount);
   const [busy, setBusy] = useState(false);
