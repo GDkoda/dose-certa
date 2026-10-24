@@ -40,11 +40,16 @@ export const manageAccount = createServerFn({ method: 'POST' })
       if (error) throw new Error('Não foi possível excluir a conta.');
     } else if (data.id) {
       if (data.login || data.password) {
+        const { data: original, error: originalError } = await context.supabase.from('profiles').select('username').eq('id', data.id).single();
+        if (originalError || !original) throw new Error('Conta não encontrada.');
         const username = data.login ? normalizeUsername(data.login) : undefined;
         const { error } = await supabaseAdmin.auth.admin.updateUserById(data.id, { ...(username ? { email: accountEmail(username), email_confirm: true } : {}), ...(data.password ? { password: data.password } : {}) });
         if (error) throw new Error('Não foi possível salvar: login já utilizado ou senha fraca.');
         const { error: profileError } = await supabaseAdmin.from('profiles').update({ ...(username ? { username } : {}), ...(data.password ? { must_change: true } : {}) }).eq('id', data.id);
-        if (profileError) throw new Error('Não foi possível atualizar o perfil.');
+        if (profileError) {
+          if (username) await supabaseAdmin.auth.admin.updateUserById(data.id, { email: accountEmail(original.username), email_confirm: true });
+          throw new Error('Não foi possível atualizar o perfil. O login anterior foi preservado.');
+        }
       }
       if (data.role) {
         const { error } = await supabaseAdmin.from('user_roles').update({ role: data.role }).eq('user_id', data.id);

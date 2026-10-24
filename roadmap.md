@@ -1,5 +1,5 @@
 # Dose Certa
-- [ ] Share accounts through Cloud authentication and preserve username sign-in.
-- [ ] Give the Master a complete account list and secure promotion of existing accounts to Operator.
-- [ ] Preserve locally created accounts and give the Master access to app management.
-- [ ] Verify signup, Master visibility, and promotion end to end.
+- [x] Share accounts through Cloud authentication and preserve username sign-in.
+- [x] Give the Master a complete account list and secure promotion of existing accounts to Operator.
+- [x] Preserve the legacy browser copy and provide an explicit Master import with new passwords; give the Master access to patients, medications, history, support, and account management.
+- [x] Verify signup, Master visibility across independent browsers, and promotion end to end.

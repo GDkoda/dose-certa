@@ -3,7 +3,7 @@ import { useServerFn } from '@tanstack/react-start';
 import { Plus, RefreshCw, Save, Search, Shield, Trash2, Upload, UserRoundCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { manageAccount } from '@/lib/accounts.functions';
-import { refreshCloud } from '@/lib/cloud-store';
+import { flushCloudWrites, refreshCloud } from '@/lib/cloud-store';
 import { getState, setState, useStore, type Role, type State, type User } from '@/lib/store';
 import { normalizeUsername } from '@/lib/account-rules';
 
@@ -55,6 +55,7 @@ export function AccountAdmin({ me }: { me: User }) {
       }
       return next;
     });
+    await flushCloudWrites();
     setImportPassword('');
   };
   const visible = users.filter((user) => user.login.includes(search.trim().toLowerCase()) && (filter === 'all' || user.role === filter));
