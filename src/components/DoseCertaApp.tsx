@@ -3,6 +3,11 @@ import {
   Bell, BellRing, ClipboardList, Download, Headphones, History, Home, Leaf, LogOut, Moon, Pencil, Pill,
   Plus, Printer, Shield, Sun, Trash2, User as UserIcon, Users, X,
 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Button } from "@/components/ui/button";
+import { AccountAdmin } from "./AccountAdmin";
+import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
+import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
 import {
   attemptLogin, canAddPatient, getState, MAX_PATIENTS, recoverPassword, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
@@ -117,26 +122,17 @@ function AuthScreen() {
   const bg = useImage("auth-bg", lavender);
   const recQuestion = useStore((s) => s.users.find((u) => u.login.toLowerCase() === login.trim().toLowerCase())?.question);
 
-  const submit = (e: React.FormEvent) => {
+  const register = useServerFn(registerAccount);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setMsg(null);
-    const s = getState();
-    if (mode === "login") {
-      const u = attemptLogin(s, login, pass);
-      if (!u) return setMsg({ ok: false, text: "Login ou senha incorretos. Esqueceu a senha? Use a recuperação abaixo." });
-      setState((st) => ({ ...st, sessionId: u.id, users: st.users.map((x) => (x.id === u.id ? { ...x, mustChange: !!u.mustChange } : x)) }));
-    } else if (mode === "signup") {
-      if (login.trim().length < 3 || pass.length < 4 || !question.trim() || !answer.trim()) return setMsg({ ok: false, text: "Preencha login (3+), senha (4+), pergunta e resposta." });
-      if (pass === RESET_PASSWORD) return setMsg({ ok: false, text: "Escolha outra senha." });
-      if (s.users.some((u) => u.login.toLowerCase() === login.trim().toLowerCase())) return setMsg({ ok: false, text: "Este login já existe." });
-      const u: User = { id: uid(), login: login.trim(), password: pass, role: "cuidador", question: question.trim(), answer: answer.trim() };
-      setState((st) => ({ ...st, users: [...st.users, u], sessionId: u.id }));
-    } else {
-      const r = recoverPassword(s, login, answer);
-      if (!r.ok) return setMsg({ ok: false, text: "Login ou resposta incorretos." });
-      setState(() => r.state);
-      setMsg({ ok: true, text: `Senha redefinida temporariamente para "${RESET_PASSWORD}". Entre e cadastre uma nova senha.` });
-      setMode("login"); setPass("");
-    }
+    setBusy(true);
+    try {
+      if (mode === "recover") { setMsg({ ok: false, text: "Peça ao Mestre para redefinir sua senha. A resposta secreta antiga não é usada nas contas compartilhadas." }); return; }
+      if (mode === "signup") await register({ data: { login, password: pass } });
+      await cloudLogin(login, pass);
+    } catch (error) { setMsg({ ok: false, text: error instanceof Error ? error.message : "Não foi possível entrar." }); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -159,16 +155,8 @@ function AuthScreen() {
         <form onSubmit={submit} className="space-y-3">
           <input className={input} placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
           {mode !== "recover" && <input className={input} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />}
-          {mode === "signup" && <>
-            <input className={input} placeholder="Pergunta de segurança (ex.: Nome do meu primeiro pet?)" value={question} onChange={(e) => setQuestion(e.target.value)} />
-            <input className={input} placeholder="Resposta secreta" value={answer} onChange={(e) => setAnswer(e.target.value)} />
-          </>}
-          {mode === "recover" && <>
-            <p className="rounded-xl bg-accent px-3 py-2 text-sm text-accent-foreground">{recQuestion ? `Pergunta: ${recQuestion}` : "Digite seu login para ver sua pergunta."}</p>
-            <input className={input} placeholder="Resposta secreta" value={answer} onChange={(e) => setAnswer(e.target.value)} />
-          </>}
           {msg && <p className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.text}</p>}
-          <button className={cls(btnPrimary, "w-full")}>{mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Redefinir senha"}</button>
+          <Button disabled={busy} className="w-full">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Solicitar recuperação"}</Button>
         </form>
         <div className="mt-4 flex flex-wrap justify-between gap-2 text-sm">
           {mode !== "login" && <button className="text-primary hover:underline" onClick={() => setMode("login")}>Já tenho conta</button>}
@@ -181,18 +169,21 @@ function AuthScreen() {
 }
 
 function ForceChangePassword({ me }: { me: User }) {
+  const finish = useServerFn(finishPasswordChange);
+  const [current, setCurrent] = useState("");
   const [p1, setP1] = useState(""); const [p2, setP2] = useState(""); const [err, setErr] = useState("");
   return (
     <div className="grid min-h-screen place-items-center bg-background p-4">
-      <form className={cls(card, "w-full max-w-md space-y-3")} onSubmit={(e) => {
+      <form className={cls(card, "w-full max-w-md space-y-3")} onSubmit={async (e) => {
         e.preventDefault();
-        if (p1.length < 4 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter 4+ caracteres e ser diferente de 123.");
+        if (p1.length < 8 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter pelo menos 8 caracteres e ser única.");
         if (p1 !== p2) return setErr("As senhas não conferem.");
-        setState((s) => ({ ...s, users: s.users.map((u) => (u.id === me.id ? { ...u, password: p1, mustChange: false } : u)) }));
+        try { await updateOwnPassword(current, p1); await finish(); await refreshCloud(); } catch (error) { setErr(error instanceof Error ? error.message : "Não foi possível alterar."); }
       }}>
         <Shield className="h-8 w-8 text-primary" />
         <h2 className="font-display text-xl text-foreground">Cadastre uma nova senha</h2>
         <p className="text-sm text-muted-foreground">Você entrou com a senha temporária. Defina uma nova senha para continuar.</p>
+        <input className={input} type="password" placeholder="Senha temporária atual" value={current} onChange={(e) => setCurrent(e.target.value)} />
         <input className={input} type="password" placeholder="Nova senha" value={p1} onChange={(e) => setP1(e.target.value)} />
         <input className={input} type="password" placeholder="Confirmar nova senha" value={p2} onChange={(e) => setP2(e.target.value)} />
         {err && <p className="text-sm text-destructive">{err}</p>}
@@ -345,7 +336,7 @@ function StatusBadge({ s }: { s: Dose["status"] }) {
 }
 
 function Patients({ me }: { me: User }) {
-  const patients = useStore((s) => s.patients.filter((p) => p.ownerId === me.id));
+  const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
   const [f, setF] = useState({ name: "", age: "", notes: "" }); const [err, setErr] = useState("");
   return (
     <div className="space-y-6">
@@ -378,8 +369,8 @@ function Patients({ me }: { me: User }) {
 }
 
 function Meds({ me }: { me: User }) {
-  const patients = useStore((s) => s.patients.filter((p) => p.ownerId === me.id));
-  const meds = useStore((s) => s.meds.filter((m) => m.ownerId === me.id));
+  const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
+  const meds = useStore((s) => s.meds.filter((m) => me.role === "mestre" || m.ownerId === me.id));
   const [f, setF] = useState({ patientId: "", name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" }); const [err, setErr] = useState("");
   return (
     <div className="space-y-6">
@@ -388,9 +379,11 @@ function Meds({ me }: { me: User }) {
         <form className={cls(card, "grid gap-3 sm:grid-cols-2")} onSubmit={(e) => {
           e.preventDefault(); setErr("");
           const times = f.times.split(",").map((t) => t.trim()).filter((t) => /^\d{2}:\d{2}$/.test(t));
-          const pid = f.patientId || patients[0]!.id;
+          const patient = patients.find((p) => p.id === f.patientId) ?? patients[0];
+          if (!patient) return;
+          const pid = patient.id;
           if (!f.name.trim() || !times.length) return setErr("Informe nome e ao menos um horário (HH:MM).");
-          setState((s) => ({ ...s, meds: [...s.meds, { id: uid(), ownerId: me.id, patientId: pid, name: f.name.trim(), dose: f.dose.trim(), times, stock: Number(f.stock) || 0, tolerance: Number(f.tolerance) || 0 }] }));
+          setState((s) => ({ ...s, meds: [...s.meds, { id: uid(), ownerId: patient.ownerId, patientId: pid, name: f.name.trim(), dose: f.dose.trim(), times, stock: Number(f.stock) || 0, tolerance: Number(f.tolerance) || 0 }] }));
           setF({ ...f, name: "", dose: "" });
         }}>
           <select className={input} value={f.patientId} onChange={(e) => setF({ ...f, patientId: e.target.value })}>{patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
@@ -502,10 +495,9 @@ function Profile({ me }: { me: User }) {
     <div className="space-y-6">
       <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
       <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
-      <form className={cls(card, "max-w-md space-y-3")} onSubmit={(e) => { e.preventDefault();
-        if (cur !== me.password) return setMsg({ ok: false, t: "Senha atual incorreta." });
-        if (p1.length < 4 || p1 === RESET_PASSWORD) return setMsg({ ok: false, t: "Nova senha inválida (4+ caracteres, diferente de 123)." });
-        setState((s) => ({ ...s, users: s.users.map((u) => (u.id === me.id ? { ...u, password: p1 } : u)) })); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }}>
+      <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
+        try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
+        catch (error) { setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." }); } }}>
         <h2 className="font-display text-lg text-foreground">Alterar senha</h2>
         <input className={input} type="password" placeholder="Senha atual" value={cur} onChange={(e) => setCur(e.target.value)} />
         <input className={input} type="password" placeholder="Nova senha" value={p1} onChange={(e) => setP1(e.target.value)} />
@@ -516,32 +508,6 @@ function Profile({ me }: { me: User }) {
   );
 }
 
-function Admin({ me }: { me: User }) {
-  const users = useStore((s) => s.users);
-  const [f, setF] = useState({ login: "", password: "" });
-  const update = (id: string, patch: Partial<User>) => setState((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
-  return (
-    <div className="space-y-6">
-      <T k="adm-title" as="h1" className="font-display text-3xl text-foreground">Painel do Mestre</T>
-      <form className={cls(card, "grid gap-3 sm:grid-cols-[1fr_1fr_auto]")} onSubmit={(e) => { e.preventDefault();
-        if (!f.login.trim() || !f.password || users.some((u) => u.login.toLowerCase() === f.login.trim().toLowerCase())) return;
-        setState((s) => ({ ...s, users: [...s.users, { id: uid(), login: f.login.trim(), password: f.password, role: "operador", question: "Pergunta padrão", answer: "operador" }] })); setF({ login: "", password: "" }); }}>
-        <input className={input} placeholder="Login do novo operador" value={f.login} onChange={(e) => setF({ ...f, login: e.target.value })} />
-        <input className={input} placeholder="Senha" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
-        <button className={btnPrimary}><Plus className="h-4 w-4" />Criar operador</button>
-      </form>
-      <div className="space-y-3">
-        {users.map((u) => (
-          <div key={u.id} className={cls(card, "grid items-center gap-3 sm:grid-cols-[1fr_1fr_140px_auto]")}>
-            <input className={input} defaultValue={u.login} onBlur={(e) => e.target.value.trim() && update(u.id, { login: e.target.value.trim() })} aria-label="Login" />
-            <input className={input} defaultValue={u.password} onBlur={(e) => e.target.value && update(u.id, { password: e.target.value })} aria-label="Senha" />
-            <select className={input} value={u.role} disabled={u.id === me.id} onChange={(e) => update(u.id, { role: e.target.value as Role })}><option value="cuidador">Cuidador</option><option value="operador">Operador</option><option value="mestre">Mestre</option></select>
-            <button aria-label="Excluir conta" disabled={u.id === me.id} className="text-destructive disabled:opacity-30" onClick={() => { if (confirm(`Excluir a conta ${u.login}?`)) setState((s) => ({ ...s, users: s.users.filter((x) => x.id !== u.id), patients: s.patients.filter((p) => p.ownerId !== u.id), meds: s.meds.filter((m) => m.ownerId !== u.id) })); }}><Trash2 className="h-4 w-4" /></button>
-          </div>))}
-      </div>
-    </div>
-  );
-}
 
 function AlertsBell({ me }: { me: User }) {
   const alerts = useStore((s) => s.alerts.filter((a) => a.ownerId === me.id));
@@ -572,16 +538,17 @@ function UrgentAlertToast({ me }: { me: User }) {
 function Shell({ me }: { me: User }) {
   const [page, setPage] = useState<Page>(me.role === "cuidador" ? "inicio" : "suporte");
   const items: { id: Page; label: string; icon: ReactNode; roles: Role[] }[] = [
-    { id: "inicio", label: "Início", icon: <Home className="h-5 w-5" />, roles: ["cuidador"] },
-    { id: "pacientes", label: "Pacientes", icon: <Users className="h-5 w-5" />, roles: ["cuidador"] },
-    { id: "medicamentos", label: "Medicamentos", icon: <Pill className="h-5 w-5" />, roles: ["cuidador"] },
+    { id: "inicio", label: "Início", icon: <Home className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
+    { id: "pacientes", label: "Pacientes", icon: <Users className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
+    { id: "medicamentos", label: "Medicamentos", icon: <Pill className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
     { id: "historico", label: "Histórico", icon: <History className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "suporte", label: "Atendimento", icon: <Headphones className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "admin", label: "Contas", icon: <ClipboardList className="h-5 w-5" />, roles: ["mestre"] },
     { id: "perfil", label: "Perfil", icon: <UserIcon className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
-  const logout = () => setState((s) => ({ ...s, sessionId: null }));
+  useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "cuidador" ? "inicio" : "suporte"); }, [me.role, page]);
+  const logout = () => { void cloudLogout(); };
   return (
     <div className="flex min-h-screen w-full bg-background">
       <aside className="no-print relative hidden w-64 shrink-0 flex-col overflow-hidden bg-sidebar p-5 text-sidebar-foreground md:flex">
@@ -607,11 +574,11 @@ function Shell({ me }: { me: User }) {
           {page === "historico" && <HistoryPage me={me} />}
           {page === "suporte" && <Support me={me} />}
           {page === "perfil" && <Profile me={me} />}
-          {page === "admin" && <Admin me={me} />}
+          {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} />}
         </main>
-        <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-border bg-card py-2 md:hidden">
-          {items.slice(0, 5).map((i) => <button key={i.id} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
-          {items[5] && <button onClick={() => setPage(items[5]!.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === items[5].id ? "text-primary" : "text-muted-foreground")}>{items[5].icon}{items[5].label}</button>}
+        <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex flex-wrap justify-around border-t border-border bg-card py-2 md:hidden">
+          {items.map((i) => <button key={i.id} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
+
         </nav>
       </div>
       <AlarmEngine me={me} />
@@ -623,10 +590,17 @@ function Shell({ me }: { me: User }) {
 export function DoseCertaApp() {
   const me = useMe();
   const [ready, setReady] = useState(false);
-  useEffect(() => { getState(); setReady(true); void isMaster; }, []);
+  const [cloudError, setCloudError] = useState("");
+  useEffect(() => {
+    let disposed = false; let cleanup: (() => void) | undefined;
+    onCloudError(setCloudError);
+    initializeCloud().then((stop) => { if (disposed) stop(); else { cleanup = stop; setReady(true); } }).catch((error) => { setCloudError(error instanceof Error ? error.message : "Não foi possível carregar."); setReady(true); });
+    return () => { disposed = true; cleanup?.(); };
+  }, []);
   if (!ready) return <div className="min-h-screen bg-background" />;
   return (
     <>
+      {cloudError && <div role="alert" className="fixed inset-x-4 top-4 z-50 rounded-lg border border-destructive bg-card p-3 text-sm text-destructive">{cloudError}<Button variant="ghost" size="sm" onClick={() => setCloudError("")}>Fechar</Button></div>}
       <PermissionPrompt />
       {!me ? <AuthScreen /> : me.mustChange ? <ForceChangePassword me={me} /> : <Shell me={me} />}
     </>
