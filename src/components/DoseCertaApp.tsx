@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell, BellRing, ClipboardList, Download, Headphones, History, Home, Leaf, LogOut, Moon, Pencil, Pill,
-  Plus, Printer, Shield, Sun, Trash2, User as UserIcon, Users, X,
+  Palette, Plus, Printer, Shield, Sun, Trash2, User as UserIcon, Users, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,35 @@ function ThemeToggle() {
   return (
     <button onClick={toggle} aria-label="Alternar modo noturno" className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
       {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+    </button>
+  );
+}
+
+const PALETTES = [
+  { id: "green", label: "Verde e lavanda" },
+  { id: "pink", label: "Rosa" },
+  { id: "blue", label: "Azul" },
+] as const;
+type PaletteId = (typeof PALETTES)[number]["id"];
+function PaletteToggle() {
+  const [palette, setPalette] = useState<PaletteId>("green");
+  useEffect(() => {
+    const saved = localStorage.getItem("dc-palette") as PaletteId | null;
+    const initial = PALETTES.some((p) => p.id === saved) ? saved! : "green";
+    setPalette(initial);
+    document.documentElement.dataset.palette = initial;
+  }, []);
+  const next = () => {
+    const index = PALETTES.findIndex((p) => p.id === palette);
+    const value = PALETTES[(index + 1) % PALETTES.length];
+    setPalette(value.id);
+    localStorage.setItem("dc-palette", value.id);
+    document.documentElement.dataset.palette = value.id;
+  };
+  const label = PALETTES.find((p) => p.id === palette)?.label ?? "Verde e lavanda";
+  return (
+    <button onClick={next} aria-label={`Paleta de cores atual: ${label}. Clique para trocar`} title={`Cores: ${label} (clique para trocar)`} className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
+      <Palette className="h-5 w-5" />
     </button>
   );
 }
@@ -571,7 +600,7 @@ function Shell({ me }: { me: User }) {
         <header className="no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-background/90 px-4 py-3 backdrop-blur md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
           <p className="hidden truncate text-sm text-muted-foreground md:block">{me.role === "mestre" ? "Modo Mestre · toque no lápis para editar" : <T k="header-hint">Organize. Acompanhe. Cuide.</T>}</p>
-          <div className="flex items-center gap-2"><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
+          <div className="flex items-center gap-2"><PaletteToggle /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
         <main className="flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10">
