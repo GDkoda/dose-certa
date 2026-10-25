@@ -24,7 +24,7 @@ Criar o aplicativo Dose Certa completo integrando todas as diretrizes do documen
 4. Hierarquia de Usuários e Poder do Mestre:
 - Cuidador: gerencia seus pacientes (até 3), cadastra medicamentos, horários, estoque de comprimidos e acompanha histórico de doses.
 - Operador: atende chamados na Central de Atendimento para suporte do app e dúvidas gerais de bulas/medicamentos.
-- Operador Mestre (login inicial 'Koda', senha 'batata'):
+- Operador Mestre (conta provisionada com segurança no Supabase; sem credenciais padrão no código):
   * Poder total sobre todas as contas (editar login/senha de cuidadores e operadores, excluir contas, criar novos operadores).
   * Edição inline com ícone de lápis: quando o Mestre está logado, aparece um ícone sutil de lápis ao lado de cada texto do site, nas imagens de fundo e no ícone do aplicativo, permitindo editar frases, trocar imagens e alterar o ícone diretamente na tela sem menus extras. Para outros usuários, a interface é limpa sem nenhum lápis.
 
@@ -52,3 +52,11 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Segurança antes de publicar
+
+- Configure segredos somente no ambiente de hospedagem; não versione arquivos `.env`.
+- Se alguma chave ou senha já foi publicada, revogue-a e gere outra. Apagar o arquivo em um commit novo não remove o segredo do histórico do Git.
+- Confirme as políticas RLS do Supabase para que cuidadores só leiam e alterem registros autorizados; valide também as permissões de Mestre e Operador no servidor.
+- Use o fluxo de recuperação de senha do Supabase ou uma redefinição administrativa autenticada; não use perguntas secretas ou senhas temporárias previsíveis como mecanismo de segurança.
+- Antes de publicar, execute `npm run lint`, `npm test` e `npm run build`.

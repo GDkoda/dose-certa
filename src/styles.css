@@ -130,6 +130,79 @@
   --shadow-soft: 0 10px 30px -12px oklch(0 0 0 / 50%);
 }
 
+
+/* Optional color palettes. The default green/lavender palette remains unchanged. */
+:root[data-palette="pink"] {
+  --primary: oklch(0.59 0.19 2);
+  --primary-foreground: oklch(0.99 0.01 350);
+  --secondary: oklch(0.72 0.14 345);
+  --secondary-foreground: oklch(0.22 0.06 350);
+  --accent: oklch(0.93 0.045 350);
+  --accent-foreground: oklch(0.3 0.1 350);
+  --ring: oklch(0.59 0.19 2);
+  --sidebar: oklch(0.52 0.15 355);
+  --sidebar-foreground: oklch(0.99 0.01 350);
+  --sidebar-primary: oklch(0.98 0.025 350);
+  --sidebar-primary-foreground: oklch(0.4 0.14 355);
+  --sidebar-accent: oklch(0.61 0.15 355);
+  --sidebar-accent-foreground: oklch(0.99 0.01 350);
+  --sidebar-border: oklch(0.65 0.12 355);
+  --sidebar-ring: oklch(0.8 0.12 350);
+  --shadow-soft: 0 10px 30px -12px color-mix(in oklab, var(--primary) 30%, transparent);
+}
+:root.dark[data-palette="pink"] {
+  --primary: oklch(0.76 0.14 350);
+  --primary-foreground: oklch(0.2 0.04 350);
+  --secondary: oklch(0.65 0.12 340);
+  --secondary-foreground: oklch(0.98 0.01 350);
+  --accent: oklch(0.34 0.07 350);
+  --accent-foreground: oklch(0.95 0.02 350);
+  --ring: oklch(0.76 0.14 350);
+  --sidebar: oklch(0.25 0.055 350);
+  --sidebar-foreground: oklch(0.95 0.02 350);
+  --sidebar-primary: oklch(0.76 0.14 350);
+  --sidebar-primary-foreground: oklch(0.2 0.04 350);
+  --sidebar-accent: oklch(0.34 0.07 350);
+  --sidebar-accent-foreground: oklch(0.95 0.02 350);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.76 0.14 350);
+}
+:root[data-palette="blue"] {
+  --primary: oklch(0.55 0.16 245);
+  --primary-foreground: oklch(0.99 0.01 240);
+  --secondary: oklch(0.7 0.11 225);
+  --secondary-foreground: oklch(0.2 0.06 245);
+  --accent: oklch(0.92 0.04 225);
+  --accent-foreground: oklch(0.28 0.08 245);
+  --ring: oklch(0.55 0.16 245);
+  --sidebar: oklch(0.43 0.13 245);
+  --sidebar-foreground: oklch(0.98 0.01 230);
+  --sidebar-primary: oklch(0.97 0.025 220);
+  --sidebar-primary-foreground: oklch(0.34 0.12 245);
+  --sidebar-accent: oklch(0.53 0.13 245);
+  --sidebar-accent-foreground: oklch(0.99 0.01 230);
+  --sidebar-border: oklch(0.55 0.1 245);
+  --sidebar-ring: oklch(0.78 0.1 225);
+  --shadow-soft: 0 10px 30px -12px color-mix(in oklab, var(--primary) 30%, transparent);
+}
+:root.dark[data-palette="blue"] {
+  --primary: oklch(0.75 0.12 235);
+  --primary-foreground: oklch(0.19 0.04 245);
+  --secondary: oklch(0.64 0.1 225);
+  --secondary-foreground: oklch(0.98 0.01 230);
+  --accent: oklch(0.32 0.06 245);
+  --accent-foreground: oklch(0.94 0.02 230);
+  --ring: oklch(0.75 0.12 235);
+  --sidebar: oklch(0.22 0.045 245);
+  --sidebar-foreground: oklch(0.94 0.02 230);
+  --sidebar-primary: oklch(0.75 0.12 235);
+  --sidebar-primary-foreground: oklch(0.19 0.04 245);
+  --sidebar-accent: oklch(0.31 0.06 245);
+  --sidebar-accent-foreground: oklch(0.94 0.02 230);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.75 0.12 235);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -142,3 +215,37 @@
 }
 
 @media print { .no-print { display: none !important; } }
+
+
+/* Accessibility: visible keyboard focus, comfortable touch targets and motion preferences. */
+@layer base {
+  :where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid var(--color-ring);
+    outline-offset: 3px;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    color: var(--color-primary-foreground);
+    background: var(--color-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
