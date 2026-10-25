@@ -6,6 +6,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
+import { TicketManagement } from "./TicketManagement";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
@@ -468,10 +469,13 @@ function Support({ me }: { me: User }) {
         {mine.length === 0 && <p className="text-sm text-muted-foreground">Nenhum chamado ainda.</p>}
         {mine.map((t) => (
           <div key={t.id} className={card}>
-            <button className="flex w-full items-center justify-between gap-2 text-left" onClick={() => setOpen(open === t.id ? null : t.id)}>
+            <div className="flex items-center gap-2">
+            <Button variant="ghost" className="h-auto min-w-0 flex-1 justify-between gap-2 whitespace-normal px-0 text-left hover:bg-transparent" onClick={() => setOpen(open === t.id ? null : t.id)}>
               <span className="min-w-0 truncate font-semibold text-foreground">{t.subject} <span className="text-xs text-muted-foreground">· {users.find((u) => u.id === t.userId)?.login}</span></span>
               <span className={cls("rounded-full px-3 py-1 text-xs font-bold", t.status === "aberto" ? "bg-warning/20 text-foreground" : "bg-primary/15 text-primary")}>{t.status}</span>
-            </button>
+            </Button>
+            <TicketManagement ticket={t} me={me} />
+            </div>
             {open === t.id && <div className="mt-3 space-y-2">
               {t.messages.map((m, i) => <div key={i} className="rounded-xl bg-muted p-3 text-sm"><p className="text-xs font-bold text-muted-foreground">{m.from} · {fmtDate(m.at)}</p><p className="text-foreground">{m.text}</p></div>)}
               <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (!reply.trim()) return;
