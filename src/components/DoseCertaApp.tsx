@@ -151,9 +151,15 @@ function AuthScreen() {
           {mode === "login" ? <T k="auth-login-title">Bem-vindo de volta</T> : mode === "signup" ? <T k="auth-signup-title">Cadastro rápido do cuidador</T> : <T k="auth-rec-title">Recuperar senha</T>}
         </h2>
         <form onSubmit={submit} className="space-y-3">
-          <input className={input} placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
-          {mode !== "recover" && <input className={input} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />}
-          {msg && <p className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.text}</p>}
+          <label className="sr-only" htmlFor="auth-login">Login</label>
+          <input id="auth-login" className={input} name="username" autoComplete="username" required minLength={mode === "signup" ? 3 : undefined} placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
+          {mode !== "recover" && (
+            <>
+              <label className="sr-only" htmlFor="auth-password">Senha</label>
+              <input id="auth-password" className={input} name="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={mode === "signup" ? 8 : undefined} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />
+            </>
+          )}
+          {msg && <p role="status" aria-live="polite" className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.text}</p>}
           <Button disabled={busy} className="w-full">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Solicitar recuperação"}</Button>
         </form>
         <div className="mt-4 flex flex-wrap justify-between gap-2 text-sm">
