@@ -142,3 +142,37 @@
 }
 
 @media print { .no-print { display: none !important; } }
+
+
+/* Accessibility: visible keyboard focus, comfortable touch targets and motion preferences. */
+@layer base {
+  :where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid var(--color-ring);
+    outline-offset: 3px;
+  }
+
+  :where(button, input, select, textarea) {
+    font: inherit;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    color: var(--color-primary-foreground);
+    background: var(--color-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
