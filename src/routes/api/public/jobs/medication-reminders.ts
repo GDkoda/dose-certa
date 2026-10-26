@@ -27,12 +27,12 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       for (const record of records ?? []) {
         if (record.kind !== "doses") continue;
         const parsed = doseSchema.safeParse(record.payload);
-        if (parsed.success) doses.push({ ...parsed.data, id: record.id, ownerId: owner });
+        if (parsed.success) doses.push({ medId: parsed.data.medId, patientId: parsed.data.patientId, scheduledAt: parsed.data.scheduledAt, status: parsed.data.status, ...(parsed.data.snoozeUntil ? { snoozeUntil: parsed.data.snoozeUntil } : {}), ...(parsed.data.lastShown ? { lastShown: parsed.data.lastShown } : {}), id: record.id, ownerId: owner });
       }
       // Generate daily doses even when the caregiver never opens the page.
       const timezone = owned[0]?.timezone ?? "UTC";
       const dayParts = Object.fromEntries(new Intl.DateTimeFormat("en", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now)).map((part) => [part.type, part.value]));
-      const day = `${dayParts.year}-${dayParts.month}-${dayParts.day}`;
+      const day = `${dayParts['year']}-${dayParts['month']}-${dayParts['day']}`;
       for (const record of records ?? []) {
         if (record.kind !== "meds") continue;
         const parsed = medSchema.safeParse(record.payload); if (!parsed.success) continue;
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
           if (doses.some((dose) => dose.medId === record.id && dose.scheduledAt === scheduledAt)) continue;
           const id = `scheduled-${record.id}-${scheduledAt}`;
           const dose: Dose = { id, ownerId: owner, medId: record.id, patientId: parsed.data.patientId, scheduledAt, status: "pendente" };
-          const { error: createError } = await db.from("app_records").upsert({ id, owner_id: owner, kind: "doses", payload: dose }, { ignoreDuplicates: true });
+          const { error: createError } = await db.from("app_records").upsert({ id, owner_id: owner, kind: "doses", payload: { ...dose } }, { ignoreDuplicates: true });
           if (!createError) doses.push(dose);
         }
       }
@@ -50,7 +50,7 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
         // Re-read the current status so a completed or snoozed dose is not sent from stale data.
         const { data: latest } = await db.from("app_records").select("payload").eq("id", dose.id).maybeSingle();
         const current = doseSchema.safeParse(latest?.payload);
-        if (!current.success || pushSlot({ ...current.data, id: dose.id, ownerId: owner }, now) === null) continue;
+        if (!current.success || pushSlot(current.data, now) === null) continue;
         for (const device of owned) {
           const deliveryKey = `${dose.id}:${device.token}:${slot}`;
           const { data: claimed, error: claimError } = await db.rpc("claim_push_delivery", { p_key: deliveryKey, p_token: device.token, p_dose: dose.id });
