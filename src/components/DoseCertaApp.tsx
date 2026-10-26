@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
+import { PushSettings } from "./PushSettings";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
@@ -234,7 +235,10 @@ function AlarmEngine({ me }: { me: User }) {
         if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification("Hora do seu medicamento", { body: m ? `${m.name} ${m.dose}` : "" });
       }
     };
-    tick(); const id = setInterval(tick, 15000); return () => clearInterval(id);
+    const resume = () => { if (!document.hidden) tick(); };
+    tick(); const id = setInterval(tick, 15000);
+    document.addEventListener("visibilitychange", resume); window.addEventListener("focus", resume);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", resume); window.removeEventListener("focus", resume); };
   }, [me.id, me.role]);
 
   if (!active) return null;
@@ -496,6 +500,7 @@ function Profile({ me }: { me: User }) {
     <div className="space-y-6">
       <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
       <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
+      {me.role === "cuidador" && <PushSettings />}
       <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
         try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
         catch (error) { setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." }); } }}>

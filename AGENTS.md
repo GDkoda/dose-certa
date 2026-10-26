@@ -14,3 +14,4 @@
 - Store roles separately in user_roles and validate Master mutations on the server; client role checks only control presentation.
 - Synchronize app records through RLS-protected Cloud storage; retain the legacy browser copy only for explicit recovery, never automatically trust its roles or overwrite Cloud records.
 - Keep support ticket management in its own component and persist through the authenticated Cloud writer; existing RLS enforces cross-account Master access without privileged client operations.
+- Background medication reminders use Firebase messaging, owner-scoped device registrations and one authenticated scheduled dispatcher; page timers only handle foreground alarms and must never be described as background delivery.
