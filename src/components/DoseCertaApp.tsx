@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
 import { PushSettings } from "./PushSettings";
+import { removePushDevice } from "@/lib/push.functions";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
@@ -232,7 +233,9 @@ function AlarmEngine({ me }: { me: User }) {
         setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
         setActive(due); beep();
         const m = getState().meds.find((x) => x.id === due.medId);
-        if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification("Hora do seu medicamento", { body: m ? `${m.name} ${m.dose}` : "" });
+        if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+          try { new Notification("Hora do seu medicamento", { body: m ? `${m.name} ${m.dose}` : "" }); } catch { /* Mobile background delivery uses Firebase messaging instead. */ }
+        }
       }
     };
     const resume = () => { if (!document.hidden) tick(); };
@@ -542,6 +545,7 @@ function UrgentAlertToast({ me }: { me: User }) {
 
 /* ---------------- shell ---------------- */
 function Shell({ me }: { me: User }) {
+  const removeDevice = useServerFn(removePushDevice);
   const [page, setPage] = useState<Page>(me.role === "cuidador" ? "inicio" : "suporte");
   const items: { id: Page; label: string; icon: ReactNode; roles: Role[] }[] = [
     { id: "inicio", label: "Início", icon: <Home className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
@@ -554,7 +558,14 @@ function Shell({ me }: { me: User }) {
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
   useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "cuidador" ? "inicio" : "suporte"); }, [me.role, page]);
-  const logout = () => { void cloudLogout(); };
+  const logout = async () => {
+    const token = sessionStorage.getItem("dc-push-token");
+    if (token) {
+      try { await removeDevice({ data: { token } }); sessionStorage.removeItem("dc-push-token"); }
+      catch { window.alert("Não foi possível desativar os avisos deste aparelho. Confira sua conexão e tente sair novamente."); return; }
+    }
+    await cloudLogout();
+  };
   return (
     <div className="flex min-h-screen w-full bg-background">
       <aside className="no-print relative hidden w-64 shrink-0 flex-col overflow-hidden bg-sidebar p-5 text-sidebar-foreground md:flex">
