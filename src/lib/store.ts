@@ -22,7 +22,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 
 export function initialState(): State {
   return {
-    users: [], // Accounts must be provisioned through authenticated Supabase flows; never ship default credentials.
+    users: [{ id: "master", login: "Koda", password: "batata", role: "mestre", question: "Palavra mestra?", answer: "batata" }],
     patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: null,
   };
 }

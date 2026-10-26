@@ -1,0 +1,11 @@
+CREATE TABLE public.push_devices (token text PRIMARY KEY, owner_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE, timezone text NOT NULL DEFAULT 'UTC', updated_at timestamptz NOT NULL DEFAULT now());
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_devices TO authenticated;
+GRANT ALL ON public.push_devices TO service_role;
+ALTER TABLE public.push_devices ENABLE ROW LEVEL SECURITY;
+CREATE POLICY push_devices_owner ON public.push_devices FOR ALL TO authenticated USING (owner_id=auth.uid()) WITH CHECK (owner_id=auth.uid());
+CREATE TABLE public.push_deliveries (delivery_key text PRIMARY KEY, device_token text NOT NULL REFERENCES public.push_devices(token) ON DELETE CASCADE, dose_id text NOT NULL, attempted_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz);
+GRANT ALL ON public.push_deliveries TO service_role;
+ALTER TABLE public.push_deliveries ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION public.claim_push_delivery(p_key text, p_token text, p_dose text) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN INSERT INTO public.push_deliveries(delivery_key,device_token,dose_id) VALUES(p_key,p_token,p_dose) ON CONFLICT(delivery_key) DO UPDATE SET attempted_at=now() WHERE push_deliveries.sent_at IS NULL AND push_deliveries.attempted_at < now()-interval '2 minutes'; RETURN FOUND; END; $$;
+REVOKE ALL ON FUNCTION public.claim_push_delivery(text,text,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_push_delivery(text,text,text) TO service_role;

@@ -8,6 +8,13 @@
       "when": 1792713977573,
       "tag": "0000_shared_accounts_and_app_records",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792975393242,
+      "tag": "0001_medication_push_delivery",
+      "breakpoints": true
     }
   ]
 }
