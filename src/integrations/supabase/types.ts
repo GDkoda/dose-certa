@@ -64,6 +64,67 @@ export type Database = {
         }
         Relationships: []
       }
+      push_deliveries: {
+        Row: {
+          attempted_at: string
+          delivery_key: string
+          device_token: string
+          dose_id: string
+          sent_at: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          delivery_key: string
+          device_token: string
+          dose_id: string
+          sent_at?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          delivery_key?: string
+          device_token?: string
+          dose_id?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_deliveries_device_token_fkey"
+            columns: ["device_token"]
+            isOneToOne: false
+            referencedRelation: "push_devices"
+            referencedColumns: ["token"]
+          },
+        ]
+      }
+      push_devices: {
+        Row: {
+          owner_id: string
+          timezone: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          owner_id: string
+          timezone?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          owner_id?: string
+          timezone?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_devices_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           role: Database["public"]["Enums"]["app_role"]
@@ -84,6 +145,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_push_delivery: {
+        Args: { p_dose: string; p_key: string; p_token: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
