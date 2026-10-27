@@ -66,7 +66,7 @@ export function AccountAdmin({ me }: { me: User }) {
     </div>
     <form className="grid gap-3 border-y border-border py-5 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
       <input className={field} required placeholder="Login do novo operador" value={login} onChange={(event) => setLogin(event.target.value)} />
-      <input className={field} required minLength={8} type="password" placeholder="Senha forte do operador" value={password} onChange={(event) => setPassword(event.target.value)} />
+      <input className={field} required minLength={4} type="password" placeholder="Senha do operador (mín. 4)" value={password} onChange={(event) => setPassword(event.target.value)} />
       <Button disabled={busy}><Plus />Criar operador</Button>
     </form>
     <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
@@ -79,7 +79,7 @@ export function AccountAdmin({ me }: { me: User }) {
     </div>
     <details className="border-t border-border pt-5"><summary className="cursor-pointer text-sm font-semibold text-foreground">Recuperar contas antigas deste aparelho</summary>
       <p className="my-3 max-w-2xl text-sm text-muted-foreground">As contas antigas estavam salvas somente no aparelho onde foram criadas. Entre como Mestre nesse aparelho para importá-las. Elas serão importadas como cuidadores; você pode promovê-las abaixo. Contas já compartilhadas não serão substituídas.</p>
-      <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha forte das contas importadas" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload />Importar contas deste aparelho</Button></div>
+      <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha das contas importadas (mín. 4)" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload />Importar contas deste aparelho</Button></div>
     </details>
   </section>;
 }

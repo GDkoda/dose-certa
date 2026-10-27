@@ -5,4 +5,7 @@
 - [x] Share accounts through Cloud authentication and preserve username sign-in.
 - [x] Give the Master a complete account list and secure promotion of existing accounts to Operator.
 - [x] Preserve the legacy browser copy and provide an explicit Master import with new passwords; give the Master access to patients, medications, history, support, and account management.
-- [x] Verify signup, Master visibility across independent browsers, and promotion end to end.
+- [x] Verify signup, Master visibility across independent browsers, and promotion end to end.- [x] Senhas a partir de 4 caracteres em todo o sistema (cadastro, troca, Mestre)
+- [x] Paletas de cor: Sálvia (padrão), Oceano (azul) e Peônia (rosa), cada uma com versão clara e escura, escolhidas em Perfil → Cor do aplicativo
+- [x] Aviso na tela de entrada quando há contas antigas no aparelho para o Mestre importar
+- [ ] Republicar o app para levar as novidades ao ar
