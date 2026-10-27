@@ -66,7 +66,7 @@ export function AccountAdmin({ me }: { me: User }) {
     </div>
     <form className="grid gap-3 border-y border-border py-5 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
       <input className={field} required placeholder="Login do novo operador" value={login} onChange={(event) => setLogin(event.target.value)} />
-      <input className={field} required minLength={8} type="password" placeholder="Senha forte do operador" value={password} onChange={(event) => setPassword(event.target.value)} />
+      <input className={field} required minLength={4} type="password" placeholder="Senha do operador (mín. 4)" value={password} onChange={(event) => setPassword(event.target.value)} />
       <Button disabled={busy}><Plus />Criar operador</Button>
     </form>
     <div className="grid gap-3 sm:grid-cols-[1fr_200px]">

@@ -86,6 +86,7 @@ export async function updateOwnPassword(currentPassword: string, password: strin
   if (!me) throw new Error('Entre novamente.');
   const { error: verified } = await supabase.auth.signInWithPassword({ email: accountEmail(me.login), password: currentPassword });
   if (verified) throw new Error('Senha atual incorreta.');
+  if (password.length < 4) throw new Error('Use uma senha com pelo menos 4 caracteres.');
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw new Error('Use uma senha longa e única, com pelo menos 8 caracteres.');
+  if (error) throw new Error('Não foi possível salvar a nova senha. Tente outra.');
 }
