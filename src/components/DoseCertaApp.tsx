@@ -106,14 +106,14 @@ function usePalette() {
     const saved = localStorage.getItem("dc-palette");
     const p: Palette = saved === "azul" || saved === "rosa" ? saved : "verde";
     setPaletteState(p);
-    if (p === "verde") delete document.documentElement.dataset.palette;
-    else document.documentElement.dataset.palette = p;
+    if (p === "verde") delete document.documentElement.dataset['palette'];
+    else document.documentElement.dataset['palette'] = p;
   }, []);
   const setPalette = (p: Palette) => {
     setPaletteState(p);
     localStorage.setItem("dc-palette", p);
-    if (p === "verde") delete document.documentElement.dataset.palette;
-    else document.documentElement.dataset.palette = p;
+    if (p === "verde") delete document.documentElement.dataset['palette'];
+    else document.documentElement.dataset['palette'] = p;
   };
   return { palette, setPalette };
 }
