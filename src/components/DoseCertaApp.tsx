@@ -138,7 +138,6 @@ function PalettePicker() {
     </div>
   );
 }
-}
 function ThemeToggle() {
   const { dark, toggle } = useTheme();
   return (
