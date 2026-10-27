@@ -176,7 +176,7 @@ function ForceChangePassword({ me }: { me: User }) {
     <div className="grid min-h-screen place-items-center bg-background p-4">
       <form className={cls(card, "w-full max-w-md space-y-3")} onSubmit={async (e) => {
         e.preventDefault();
-        if (p1.length < 8 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter pelo menos 8 caracteres e ser única.");
+        if (p1.length < 4 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter pelo menos 4 caracteres e ser única.");
         if (p1 !== p2) return setErr("As senhas não conferem.");
         try { await updateOwnPassword(current, p1); await finish(); await refreshCloud(); } catch (error) { setErr(error instanceof Error ? error.message : "Não foi possível alterar."); }
       }}>

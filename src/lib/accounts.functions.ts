@@ -8,7 +8,7 @@ export const registerAccount = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const username = normalizeUsername(data.login);
     if (username === 'koda') throw new Error('Este login está reservado.');
-    if (data.password.length < 8) throw new Error('Escolha uma senha com pelo menos 8 caracteres.');
+    if (data.password.length < 4) throw new Error('Escolha uma senha com pelo menos 4 caracteres.');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     const { error } = await supabaseAdmin.auth.admin.createUser({ email: accountEmail(username), password: data.password, email_confirm: true, user_metadata: { username } });
     if (error) throw new Error(error.message.includes('registered') ? 'Este login já existe.' : 'Não foi possível criar a conta. Use uma senha longa e única ou outro login.');
@@ -26,7 +26,7 @@ export const manageAccount = createServerFn({ method: 'POST' })
       authorizeAccountChange('mestre', context.userId, data.id);
     }
     if (data.role && !['mestre', 'operador', 'cuidador'].includes(data.role)) throw new Error('Função inválida.');
-    if (data.password && data.password.length < 8) throw new Error('A senha precisa ter pelo menos 8 caracteres.');
+    if (data.password && data.password.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     if (data.action === 'create') {
       if (!data.login || !data.password) throw new Error('Informe login e senha.');
