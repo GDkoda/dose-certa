@@ -93,6 +93,52 @@ function useTheme() {
   const toggle = () => { const d = !dark; setDark(d); localStorage.setItem("dc-theme", d ? "dark" : "light"); document.documentElement.classList.toggle("dark", d); };
   return { dark, toggle };
 }
+
+export type Palette = "verde" | "azul" | "rosa";
+export const PALETTES: { id: Palette; name: string; light: string; dark: string }[] = [
+  { id: "verde", name: "Sálvia", light: "oklch(0.52 0.05 165)", dark: "oklch(0.66 0.06 165)" },
+  { id: "azul", name: "Oceano", light: "oklch(0.52 0.11 245)", dark: "oklch(0.7 0.11 240)" },
+  { id: "rosa", name: "Peônia", light: "oklch(0.56 0.15 8)", dark: "oklch(0.72 0.13 8)" },
+];
+function usePalette() {
+  const [palette, setPaletteState] = useState<Palette>("verde");
+  useEffect(() => {
+    const saved = localStorage.getItem("dc-palette");
+    const p: Palette = saved === "azul" || saved === "rosa" ? saved : "verde";
+    setPaletteState(p);
+    if (p === "verde") delete document.documentElement.dataset.palette;
+    else document.documentElement.dataset.palette = p;
+  }, []);
+  const setPalette = (p: Palette) => {
+    setPaletteState(p);
+    localStorage.setItem("dc-palette", p);
+    if (p === "verde") delete document.documentElement.dataset.palette;
+    else document.documentElement.dataset.palette = p;
+  };
+  return { palette, setPalette };
+}
+
+function PalettePicker() {
+  const { palette, setPalette } = usePalette();
+  return (
+    <div className={cls(card, "max-w-md space-y-3")}>
+      <h2 className="font-display text-lg text-foreground">Cor do aplicativo</h2>
+      <p className="text-sm text-muted-foreground">Escolha a paleta deste aparelho. Ela combina com o modo claro e o noturno.</p>
+      <div className="flex gap-3" role="radiogroup" aria-label="Cor do aplicativo">
+        {PALETTES.map((p) => (
+          <button key={p.id} role="radio" aria-checked={palette === p.id} onClick={() => setPalette(p.id)} className={cls("flex flex-col items-center gap-1 rounded-2xl border p-3 transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}>
+            <span className="flex overflow-hidden rounded-full border border-border">
+              <span className="h-6 w-6" style={{ background: p.light }} />
+              <span className="h-6 w-6" style={{ background: p.dark }} />
+            </span>
+            <span className="text-xs text-foreground">{p.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+}
 function ThemeToggle() {
   const { dark, toggle } = useTheme();
   return (
@@ -503,6 +549,7 @@ function Profile({ me }: { me: User }) {
     <div className="space-y-6">
       <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
       <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
+      <PalettePicker />
       {me.role === "cuidador" && <PushSettings />}
       <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
         try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
