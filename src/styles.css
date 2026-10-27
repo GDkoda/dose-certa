@@ -130,6 +130,116 @@
   --shadow-soft: 0 10px 30px -12px oklch(0 0 0 / 50%);
 }
 
+/* Paleta Azul "Oceano Sereno" — claro */
+:root[data-palette="azul"] {
+  --background: oklch(0.972 0.012 235);
+  --foreground: oklch(0.27 0.07 258);
+  --card: oklch(0.995 0.005 235);
+  --card-foreground: oklch(0.27 0.07 258);
+  --popover: oklch(0.995 0.005 235);
+  --popover-foreground: oklch(0.27 0.07 258);
+  --primary: oklch(0.52 0.11 245);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.6 0.1 205);
+  --secondary-foreground: oklch(0.99 0 0);
+  --muted: oklch(0.94 0.018 235);
+  --muted-foreground: oklch(0.5 0.04 250);
+  --accent: oklch(0.93 0.035 215);
+  --accent-foreground: oklch(0.3 0.08 250);
+  --border: oklch(0.9 0.025 235);
+  --input: oklch(0.9 0.025 235);
+  --ring: oklch(0.52 0.11 245);
+  --chart-1: oklch(0.52 0.11 245); --chart-2: oklch(0.6 0.1 205); --chart-3: oklch(0.32 0.09 260); --chart-4: oklch(0.78 0.14 75); --chart-5: oklch(0.58 0.2 25);
+  --sidebar: oklch(0.44 0.1 255);
+  --sidebar-foreground: oklch(0.97 0.01 235);
+  --sidebar-primary: oklch(0.97 0.01 235);
+  --sidebar-primary-foreground: oklch(0.38 0.09 250);
+  --sidebar-accent: oklch(0.52 0.1 250);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.55 0.08 250);
+  --sidebar-ring: oklch(0.8 0.06 235);
+}
+
+/* Paleta Azul "Oceano Profundo" — escuro */
+.dark[data-palette="azul"] {
+  --background: oklch(0.19 0.03 258);
+  --foreground: oklch(0.94 0.01 235);
+  --card: oklch(0.24 0.035 258);
+  --card-foreground: oklch(0.94 0.01 235);
+  --popover: oklch(0.24 0.035 258);
+  --popover-foreground: oklch(0.94 0.01 235);
+  --primary: oklch(0.7 0.11 240);
+  --primary-foreground: oklch(0.17 0.03 255);
+  --secondary: oklch(0.7 0.1 205);
+  --secondary-foreground: oklch(0.17 0.03 220);
+  --muted: oklch(0.29 0.035 258);
+  --muted-foreground: oklch(0.73 0.03 245);
+  --accent: oklch(0.32 0.05 240);
+  --accent-foreground: oklch(0.94 0.01 235);
+  --sidebar: oklch(0.26 0.045 258);
+  --sidebar-foreground: oklch(0.94 0.01 235);
+  --sidebar-primary: oklch(0.7 0.11 240);
+  --sidebar-primary-foreground: oklch(0.17 0.03 255);
+  --sidebar-accent: oklch(0.33 0.05 250);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-ring: oklch(0.7 0.11 240);
+}
+
+/* Paleta Rosa "Jardim de Peônias" — claro */
+:root[data-palette="rosa"] {
+  --background: oklch(0.972 0.012 5);
+  --foreground: oklch(0.3 0.06 350);
+  --card: oklch(0.995 0.005 5);
+  --card-foreground: oklch(0.3 0.06 350);
+  --popover: oklch(0.995 0.005 5);
+  --popover-foreground: oklch(0.3 0.06 350);
+  --primary: oklch(0.56 0.15 8);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.62 0.11 340);
+  --secondary-foreground: oklch(0.99 0 0);
+  --muted: oklch(0.94 0.018 5);
+  --muted-foreground: oklch(0.5 0.04 350);
+  --accent: oklch(0.93 0.035 350);
+  --accent-foreground: oklch(0.32 0.08 350);
+  --border: oklch(0.9 0.025 5);
+  --input: oklch(0.9 0.025 5);
+  --ring: oklch(0.56 0.15 8);
+  --chart-1: oklch(0.56 0.15 8); --chart-2: oklch(0.62 0.11 340); --chart-3: oklch(0.35 0.08 350); --chart-4: oklch(0.78 0.14 75); --chart-5: oklch(0.58 0.2 25);
+  --sidebar: oklch(0.48 0.13 355);
+  --sidebar-foreground: oklch(0.97 0.01 5);
+  --sidebar-primary: oklch(0.97 0.01 5);
+  --sidebar-primary-foreground: oklch(0.4 0.1 355);
+  --sidebar-accent: oklch(0.56 0.12 355);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.58 0.1 355);
+  --sidebar-ring: oklch(0.82 0.06 5);
+}
+
+/* Paleta Rosa "Jardim Noturno" — escuro */
+.dark[data-palette="rosa"] {
+  --background: oklch(0.2 0.03 350);
+  --foreground: oklch(0.94 0.01 5);
+  --card: oklch(0.25 0.035 350);
+  --card-foreground: oklch(0.94 0.01 5);
+  --popover: oklch(0.25 0.035 350);
+  --popover-foreground: oklch(0.94 0.01 5);
+  --primary: oklch(0.72 0.13 8);
+  --primary-foreground: oklch(0.18 0.03 350);
+  --secondary: oklch(0.7 0.1 340);
+  --secondary-foreground: oklch(0.18 0.03 340);
+  --muted: oklch(0.3 0.035 350);
+  --muted-foreground: oklch(0.73 0.03 350);
+  --accent: oklch(0.33 0.05 350);
+  --accent-foreground: oklch(0.94 0.01 5);
+  --sidebar: oklch(0.27 0.045 350);
+  --sidebar-foreground: oklch(0.94 0.01 5);
+  --sidebar-primary: oklch(0.72 0.13 8);
+  --sidebar-primary-foreground: oklch(0.18 0.03 350);
+  --sidebar-accent: oklch(0.34 0.05 350);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-ring: oklch(0.72 0.13 8);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

@@ -79,7 +79,7 @@ export function AccountAdmin({ me }: { me: User }) {
     </div>
     <details className="border-t border-border pt-5"><summary className="cursor-pointer text-sm font-semibold text-foreground">Recuperar contas antigas deste aparelho</summary>
       <p className="my-3 max-w-2xl text-sm text-muted-foreground">As contas antigas estavam salvas somente no aparelho onde foram criadas. Entre como Mestre nesse aparelho para importá-las. Elas serão importadas como cuidadores; você pode promovê-las abaixo. Contas já compartilhadas não serão substituídas.</p>
-      <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha forte das contas importadas" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload />Importar contas deste aparelho</Button></div>
+      <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha das contas importadas (mín. 4)" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload />Importar contas deste aparelho</Button></div>
     </details>
   </section>;
 }
