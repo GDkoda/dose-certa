@@ -209,9 +209,23 @@ function AuthScreen() {
           {mode !== "signup" && <button className="text-primary hover:underline" onClick={() => setMode("signup")}>Criar conta de cuidador</button>}
           {mode !== "recover" && <button className="text-secondary hover:underline" onClick={() => setMode("recover")}>Esqueci minha senha</button>}
         </div>
+        <LegacyAccountsHint />
       </div>
     </div>
   );
+}
+
+function LegacyAccountsHint() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("dose-certa-v1");
+      const users = raw ? (JSON.parse(raw) as { users?: unknown[] }).users : [];
+      setCount(Array.isArray(users) ? users.length : 0);
+    } catch { setCount(0); }
+  }, []);
+  if (count === 0) return null;
+  return <p className="mt-4 rounded-xl border border-border bg-muted p-3 text-xs text-muted-foreground">Este aparelho tem {count} {count === 1 ? "conta antiga" : "contas antigas"} do sistema anterior. Entre como Mestre e use <b>Contas → Importar contas deste aparelho</b> para integrá-las ao sistema compartilhado.</p>;
 }
 
 function ForceChangePassword({ me }: { me: User }) {
