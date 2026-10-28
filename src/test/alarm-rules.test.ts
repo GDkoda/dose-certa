@@ -18,7 +18,7 @@ describe("alarm rules", () => {
     const existing = [{ ...dose, scheduledAt: localScheduledAt(day, "08:00") }];
     const additions = buildMissingDoses([med, { ...med, id: "m2", ownerId: "other" }], existing, "u1", day, () => "new-id");
     expect(additions).toHaveLength(1);
-    expect(additions[0].scheduledAt).toBe(localScheduledAt(day, "20:00"));
+    expect(additions[0]?.scheduledAt).toBe(localScheduledAt(day, "20:00"));
   });
   it("does not repeat a dose before its time or after it is confirmed", () => {
     const dueAt = Date.parse(dose.scheduledAt);
