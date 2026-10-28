@@ -340,7 +340,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dc-main button { border-radius: 0.95rem; }
 .dc-main button:active { transform: translateY(1px); }
 .dc-mobile-nav { padding-bottom: max(0.55rem, env(safe-area-inset-bottom)); }
-.dc-mobile-nav button { min-width: 58px; min-height: 48px; border-radius: 0.85rem; }
+.dc-mobile-nav button { min-width: 0; min-height: 44px; border-radius: 0.85rem; }
 .dc-mobile-nav button[aria-current="page"] { background: color-mix(in oklab, var(--primary) 10%, transparent); }
 @media (min-width: 768px) {
   .dc-main { padding-top: 2rem; }
@@ -349,4 +349,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 767px) {
   .dc-main h1 { font-size: clamp(1.8rem, 7vw, 2.25rem); }
   .dc-main .rounded-2xl, .dc-main .rounded-3xl { border-radius: 1.25rem; }
+}
+
+
+/* Navigation refinements: centered desktop menu and compact, fully visible mobile tabs */
+.dc-sidebar .dc-nav { margin-block: auto; }
+.dc-sidebar .dc-nav button { min-height: 46px; }
+.dc-mobile-nav { overflow: visible; }
+@media (max-width: 380px) {
+  .dc-mobile-nav button { gap: 0.2rem; font-size: 8px; }
+  .dc-mobile-nav button svg { width: 1rem; height: 1rem; }
 }
