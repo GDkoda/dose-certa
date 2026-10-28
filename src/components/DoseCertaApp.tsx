@@ -12,6 +12,7 @@ import { removePushDevice } from "@/lib/push.functions";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
+import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
 import {
   canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
   type Dose, type Role, type User,
@@ -269,17 +270,8 @@ function ForceChangePassword({ me }: { me: User }) {
 
 /* ---------------- alarm engine ---------------- */
 function ensureTodayDoses(ownerId: string) {
-  const s = getState(); const now = new Date(); const day = now.toDateString();
-  const add: Dose[] = [];
-  for (const m of s.meds.filter((x) => x.ownerId === ownerId)) {
-    for (const t of m.times) {
-      const [h = 0, mi = 0] = t.split(":").map(Number); const d = new Date(); d.setHours(h, mi, 0, 0);
-      const iso = d.toISOString();
-      if (!s.doses.some((x) => x.medId === m.id && x.scheduledAt === iso) && new Date(iso).toDateString() === day) {
-        add.push({ id: uid(), medId: m.id, patientId: m.patientId, ownerId, scheduledAt: iso, status: "pendente" });
-      }
-    }
-  }
+  const s = getState();
+  const add = buildMissingDoses(s.meds, s.doses, ownerId, new Date(), uid);
   if (add.length) setState((st) => ({ ...st, doses: [...st.doses, ...add] }));
 }
 
@@ -298,11 +290,7 @@ function AlarmEngine({ me }: { me: User }) {
         doses: st.doses.map((d) => (late.some((l) => l.id === d.id) ? { ...d, lateAlerted: true } : d)),
         alerts: [...late.map((d) => ({ id: uid(), ownerId: me.id, at: new Date().toISOString(), read: false, text: `Dose atrasada além da tolerância: ${st.meds.find((m) => m.id === d.medId)?.name} (${st.patients.find((p) => p.id === d.patientId)?.name})` })), ...st.alerts],
       }));
-      const due = getState().doses.find((d) => d.ownerId === me.id && d.status === "pendente"
-        && new Date(d.scheduledAt).getTime() <= now
-        && now - new Date(d.scheduledAt).getTime() < 12 * 3600000
-        && (!d.snoozeUntil || new Date(d.snoozeUntil).getTime() <= now)
-        && (!d.lastShown || now - new Date(d.lastShown).getTime() >= SNOOZE_MIN * 60000));
+      const due = findDueDose(getState().doses, me.id, now);
       if (due) {
         setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
         setActive(due); beep();
