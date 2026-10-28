@@ -4,7 +4,7 @@ type Dose = {
   id: string; ownerId: string; patientId: string; medId: string;
   scheduledAt: string; status: string; snoozeUntil?: string; lastShown?: string;
 };
-type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string };
+type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number };
 type Device = { owner_id: string; token: string; timezone: string };
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret" };
@@ -88,40 +88,31 @@ Deno.serve(async (request) => {
     const devices = devicesByOwner.get(dose.ownerId) ?? [];
     if (!devices.length) { skipped++; continue; }
     const slot = Math.floor((now - scheduled) / (5 * 60_000));
+    const late = now >= scheduled + Math.max(0, Number(med.tolerance) || 0) * 60_000;
     for (const device of devices) {
-      const deliveryKey = `${dose.id}:${slot}:${device.token.slice(-12)}`;
-      const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", { p_dose: dose.id, p_key: deliveryKey, p_token: device.token });
-      if (claimError) { failed++; continue; }
-      if (!claimed) { skipped++; continue; }
-      try {
-        accessToken ??= await googleAccessToken(serviceAccount);
-        const response = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ message: {
-            token: device.token,
-            data: {
-              title: "Hora do seu medicamento",
-              body: `Está na hora de tomar ${med.name}${med.dose ? ` — ${med.dose}` : ""}. Abra o Dose Certa para confirmar.`,
-              doseId: dose.id,
-              url: "/",
-            },
-            android: { priority: "high" },
-            webpush: { headers: { Urgency: "high" }, fcmOptions: { link: "/" } },
-          } }),
-        });
-        if (!response.ok) {
-          const detail = await response.text();
-          if (response.status === 404 || (response.status === 400 && /UNREGISTERED|registration-token-not-registered|INVALID_ARGUMENT/.test(detail))) {
-            await supabase.from("push_devices").delete().eq("token", device.token);
+      // Normal reminders repeat every five minutes; the overdue-care alert is one-time per dose/device.
+      const messages = [
+        { key: `${dose.id}:${slot}:${device.token.slice(-12)}`, title: "Hora do seu medicamento", body: `Está na hora de tomar ${med.name}${med.dose ? ` — ${med.dose}` : ""}. Abra o Dose Certa para confirmar.` },
+        ...(late ? [{ key: `late:${dose.id}:${device.token.slice(-12)}`, title: "Dose ainda não confirmada", body: `A dose de ${med.name} continua pendente após o período de tolerância. Confira o Dose Certa; o registro não confirma se o medicamento foi tomado.` }] : []),
+      ];
+      for (const item of messages) {
+        const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", { p_dose: dose.id, p_key: item.key, p_token: device.token });
+        if (claimError) { failed++; continue; }
+        if (!claimed) { skipped++; continue; }
+        try {
+          accessToken ??= await googleAccessToken(serviceAccount);
+          const response = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+            method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: { token: device.token, data: { title: item.title, body: item.body, doseId: dose.id, url: "/" }, android: { priority: "high" }, webpush: { headers: { Urgency: "high" }, fcmOptions: { link: "/" } } } }),
+          });
+          if (!response.ok) {
+            const detail = await response.text();
+            if (response.status === 404 || (response.status === 400 && /UNREGISTERED|registration-token-not-registered/.test(detail))) await supabase.from("push_devices").delete().eq("token", device.token);
+            failed++; continue;
           }
-          failed++;
-          continue;
-        }
-        const { error: markError } = await supabase.from("push_deliveries").update({ sent_at: isoNow }).eq("delivery_key", deliveryKey).eq("device_token", device.token);
-        if (markError) failed++; else sent++;
-      } catch {
-        failed++;
+          const { error: markError } = await supabase.from("push_deliveries").update({ sent_at: isoNow }).eq("delivery_key", item.key).eq("device_token", device.token);
+          if (markError) failed++; else sent++;
+        } catch { failed++; }
       }
     }
   }
