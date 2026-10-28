@@ -688,6 +688,17 @@ export function DoseCertaApp() {
   const [ready, setReady] = useState(false);
   const [cloudError, setCloudError] = useState("");
   useEffect(() => {
+    // Restore the device's appearance before the app shell renders. The palette
+    // and color mode use separate preferences, so switching modes never resets
+    // the selected palette.
+    const savedPalette = localStorage.getItem("dc-palette");
+    if (savedPalette === "azul" || savedPalette === "rosa" || savedPalette === "lavanda") {
+      document.documentElement.dataset["palette"] = savedPalette;
+    } else {
+      delete document.documentElement.dataset["palette"];
+    }
+    document.documentElement.classList.toggle("dark", localStorage.getItem("dc-theme") === "dark");
+
     let disposed = false; let cleanup: (() => void) | undefined;
     onCloudError(setCloudError);
     initializeCloud().then((stop) => { if (disposed) stop(); else { cleanup = stop; setReady(true); } }).catch((error) => { setCloudError(error instanceof Error ? error.message : "Não foi possível carregar."); setReady(true); });
