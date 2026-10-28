@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowRight, Bell, BellRing, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LogOut, Moon, Pencil, Pill,
-  Plus, Printer, Shield, Sun, Trash2, User as UserIcon, Users, X,
+  ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  Plus, Printer, ShieldCheck, Sun, Trash2, UserRound, UsersRound, X, Settings2,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -666,14 +666,14 @@ function UrgentAlertToast({ me }: { me: User }) {
 function Shell({ me }: { me: User }) {
   const removeDevice = useServerFn(removePushDevice);
   const [page, setPage] = useState<Page>(me.role === "cuidador" ? "inicio" : "suporte");
-  const items: { id: Page; label: string; icon: ReactNode; roles: Role[] }[] = [
-    { id: "inicio", label: "Início", icon: <Home className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
-    { id: "pacientes", label: "Pacientes", icon: <Users className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
-    { id: "medicamentos", label: "Medicamentos", icon: <Pill className="h-5 w-5" />, roles: ["cuidador", "mestre"] },
-    { id: "historico", label: "Histórico", icon: <History className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
-    { id: "suporte", label: "Atendimento", icon: <Headphones className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
-    { id: "admin", label: "Contas", icon: <ClipboardList className="h-5 w-5" />, roles: ["mestre"] },
-    { id: "perfil", label: "Perfil", icon: <UserIcon className="h-5 w-5" />, roles: ["cuidador", "operador", "mestre"] },
+  const items: { id: Page; label: string; mobileLabel: string; icon: ReactNode; roles: Role[] }[] = [
+    { id: "inicio", label: "Início", mobileLabel: "Início", icon: <Home className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
+    { id: "pacientes", label: "Pacientes", mobileLabel: "Pacientes", icon: <UsersRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
+    { id: "medicamentos", label: "Medicamentos", mobileLabel: "Remédios", icon: <PillBottle className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
+    { id: "historico", label: "Histórico", mobileLabel: "Histórico", icon: <CalendarDays className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
+    { id: "suporte", label: "Atendimento", mobileLabel: "Suporte", icon: <LifeBuoy className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
+    { id: "admin", label: "Contas", mobileLabel: "Contas", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
+    { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
   useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "cuidador" ? "inicio" : "suporte"); }, [me.role, page]);
@@ -689,9 +689,9 @@ function Shell({ me }: { me: User }) {
     <div className="dc-app flex min-h-screen w-full bg-background">
       <aside className="dc-sidebar no-print sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden bg-sidebar p-6 text-sidebar-foreground md:flex">
         <div className="mb-8 flex items-center gap-3"><Logo /><T k="brand" className="font-display text-2xl font-semibold tracking-tight">Dose Certa</T></div>
-        <nav aria-label="Navegação principal" className="dc-nav relative z-10 space-y-1">
-          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent")}>{i.icon}{i.label}</button>)}
-          <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-sidebar-accent"><LogOut className="h-5 w-5" />Sair</button>
+        <nav aria-label="Navegação principal" className="dc-nav relative z-10 flex flex-1 flex-col justify-center gap-1.5 py-8">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>{i.icon}{i.label}</button>)}
+          <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-sidebar-accent"><LogOut className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />Sair</button>
         </nav>
         <img src={sideImg} alt="" className="pointer-events-none absolute -bottom-10 -left-10 h-80 opacity-40" width={768} height={1152} />
         <ImageEditButton k="side-bg" className="absolute bottom-4 right-4" />
@@ -712,9 +712,8 @@ function Shell({ me }: { me: User }) {
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} />}
         </main>
-        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-border/70 bg-card/95 px-2 py-2 backdrop-blur-xl md:hidden">
-          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex min-w-[4.5rem] shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}{i.label}</button>)}
-
+        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 items-stretch gap-0.5 border-t border-border/70 bg-card/95 px-1.5 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[9px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}<span className="w-full truncate text-center">{i.mobileLabel}</span></button>)}
         </nav>
       </div>
       <AlarmEngine me={me} />
