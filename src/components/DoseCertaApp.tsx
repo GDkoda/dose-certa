@@ -14,6 +14,7 @@ import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, u
 import lavender from "@/assets/lavender.png";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
 import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
+import { summarizeDoseStatuses } from "@/lib/report-rules";
 import {
   canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
   type Dose, type Role, type User,
@@ -497,7 +498,7 @@ function HistoryPage({ me }: { me: User }) {
     const blob = new Blob([lines.map((l) => l.map((c) => `"${c}"`).join(";")).join("\n")], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "historico-dose-certa.csv"; a.click();
   };
-  const taken = rows.filter((r) => r.status === "tomado").length;
+  const report = summarizeDoseStatuses(rows.map((row) => row.status));
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><T k="hist-title" as="h1" className="font-display text-3xl text-foreground">Histórico de doses</T>
@@ -509,8 +510,13 @@ function HistoryPage({ me }: { me: User }) {
         <input className={input} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className={card}>
-        <p className="mb-2 text-sm text-muted-foreground">Adesão: {rows.length ? Math.round((taken / rows.length) * 100) : 0}% ({taken} de {rows.length})</p>
-        <div className="mb-4 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${rows.length ? (taken / rows.length) * 100 : 0}%` }} /></div>
+        <p className="mb-2 text-sm text-muted-foreground">Adesão registrada: {report.adherencePercent}% ({report.taken} tomadas de {report.finalized} doses finalizadas)</p>
+        <div className="mb-4 h-3 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Adesão registrada" aria-valuemin={0} aria-valuemax={100} aria-valuenow={report.adherencePercent}><div className="h-full bg-primary" style={{ width: `${report.adherencePercent}%` }} /></div>
+        <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-xl bg-primary/10 p-3"><p className="text-muted-foreground">Tomadas</p><p className="text-lg font-bold text-foreground">{report.taken}</p></div>
+          <div className="rounded-xl bg-destructive/10 p-3"><p className="text-muted-foreground">Não tomadas</p><p className="text-lg font-bold text-foreground">{report.missed}</p></div>
+          <div className="rounded-xl bg-muted p-3"><p className="text-muted-foreground">Pendentes</p><p className="text-lg font-bold text-foreground">{report.pending}</p></div>
+        </div>
         {rows.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum registro.</p> :
           <ul className="divide-y divide-border">{rows.map((d) => (
             <li key={d.id} className="flex items-center gap-3 py-2 text-sm"><span className="w-32 shrink-0 text-muted-foreground">{fmtDate(d.scheduledAt)}</span>
