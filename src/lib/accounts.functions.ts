@@ -10,8 +10,47 @@ export const registerAccount = createServerFn({ method: 'POST' })
     if (username === 'koda') throw new Error('Este login está reservado.');
     if (data.password.length < 4) throw new Error('Escolha uma senha com pelo menos 4 caracteres.');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
-    const { error } = await supabaseAdmin.auth.admin.createUser({ email: accountEmail(username), password: data.password, email_confirm: true, user_metadata: { username } });
-    if (error) throw new Error(error.message.includes('registered') ? 'Este login já existe.' : 'Não foi possível criar a conta. Use uma senha longa e única ou outro login.');
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+      email: accountEmail(username),
+      password: data.password,
+      email_confirm: true,
+      user_metadata: { username },
+    });
+
+    if (error) {
+      // Keep the provider's detailed error in server logs so configuration failures
+      // are diagnosable without exposing internal details to the user.
+      console.error('[registerAccount] Supabase createUser failed', {
+        code: error.code,
+        status: error.status,
+        message: error.message,
+      });
+
+      const message = error.message.toLowerCase();
+      if (
+        error.code === 'email_exists' ||
+        error.code === 'user_already_exists' ||
+        message.includes('already registered') ||
+        message.includes('already exists') ||
+        message.includes('already been registered')
+      ) {
+        throw new Error('Este login já existe. Escolha outro login.');
+      }
+      if (
+        error.code === 'weak_password' ||
+        message.includes('password') ||
+        message.includes('senha')
+      ) {
+        throw new Error('O Supabase recusou a senha. Escolha uma senha mais longa e única, sem reutilizar uma senha antiga.');
+      }
+      if (message.includes('invalid email') || message.includes('email address')) {
+        throw new Error('O Supabase recusou o endereço interno usado para este login. A configuração de autenticação precisa ser ajustada.');
+      }
+      if (error.status === 429) {
+        throw new Error('Muitas tentativas de cadastro. Aguarde um pouco e tente novamente.');
+      }
+      throw new Error('Falha ao criar a conta no Supabase. Consulte os logs do servidor para identificar a causa.');
+    }
     return { ok: true };
   });
 
