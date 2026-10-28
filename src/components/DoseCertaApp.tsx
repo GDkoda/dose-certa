@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Bell, BellRing, ClipboardList, Download, Headphones, History, Home, Leaf, LogOut, Moon, Pencil, Pill,
+  ArrowRight, Bell, BellRing, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LogOut, Moon, Pencil, Pill,
   Plus, Printer, Shield, Sun, Trash2, User as UserIcon, Users, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
