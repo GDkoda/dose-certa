@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   Plus, Printer, ShieldCheck, Sun, Trash2, UserRound, UsersRound, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
