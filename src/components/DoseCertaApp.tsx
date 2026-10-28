@@ -13,6 +13,7 @@ import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions"
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import lavender from "@/assets/lavender.png";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
+import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
 import {
   canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
   type Dose, type Role, type User,
@@ -471,10 +472,14 @@ function Meds({ me }: { me: User }) {
               <button aria-label="Excluir medicamento" className="text-destructive" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
             </div>
             <div className="mt-3 flex items-center gap-2 text-sm">
-              <span className={cls("rounded-full px-3 py-1 font-bold", m.stock <= 5 ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary")}>Estoque: {m.stock}</span>
+              <span className={cls("rounded-full px-3 py-1 font-bold", stockLevel(m) !== "ok" ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary")}>Estoque: {m.stock}</span>
+              <span className="text-xs text-muted-foreground">{stockLevel(m) === "empty" ? "Estoque esgotado" : stockLevel(m) === "low" ? "Estoque baixo" : "Estoque suficiente"}</span>
               <button className={btnOutline} onClick={() => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, stock: x.stock + 30 } : x)) }))}>+30</button>
               <label className="ml-auto flex items-center gap-1 text-muted-foreground">Tol.<input className="w-16 rounded-lg border border-input bg-card px-2 py-1" type="number" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} /></label>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Estimativa: {estimateStockDays(m) === null ? "cadastre horários para estimar a duração" : String(estimateStockDays(m)) + " dia(s) restantes, considerando uma unidade por horário"}.
+            </p>
           </div>))}
       </div>
     </div>
