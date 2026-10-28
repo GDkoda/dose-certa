@@ -375,32 +375,72 @@ function Dashboard({ me, go }: { me: User; go: (p: Page) => void }) {
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const heroImg = useImage("dash-bg", lavender);
+  const nextDoses = [...doses].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  const progress = doses.length ? Math.round((taken / doses.length) * 100) : 0;
   return (
-    <div className="space-y-6">
-      <div className={cls(card, "relative overflow-hidden")}>
-        <img src={heroImg} alt="" className="pointer-events-none absolute -right-6 -top-10 h-64 opacity-50" width={768} height={1152} />
+    <div className="mx-auto w-full max-w-7xl space-y-7">
+      <section className="relative isolate overflow-hidden rounded-[2rem] bg-primary px-6 py-7 text-primary-foreground shadow-[var(--shadow-soft)] sm:px-9 sm:py-9">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary via-primary to-secondary opacity-95" />
+        <img src={heroImg} alt="" className="pointer-events-none absolute -right-5 -top-10 -z-10 h-64 opacity-20 sm:right-5 sm:top-0 sm:h-80" width={768} height={1152} />
         <ImageEditButton k="dash-bg" className="absolute right-3 top-3" />
-        <h1 className="font-display text-3xl text-foreground">{hello}, {me.login}</h1>
-        <T k="dash-sub" as="p" className="text-muted-foreground">Seu cuidado hoje faz toda a diferença.</T>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[{ l: "Doses tomadas", v: `${taken}/${doses.length}`, c: "text-primary" }, { l: "Pendentes", v: pend, c: "text-warning" }, { l: "Não tomadas", v: miss, c: "text-destructive" }].map((x) => (
-          <div key={x.l} className={card}><p className="text-sm text-muted-foreground">{x.l}</p><p className={cls("text-3xl font-extrabold", x.c)}>{x.v}</p></div>
-        ))}
-      </div>
-      <div className={card}>
-        <div className="mb-3 flex items-center justify-between"><T k="dash-next" as="h2" className="font-display text-xl text-foreground">Próximos medicamentos</T>
-          <button className="text-sm text-primary" onClick={() => go("medicamentos")}>Ver todos</button></div>
-        {doses.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma dose hoje. {patients.filter((p) => p.ownerId === me.id).length === 0 ? "Comece cadastrando um paciente." : "Cadastre medicamentos e horários."}</p> :
-          <ul className="divide-y divide-border">
-            {[...doses].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)).map((d) => { const m = meds.find((x) => x.id === d.medId); return (
-              <li key={d.id} className="flex items-center gap-3 py-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent"><Pill className="h-5 w-5 text-secondary" /></span>
-                <div className="min-w-0 flex-1"><p className="truncate font-semibold text-foreground">{m?.name} {m?.dose}</p><p className="text-xs text-muted-foreground">{fmtTime(d.scheduledAt)} · {patients.find((p) => p.id === d.patientId)?.name}</p></div>
-                <StatusBadge s={d.status} />
-              </li>); })}
-          </ul>}
-      </div>
+        <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] opacity-80">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <h1 className="max-w-2xl font-display text-3xl font-semibold leading-tight sm:text-4xl">{hello}, {me.login}.</h1>
+        <T k="dash-sub" as="p" className="mt-2 max-w-lg text-sm leading-relaxed opacity-85 sm:text-base">Seu cuidado de hoje, organizado em um só lugar.</T>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button onClick={() => go("medicamentos")} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-foreground px-5 py-3 text-sm font-bold text-primary shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"><Plus className="h-4 w-4" />Adicionar medicamento</button>
+          <button onClick={() => go("pacientes")} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary-foreground/35 bg-primary-foreground/10 px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-foreground/20"><Users className="h-4 w-4" />Ver pacientes<ArrowRight className="h-4 w-4" /></button>
+        </div>
+      </section>
+
+      <section aria-label="Resumo das doses de hoje" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:col-span-2">
+          <div className="flex items-start justify-between gap-4">
+            <div><p className="text-sm font-semibold text-muted-foreground">Rotina de hoje</p><p className="mt-1 text-3xl font-bold tracking-tight text-foreground">{progress}% <span className="text-base font-medium text-muted-foreground">concluído</span></p></div>
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><ClipboardList className="h-5 w-5" /></span>
+          </div>
+          <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Progresso das doses de hoje" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} /></div>
+          <p className="mt-2 text-xs text-muted-foreground">{taken} de {doses.length} doses registradas como tomadas</p>
+        </div>
+        {[
+          { l: "Tomadas", v: taken, icon: <CheckCircle2 className="h-5 w-5" />, tone: "bg-primary/10 text-primary" },
+          { l: "Pendentes", v: pend, icon: <Clock3 className="h-5 w-5" />, tone: "bg-warning/20 text-foreground" },
+        ].map((x) => <div key={x.l} className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm"><span className={cls("grid h-12 w-12 shrink-0 place-items-center rounded-2xl", x.tone)}>{x.icon}</span><div><p className="text-sm font-medium text-muted-foreground">{x.l}</p><p className="text-3xl font-bold tracking-tight text-foreground">{x.v}</p></div></div>)}
+        <div className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-destructive/10 text-destructive"><BellRing className="h-5 w-5" /></span><div><p className="text-sm font-medium text-muted-foreground">Não tomadas</p><p className="text-3xl font-bold tracking-tight text-foreground">{miss}</p></div></div>
+      </section>
+
+      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.8fr)]">
+        <div className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-5 sm:px-6">
+            <div><h2 className="font-display text-xl font-semibold text-foreground sm:text-2xl">Agenda de medicamentos</h2><p className="mt-1 text-sm text-muted-foreground">Confira os horários previstos para hoje.</p></div>
+            <button className="shrink-0 rounded-full px-3 py-2 text-sm font-bold text-primary transition hover:bg-primary/10" onClick={() => go("medicamentos")}>Ver todos <ArrowRight className="ml-1 inline h-4 w-4" /></button>
+          </div>
+          {nextDoses.length === 0 ? <div className="px-6 py-10 text-center"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary"><Pill className="h-6 w-6" /></span><p className="mt-4 font-semibold text-foreground">Sua agenda está livre por enquanto</p><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{patients.filter((p) => p.ownerId === me.id).length === 0 ? "Cadastre um paciente para começar a organizar os cuidados." : "Cadastre medicamentos e horários para acompanhar as doses do dia."}</p><button onClick={() => go(patients.filter((p) => p.ownerId === me.id).length === 0 ? "pacientes" : "medicamentos")} className={cls(btnPrimary, "mt-4 rounded-full")}>{patients.filter((p) => p.ownerId === me.id).length === 0 ? "Cadastrar paciente" : "Cadastrar medicamento"}<ArrowRight className="h-4 w-4" /></button></div> :
+            <ul className="divide-y divide-border/70">
+              {nextDoses.map((d) => { const m = meds.find((x) => x.id === d.medId); return (
+                <li key={d.id} className="flex items-center gap-3 px-5 py-4 transition hover:bg-muted/40 sm:px-6">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent text-primary"><Pill className="h-5 w-5" /></span>
+                  <div className="min-w-0 flex-1"><p className="truncate font-bold text-foreground">{m?.name ?? "Medicamento"} <span className="font-medium text-muted-foreground">{m?.dose}</span></p><p className="mt-1 text-sm text-muted-foreground">{fmtTime(d.scheduledAt)} <span className="px-1">·</span> {patients.find((p) => p.id === d.patientId)?.name}</p></div>
+                  <StatusBadge s={d.status} />
+                </li>); })}
+            </ul>}
+        </div>
+        <aside className="space-y-4">
+          <div className="rounded-[1.75rem] border border-border/70 bg-card p-5 shadow-sm sm:p-6">
+            <p className="text-sm font-semibold text-muted-foreground">Visão geral</p>
+            <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Seu cuidado em números</h2>
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Pacientes acompanhados</span><span className="font-bold tabular-nums text-foreground">{patients.filter((p) => p.ownerId === me.id).length}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Medicamentos cadastrados</span><span className="font-bold tabular-nums text-foreground">{meds.filter((m) => m.ownerId === me.id).length}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Doses previstas hoje</span><span className="font-bold tabular-nums text-foreground">{doses.length}</span></div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button onClick={() => go("pacientes")} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-bold text-foreground transition hover:bg-accent"><Users className="h-4 w-4" />Pacientes</button>
+              <button onClick={() => go("historico")} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm font-bold text-foreground transition hover:bg-accent"><History className="h-4 w-4" />Histórico</button>
+            </div>
+          </div>
+          {miss > 0 && <div className="rounded-[1.5rem] border border-destructive/20 bg-destructive/5 p-5"><div className="flex items-start gap-3"><BellRing className="mt-0.5 h-5 w-5 shrink-0 text-destructive" /><div><p className="font-bold text-foreground">Atenção às doses</p><p className="mt-1 text-sm text-muted-foreground">Há {miss} {miss === 1 ? "dose não tomada" : "doses não tomadas"} registradas hoje. Confira o histórico para acompanhar os registros.</p><button onClick={() => go("historico")} className="mt-3 text-sm font-bold text-destructive hover:underline">Abrir histórico <ArrowRight className="ml-1 inline h-4 w-4" /></button></div></div></div>}
+        </aside>
+      </section>
     </div>
   );
 }
