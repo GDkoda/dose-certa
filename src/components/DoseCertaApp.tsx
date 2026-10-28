@@ -201,8 +201,8 @@ function AuthScreen() {
           {mode === "login" ? <T k="auth-login-title">Bem-vindo de volta</T> : mode === "signup" ? <T k="auth-signup-title">Cadastro rápido do cuidador</T> : <T k="auth-rec-title">Recuperar senha</T>}
         </h2>
         <form onSubmit={submit} className="space-y-3">
-          <input className={input} placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
-          {mode !== "recover" && <input className={input} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />}
+          <input className={input} aria-label="Login" autoComplete="username" required placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
+          {mode !== "recover" && <input className={input} aria-label="Senha" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={mode === "signup" ? 8 : undefined} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />}
           {msg && <p className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.text}</p>}
           <Button disabled={busy} className={cls("w-full rounded-xl py-6 text-base font-bold shadow-md transition-all focus-visible:ring-4 focus-visible:ring-primary/30", mode === "signup" ? "bg-primary text-primary-foreground shadow-primary/30 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30" : "")}>{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar minha conta" : "Solicitar recuperação"}</Button>
         </form>
@@ -504,10 +504,10 @@ function HistoryPage({ me }: { me: User }) {
       <div className="flex flex-wrap items-center justify-between gap-3"><T k="hist-title" as="h1" className="font-display text-3xl text-foreground">Histórico de doses</T>
         <div className="no-print flex gap-2"><button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Relatório</button></div></div>
       <div className="no-print grid gap-3 sm:grid-cols-4">
-        <select className={input} value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Todos os pacientes</option>{myPatients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <select className={input} value={st} onChange={(e) => setSt(e.target.value)}><option value="">Todos os status</option><option value="tomado">Tomado</option><option value="pendente">Pendente</option><option value="nao_tomado">Não tomado</option></select>
-        <input className={input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input className={input} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <select className={input} aria-label="Filtrar por paciente" value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Todos os pacientes</option>{myPatients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        <select className={input} aria-label="Filtrar por status da dose" value={st} onChange={(e) => setSt(e.target.value)}><option value="">Todos os status</option><option value="tomado">Tomado</option><option value="pendente">Pendente</option><option value="nao_tomado">Não tomado</option></select>
+        <input className={input} aria-label="Data inicial" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input className={input} aria-label="Data final" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className={card}>
         <p className="mb-2 text-sm text-muted-foreground">Adesão registrada: {report.adherencePercent}% ({report.taken} tomadas de {report.finalized} doses finalizadas)</p>
@@ -644,8 +644,8 @@ function Shell({ me }: { me: User }) {
     <div className="flex min-h-screen w-full bg-background">
       <aside className="no-print relative hidden w-64 shrink-0 flex-col overflow-hidden bg-sidebar p-5 text-sidebar-foreground md:flex">
         <div className="mb-8 flex items-center gap-3"><Logo /><T k="brand" className="font-display text-2xl font-semibold">Dose Certa</T></div>
-        <nav className="relative z-10 space-y-1">
-          {items.map((i) => <button key={i.id} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent")}>{i.icon}{i.label}</button>)}
+        <nav aria-label="Navegação principal" className="relative z-10 space-y-1">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent")}>{i.icon}{i.label}</button>)}
           <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-sidebar-accent"><LogOut className="h-5 w-5" />Sair</button>
         </nav>
         <img src={sideImg} alt="" className="pointer-events-none absolute -bottom-10 -left-10 h-80 opacity-40" width={768} height={1152} />
@@ -667,8 +667,8 @@ function Shell({ me }: { me: User }) {
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} />}
         </main>
-        <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex flex-wrap justify-around border-t border-border bg-card py-2 md:hidden">
-          {items.map((i) => <button key={i.id} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
+        <nav aria-label="Navegação móvel" className="no-print fixed inset-x-0 bottom-0 z-30 flex flex-wrap justify-around border-t border-border bg-card py-2 md:hidden">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
 
         </nav>
       </div>
