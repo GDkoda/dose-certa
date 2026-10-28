@@ -327,3 +327,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media print { .no-print { display: none !important; } }
+
+/* Dose Certa — polished, responsive app shell */
+.dc-app { background-image: radial-gradient(ellipse at 12% 0%, color-mix(in oklab, var(--primary) 7%, transparent), transparent 38%); }
+.dc-sidebar { box-shadow: 10px 0 36px -30px oklch(0 0 0 / 45%); }
+.dc-sidebar > nav button { min-height: 44px; border-radius: 0.95rem; text-align: left; }
+.dc-sidebar > nav button[aria-current="page"] { box-shadow: 0 6px 18px -12px currentColor; }
+.dc-header { min-height: 68px; }
+.dc-main { width: 100%; max-width: 1600px; margin-inline: auto; }
+.dc-main h1 { letter-spacing: -0.035em; line-height: 1.12; }
+.dc-main input, .dc-main select, .dc-main textarea { min-height: 44px; border-radius: 0.95rem; }
+.dc-main button { border-radius: 0.95rem; }
+.dc-main button:active { transform: translateY(1px); }
+.dc-mobile-nav { padding-bottom: max(0.55rem, env(safe-area-inset-bottom)); }
+.dc-mobile-nav button { min-width: 58px; min-height: 48px; border-radius: 0.85rem; }
+.dc-mobile-nav button[aria-current="page"] { background: color-mix(in oklab, var(--primary) 10%, transparent); }
+@media (min-width: 768px) {
+  .dc-main { padding-top: 2rem; }
+  .dc-main > div { max-width: 1240px; }
+}
+@media (max-width: 767px) {
+  .dc-main h1 { font-size: clamp(1.8rem, 7vw, 2.25rem); }
+  .dc-main .rounded-2xl, .dc-main .rounded-3xl { border-radius: 1.25rem; }
+}
