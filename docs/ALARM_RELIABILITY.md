@@ -56,6 +56,12 @@ A forma de armazenar e referenciar o segredo no Supabase Cron depende da configu
 - Tokens FCM e nomes de medicamentos são dados sensíveis. Limite acesso aos logs e retenção, e nunca registre tokens completos ou payloads de saúde em logs.
 - O projeto precisa validar RLS e permissões das tabelas `app_records`, `push_devices` e `push_deliveries` antes de produção.
 
+## Etapa seguinte: vínculos entre pacientes e cuidadores
+
+The overdue-dose notification currently reaches devices registered under the medication owner's account. To notify a different family member, the product still needs an explicit patient-caregiver relationship, invitation/approval flow, database policies, and authorization checks. Do not expose patient data by simply allowing a second account to query another owner's records.
+
+Stock duration is only an estimate: the current medication model does not encode units per dose or liquid volume, so the calculation assumes one stock unit per scheduled time. It must not be interpreted as a prescription or dosing recommendation.
+
 ## Matriz mínima de validação manual
 
 - Chrome desktop: app aberto, aba em segundo plano, aba fechada, permissão permitida e negada.
