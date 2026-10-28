@@ -60,7 +60,7 @@ A forma de armazenar e referenciar o segredo no Supabase Cron depende da configu
 
 O vínculo entre familiares e cuidadores foi descartado por decisão do produto e não faz parte do escopo desta etapa. Os alertas permanecem limitados aos dispositivos registrados na mesma conta proprietária.
 
-Stock duration is only an estimate: the current medication model does not encode units per dose or liquid volume, so the calculation assumes one stock unit per scheduled time. It must not be interpreted as a prescription or dosing recommendation.
+A duração do estoque é apenas uma estimativa: o modelo atual não registra unidades por dose nem volume de líquidos, então o cálculo assume uma unidade por horário cadastrado. Não deve ser interpretada como prescrição ou recomendação de dose.
 
 ## Relatórios e adesão
 
