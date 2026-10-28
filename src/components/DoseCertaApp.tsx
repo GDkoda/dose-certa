@@ -101,17 +101,18 @@ function useTheme() {
   return { dark, toggle };
 }
 
-export type Palette = "verde" | "azul" | "rosa";
+export type Palette = "verde" | "azul" | "rosa" | "lavanda";
 export const PALETTES: { id: Palette; name: string; light: string; dark: string }[] = [
   { id: "verde", name: "Sálvia", light: "oklch(0.52 0.05 165)", dark: "oklch(0.66 0.06 165)" },
   { id: "azul", name: "Oceano", light: "oklch(0.52 0.11 245)", dark: "oklch(0.7 0.11 240)" },
   { id: "rosa", name: "Peônia", light: "oklch(0.56 0.15 8)", dark: "oklch(0.72 0.13 8)" },
+  { id: "lavanda", name: "Lavanda", light: "oklch(0.54 0.12 292)", dark: "oklch(0.73 0.1 292)" },
 ];
 function usePalette() {
   const [palette, setPaletteState] = useState<Palette>("verde");
   useEffect(() => {
     const saved = localStorage.getItem("dc-palette");
-    const p: Palette = saved === "azul" || saved === "rosa" ? saved : "verde";
+    const p: Palette = saved === "azul" || saved === "rosa" || saved === "lavanda" ? saved : "verde";
     setPaletteState(p);
     if (p === "verde") delete document.documentElement.dataset['palette'];
     else document.documentElement.dataset['palette'] = p;
