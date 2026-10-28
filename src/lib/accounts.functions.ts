@@ -8,7 +8,7 @@ export const registerAccount = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const username = normalizeUsername(data.login);
     if (username === 'koda') throw new Error('Este login está reservado.');
-    if (data.password.length < 4) throw new Error('Escolha uma senha com pelo menos 4 caracteres.');
+    if (data.password.length < 8) throw new Error('Escolha uma senha com pelo menos 8 caracteres.');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     const { error } = await supabaseAdmin.auth.admin.createUser({
       email: accountEmail(username),
@@ -41,7 +41,9 @@ export const registerAccount = createServerFn({ method: 'POST' })
         message.includes('password') ||
         message.includes('senha')
       ) {
-        throw new Error('O Supabase recusou a senha. Escolha uma senha mais longa e única, sem reutilizar uma senha antiga.');
+        // Surface the provider's policy reason instead of incorrectly implying
+        // that every rejection is caused by password length or reuse.
+        throw new Error(`O Supabase recusou a senha: ${error.message}`);
       }
       if (message.includes('invalid email') || message.includes('email address')) {
         throw new Error('O Supabase recusou o endereço interno usado para este login. A configuração de autenticação precisa ser ajustada.');
@@ -65,7 +67,7 @@ export const manageAccount = createServerFn({ method: 'POST' })
       authorizeAccountChange('mestre', context.userId, data.id);
     }
     if (data.role && !['mestre', 'operador', 'cuidador'].includes(data.role)) throw new Error('Função inválida.');
-    if (data.password && data.password.length < 4) throw new Error('A senha precisa ter pelo menos 4 caracteres.');
+    if (data.password && data.password.length < 8) throw new Error('A senha precisa ter pelo menos 8 caracteres.');
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     if (data.action === 'create') {
       if (!data.login || !data.password) throw new Error('Informe login e senha.');
