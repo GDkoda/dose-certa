@@ -23,6 +23,10 @@ import {
 /* ---------------- helpers ---------------- */
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+const csvCell = (value: string) => {
+  const safe = /^[=+@\-\t\r]/.test(value) ? "'" + value : value;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
 const cls = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 const btn = "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50";
 const btnPrimary = `${btn} bg-primary text-primary-foreground hover:opacity-90`;
@@ -495,7 +499,7 @@ function HistoryPage({ me }: { me: User }) {
   const myPatients = patients.filter((p) => me.role !== "cuidador" || p.ownerId === me.id);
   const csv = () => {
     const lines = [["Data", "Paciente", "Medicamento", "Status"], ...rows.map((d) => [fmtDate(d.scheduledAt), patients.find((p) => p.id === d.patientId)?.name ?? "", meds.find((m) => m.id === d.medId)?.name ?? "", d.status])];
-    const blob = new Blob([lines.map((l) => l.map((c) => `"${c}"`).join(";")).join("\n")], { type: "text/csv" });
+    const blob = new Blob(["\uFEFF", lines.map((l) => l.map(csvCell).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "historico-dose-certa.csv"; a.click();
   };
   const report = summarizeDoseStatuses(rows.map((row) => row.status));
