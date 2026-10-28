@@ -201,8 +201,23 @@ function AuthScreen() {
           <input className={input} placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} />
           {mode !== "recover" && <input className={input} type="password" placeholder="Senha" value={pass} onChange={(e) => setPass(e.target.value)} />}
           {msg && <p className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.text}</p>}
-          <Button disabled={busy} className="w-full">{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar conta" : "Solicitar recuperação"}</Button>
+          <Button disabled={busy} className={cls("w-full rounded-xl py-6 text-base font-bold shadow-md transition-all focus-visible:ring-4 focus-visible:ring-primary/30", mode === "signup" ? "bg-primary text-primary-foreground shadow-primary/30 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30" : "")}>{busy ? "Aguarde…" : mode === "login" ? "Entrar" : mode === "signup" ? "Criar minha conta" : "Solicitar recuperação"}</Button>
         </form>
+        {mode === "signup" && (
+          <aside className="mt-5 space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-4" aria-labelledby="signup-tips-title">
+            <div>
+              <h3 id="signup-tips-title" className="font-semibold text-foreground">Dicas para criar uma conta segura</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Alguns cuidados ajudam a proteger seus dados.</p>
+            </div>
+            <ul className="space-y-2.5 text-sm text-foreground">
+              <li className="flex gap-2"><Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong>Escolha um login único.</strong> Evite usar seu nome completo ou data de nascimento.</span></li>
+              <li className="flex gap-2"><Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong>Crie uma senha forte.</strong> Use pelo menos 8 caracteres; misturar letras maiúsculas e minúsculas, números e símbolos ajuda.</span></li>
+              <li className="flex gap-2"><Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong>Evite senhas óbvias.</strong> Não use sequências como 123456, palavras comuns ou uma senha que já usa em outro serviço.</span></li>
+              <li className="flex gap-2"><Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong>Mantenha a senha em segurança.</strong> Guarde-a em um local confiável e não a compartilhe.</span></li>
+            </ul>
+            <p className="rounded-xl border border-primary/20 bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground"><strong className="text-foreground">Importante:</strong> o sistema pode recusar senhas consideradas fracas ou fáceis de adivinhar. Se isso acontecer, tente outra senha mais exclusiva.</p>
+          </aside>
+        )}
         <div className="mt-4 flex flex-wrap justify-between gap-2 text-sm">
           {mode !== "login" && <button className="text-primary hover:underline" onClick={() => setMode("login")}>Já tenho conta</button>}
           {mode !== "signup" && <button className="text-primary hover:underline" onClick={() => setMode("signup")}>Criar conta de cuidador</button>}
