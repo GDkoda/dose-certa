@@ -24,7 +24,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  claimed boolean := false;
+  affected_rows integer := 0;
 begin
   insert into public.push_deliveries (delivery_key, dose_id, device_token, attempted_at, sent_at)
   values (p_key, p_dose, p_token, now(), null)
@@ -32,8 +32,8 @@ begin
     set attempted_at = now()
     where public.push_deliveries.sent_at is null
       and public.push_deliveries.attempted_at < now() - interval '2 minutes';
-  get diagnostics claimed = row_count;
-  return claimed;
+  get diagnostics affected_rows = row_count;
+  return affected_rows > 0;
 end;
 $$;
 
