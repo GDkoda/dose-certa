@@ -219,9 +219,9 @@ function AuthScreen() {
           </aside>
         )}
         <div className="mt-4 flex flex-wrap justify-between gap-2 text-sm">
-          {mode !== "login" && <button className="text-primary hover:underline" onClick={() => setMode("login")}>Já tenho conta</button>}
-          {mode !== "signup" && <button className="text-primary hover:underline" onClick={() => setMode("signup")}>Criar conta de cuidador</button>}
-          {mode !== "recover" && <button className="text-secondary hover:underline" onClick={() => setMode("recover")}>Esqueci minha senha</button>}
+          {mode !== "login" && <button className="rounded-xl px-3 py-2 font-medium text-primary hover:bg-primary/10 hover:underline" onClick={() => setMode("login")}>Já tenho conta</button>}
+          {mode !== "signup" && <button className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30" onClick={() => { setMsg(null); setMode("signup"); }}><Plus className="h-4 w-4" />Criar conta de cuidador</button>}
+          {mode !== "recover" && <button className="rounded-xl px-3 py-2 font-medium text-secondary hover:bg-secondary/10 hover:underline" onClick={() => setMode("recover")}>Esqueci minha senha</button>}
         </div>
         <LegacyAccountsHint />
       </div>
