@@ -129,17 +129,17 @@ function usePalette() {
 function PalettePicker() {
   const { palette, setPalette } = usePalette();
   return (
-    <div className={cls(card, "max-w-md space-y-3")}>
+    <div className={cls(card, "max-w-md !p-4 space-y-3 sm:!p-5")}>
       <h2 className="font-display text-lg text-foreground">Cor do aplicativo</h2>
       <p className="text-sm text-muted-foreground">Escolha a paleta deste aparelho. Ela combina com o modo claro e o noturno.</p>
-      <div className="flex gap-3" role="radiogroup" aria-label="Cor do aplicativo">
+      <div className="grid w-full grid-cols-4 gap-2 sm:gap-3" role="radiogroup" aria-label="Cor do aplicativo">
         {PALETTES.map((p) => (
-          <button key={p.id} role="radio" aria-checked={palette === p.id} onClick={() => setPalette(p.id)} className={cls("flex flex-col items-center gap-1 rounded-2xl border p-3 transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}>
-            <span className="flex overflow-hidden rounded-full border border-border">
-              <span className="h-6 w-6" style={{ background: p.light }} />
-              <span className="h-6 w-6" style={{ background: p.dark }} />
+          <button key={p.id} role="radio" aria-checked={palette === p.id} onClick={() => setPalette(p.id)} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border p-2 transition sm:p-3", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}>
+            <span className="flex max-w-full shrink-0 overflow-hidden rounded-full border border-border">
+              <span className="h-5 w-5 sm:h-6 sm:w-6" style={{ background: p.light }} />
+              <span className="h-5 w-5 sm:h-6 sm:w-6" style={{ background: p.dark }} />
             </span>
-            <span className="text-xs text-foreground">{p.name}</span>
+            <span className="whitespace-nowrap text-[11px] leading-tight text-foreground sm:text-xs">{p.name}</span>
           </button>
         ))}
       </div>
