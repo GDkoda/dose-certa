@@ -687,7 +687,7 @@ function Shell({ me }: { me: User }) {
   };
   return (
     <div className="dc-app flex min-h-screen w-full bg-background">
-      <aside className="dc-sidebar no-print sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden bg-sidebar p-5 text-sidebar-foreground md:flex">
+      <aside className="dc-sidebar no-print sticky top-0 hidden h-screen w-72 shrink-0 flex-col overflow-hidden bg-sidebar p-6 text-sidebar-foreground md:flex">
         <div className="mb-8 flex items-center gap-3"><Logo /><T k="brand" className="font-display text-2xl font-semibold tracking-tight">Dose Certa</T></div>
         <nav aria-label="Navegação principal" className="dc-nav relative z-10 space-y-1">
           {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent")}>{i.icon}{i.label}</button>)}
@@ -699,7 +699,7 @@ function Shell({ me }: { me: User }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
-          <p className="hidden truncate text-sm text-muted-foreground md:block">{me.role === "mestre" ? "Modo Mestre · toque no lápis para editar" : <T k="header-hint">Organize. Acompanhe. Cuide.</T>}</p>
+          <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{items.find((item) => item.id === page)?.label ?? "Dose Certa"}</p></div>
           <div className="flex items-center gap-2"><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
@@ -712,8 +712,8 @@ function Shell({ me }: { me: User }) {
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} />}
         </main>
-        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 flex flex-wrap justify-around border-t border-border/70 bg-card/95 py-2 backdrop-blur-xl md:hidden">
-          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex flex-col items-center gap-0.5 px-2 text-[11px] font-semibold", page === i.id ? "text-primary" : "text-muted-foreground")}>{i.icon}{i.label}</button>)}
+        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-border/70 bg-card/95 px-2 py-2 backdrop-blur-xl md:hidden">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex min-w-[4.5rem] shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}{i.label}</button>)}
 
         </nav>
       </div>
