@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
 import { PushSettings } from "./PushSettings";
+import { registerPushDevice } from "@/lib/push.functions";
+import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
@@ -677,6 +679,16 @@ function Shell({ me }: { me: User }) {
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
   useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "cuidador" ? "inicio" : "suporte"); }, [me.role, page]);
+  const registerDevice = useServerFn(registerPushDevice);
+  // Re-link this phone to the signed-in caregiver on every open, so tokens stay fresh and follow the account in use.
+  useEffect(() => {
+    if (me.role !== "cuidador" || typeof Notification === "undefined" || Notification.permission !== "granted" || window.top !== window.self) return;
+    enablePush().then(async (result) => {
+      if (result.status !== "registered") return;
+      await registerDevice({ data: { token: result.token, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+      sessionStorage.setItem("dc-push-token", result.token);
+    }).catch(() => undefined);
+  }, [me.id, me.role]);
   const logout = async () => {
     const token = sessionStorage.getItem("dc-push-token");
     if (token) {
