@@ -2,13 +2,15 @@ import { useState } from "react";
 import { Bell } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { registerPushDevice } from "@/lib/push.functions";
+import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
 import { enablePush } from "@/lib/push-browser";
 
 export function PushSettings() {
   const register = useServerFn(registerPushDevice);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const test = useServerFn(sendTestPush);
+  const [testing, setTesting] = useState(false);
   return <section className="space-y-3">
     <h2 className="font-display text-lg text-foreground">Avisos no telefone</h2>
     <Button disabled={busy} onClick={async () => {
@@ -23,6 +25,14 @@ export function PushSettings() {
       } catch { setMessage("Não foi possível ativar os avisos. Confira sua conexão e tente novamente."); }
       finally { setBusy(false); }
     }}><Bell />{busy ? "Ativando..." : "Ativar avisos neste aparelho"}</Button>
+    <Button variant="outline" disabled={testing} onClick={async () => {
+      setTesting(true); setMessage("Enviando teste... feche ou minimize o app agora.");
+      try {
+        const r = await test();
+        setMessage(r.devices === 0 ? "Nenhum aparelho registrado. Ative os avisos primeiro." : r.sent > 0 ? `Teste enviado para ${r.sent} aparelho(s). Deve aparecer em instantes.` : "O envio falhou. Ative os avisos novamente neste aparelho.");
+      } catch { setMessage("Não foi possível enviar o teste."); }
+      finally { setTesting(false); }
+    }}>{testing ? "Enviando..." : "Disparar teste de alarme no meu celular"}</Button>
     {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
   </section>;
 }
