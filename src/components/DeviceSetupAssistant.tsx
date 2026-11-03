@@ -28,6 +28,12 @@ function isIosDevice() {
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 }
 
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
 function setupStorageKey(accountId: string) {
   return "dc-first-setup-complete-" + accountId;
 }
@@ -42,6 +48,8 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
   const installFlow = useInstallPrompt();
   const register = useServerFn(registerPushDevice);
   const [open, setOpen] = useState(false);
+  const [setupFinished, setSetupFinished] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [step, setStep] = useState<SetupStep>(() => isStandaloneApp() ? "notifications" : "install");
   const [installed, setInstalled] = useState(isStandaloneApp);
   const [pushState, setPushState] = useState<PushState>(() => {
@@ -54,9 +62,11 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
   const [vibrationMessage, setVibrationMessage] = useState("");
 
   const finish = useCallback(() => {
+    if (!installed && isMobileDevice()) installFlow.rest();
     try { localStorage.setItem(setupStorageKey(accountId), "1"); } catch { /* A sessão continua normalmente sem armazenamento local. */ }
+    setSetupFinished(true);
     setOpen(false);
-  }, [accountId]);
+  }, [accountId, installed, installFlow.rest]);
 
   const connectNotifications = useCallback(async () => {
     setPushBusy(true);
@@ -97,7 +107,9 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
   }, [accountId, register]);
 
   useEffect(() => {
-    if (!wasSetupCompleted(accountId)) setOpen(true);
+    const completed = wasSetupCompleted(accountId);
+    setSetupFinished(completed);
+    if (!completed) setOpen(true);
   }, [accountId]);
 
   useEffect(() => {
@@ -162,6 +174,30 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
     continueToNotifications();
   };
 
+  const retryInstall = async () => {
+    setShowInstallHelp(false);
+    if (installFlow.step === "native") {
+      const result = await installFlow.install();
+      if (result === "accepted") {
+        setInstalled(true);
+        setMessage("Instalação aceita. O Dose Certa ficará disponível na tela inicial.");
+      } else if (result === "unavailable") {
+        setShowInstallHelp(true);
+      }
+      return;
+    }
+    if (installFlow.step === "own-tab") {
+      installFlow.openOwnTab();
+      return;
+    }
+    setShowInstallHelp(true);
+  };
+
+  const snoozeInstall = () => {
+    installFlow.rest();
+    setShowInstallHelp(false);
+  };
+
   const testVibration = () => {
     if (typeof navigator.vibrate !== "function") {
       setVibrationMessage("Este navegador não oferece vibração pela página.");
@@ -173,7 +209,37 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
       : "O aparelho não aceitou o teste de vibração.");
   };
 
-  if (!open || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
+
+  if (!open && setupFinished && !installed && isMobileDevice() && installFlow.step !== "none") {
+    return (
+      <section className="dc-install-reminder mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-card px-4 py-3 shadow-sm">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Download className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">Instale o Dose Certa no celular</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">Deixe o app na tela inicial para abrir seus lembretes com mais facilidade.</p>
+          </div>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Button size="sm" onClick={() => void retryInstall()}>
+            <Download className="h-4 w-4" />{installFlow.step === "native" ? "Instalar agora" : installFlow.step === "own-tab" ? "Abrir em outra aba" : "Como instalar"}
+          </Button>
+          <button type="button" onClick={snoozeInstall} className="px-2 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">Lembrar depois</button>
+        </div>
+        {showInstallHelp && (
+          <div className="w-full rounded-xl bg-muted/70 p-3 text-xs leading-relaxed text-muted-foreground">
+            {isIosDevice()
+              ? "No Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”. Depois abra o Dose Certa pelo novo ícone."
+              : "No Android, abra o menu do navegador (⋮) e escolha “Instalar app” ou “Adicionar à tela inicial”. Os nomes podem variar conforme o navegador."}
+            <button type="button" onClick={snoozeInstall} className="ml-2 font-bold text-primary">Entendi</button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  if (!open) return null;
 
   const installPromptAvailable = installFlow.step === "native";
   const isCaregiver = role === "cuidador";
