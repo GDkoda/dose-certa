@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
@@ -40,6 +41,25 @@ const card = "rounded-[1.5rem] border border-border/80 bg-card p-5 shadow-[var(-
 
 function useMe(): User | null {
   return useStore((s) => s.users.find((u) => u.id === s.sessionId) ?? null);
+}
+
+function EmptyState({ icon, title, description, actionLabel, onAction }: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <section className="rounded-[1.5rem] border border-dashed border-primary/30 bg-primary/[0.035] px-5 py-7 text-center">
+      <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">{icon}</span>
+      <h2 className="mt-3 font-display text-lg font-semibold text-foreground">{title}</h2>
+      <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">{description}</p>
+      <button type="button" onClick={onAction} className={cls(btnPrimary, "mt-4 rounded-full")}>
+        {actionLabel}<ArrowRight className="h-4 w-4" />
+      </button>
+    </section>
+  );
 }
 
 /* ---------------- master inline editing ---------------- */
@@ -88,9 +108,17 @@ function ImageEditButton({ k, className }: { k: string; className?: string }) {
 function Logo({ size = 40 }: { size?: number }) {
   const icon = useStore((s) => s.images["app-icon"]);
   return (
-    <span className="relative inline-flex">
-      {icon ? <img src={icon} alt="Ícone do app" style={{ width: size, height: size }} className="rounded-xl object-cover" />
-        : <img src="/dose-certa-icon.svg" alt="Dose Certa" style={{ width: size, height: size }} className="rounded-xl object-cover" />}
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      {icon ? (
+        <img src={icon} alt="Ícone personalizado do Dose Certa" className="h-full w-full rounded-xl object-cover" />
+      ) : (
+        <span className="grid h-full w-full place-items-center rounded-xl bg-primary/10 text-primary">
+          <svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Dose Certa">
+            <path d="M7.2 4.8a5.7 5.7 0 0 1 8.1 0l3.9 3.9a5.7 5.7 0 0 1-8.1 8.1l-3.9-3.9a5.7 5.7 0 0 1 0-8.1Z" />
+            <path d="m9 6.6 8.4 8.4" />
+          </svg>
+        </span>
+      )}
       <ImageEditButton k="app-icon" className="absolute -right-2 -top-2 h-5 w-5" />
     </span>
   );
@@ -168,8 +196,65 @@ function ThemeToggle() {
 function PaletteQuickAccess() {
   const { palette, setPalette } = usePalette();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const dialog = open && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/35 p-3 backdrop-blur-sm sm:p-5"
+          onClick={() => setOpen(false)}
+          role="presentation"
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Escolher tema de cores"
+            className={cls(card, "w-[min(25rem,calc(100vw-1.5rem))] max-h-[min(82dvh,42rem)] overflow-y-auto !p-4 shadow-2xl sm:!p-5")}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-display text-lg font-semibold text-foreground">Tema de cores</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">A aparência muda neste aparelho.</p>
+              </div>
+              <button type="button" aria-label="Fechar temas" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              {PALETTES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={palette === p.id}
+                  onClick={() => { setPalette(p.id); setOpen(false); }}
+                  className={cls("flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}
+                >
+                  <span className="flex shrink-0 overflow-hidden rounded-full border border-border">
+                    <span className="h-4 w-4" style={{ background: p.light }} />
+                    <span className="h-4 w-4" style={{ background: p.dark }} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{p.name}</span>
+                  {palette === p.id && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
-    <div className="relative">
+    <>
       <button
         type="button"
         aria-label="Escolher tema de cores"
@@ -181,33 +266,8 @@ function PaletteQuickAccess() {
       >
         <PaletteIcon className="h-5 w-5" />
       </button>
-      {open && (
-        <div role="dialog" aria-label="Escolher tema de cores" className={cls(card, "absolute right-0 z-50 mt-2 max-h-[70dvh] w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-y-auto !p-3 shadow-xl")}>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground">Tema de cores</p>
-            <button type="button" aria-label="Fechar temas" onClick={() => setOpen(false)} className="rounded-full p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {PALETTES.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                aria-pressed={palette === p.id}
-                onClick={() => { setPalette(p.id); setOpen(false); }}
-                className={cls("flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}
-              >
-                <span className="flex shrink-0 overflow-hidden rounded-full border border-border">
-                  <span className="h-4 w-4" style={{ background: p.light }} />
-                  <span className="h-4 w-4" style={{ background: p.dark }} />
-                </span>
-                <span className="truncate text-xs font-medium text-foreground">{p.name}</span>
-                {palette === p.id && <CheckCircle2 className="ml-auto h-4 w-4 shrink-0 text-primary" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      {dialog}
+    </>
   );
 }
 
@@ -491,8 +551,8 @@ function PermissionPrompt() {
 /* ---------------- pages ---------------- */
 type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | "perfil" | "admin";
 
-function Dashboard({ me, go }: { me: User; go: (p: Page) => void }) {
-  const doses = useStore((s) => s.doses.filter((d) => d.ownerId === me.id && new Date(d.scheduledAt).toDateString() === new Date().toDateString()));
+function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) => void; activePatientId?: string }) {
+  const doses = useStore((s) => s.doses.filter((d) => d.ownerId === me.id && (!activePatientId || d.patientId === activePatientId) && new Date(d.scheduledAt).toDateString() === new Date().toDateString()));
   const meds = useStore((s) => s.meds); const patients = useStore((s) => s.patients);
   const taken = doses.filter((d) => d.status === "tomado").length;
   const pend = doses.filter((d) => d.status === "pendente").length;
@@ -576,92 +636,285 @@ function StatusBadge({ s }: { s: Dose["status"] }) {
   return <span className={cls("shrink-0 rounded-full px-3 py-1 text-xs font-bold", map[s][1])}>{map[s][0]}</span>;
 }
 
-function Patients({ me }: { me: User }) {
+function Patients({ me, activePatientId = "", onSelectPatient }: {
+  me: User;
+  activePatientId?: string;
+  onSelectPatient: (patientId: string) => void;
+}) {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
-  const [f, setF] = useState({ name: "", age: "", notes: "" }); const [err, setErr] = useState("");
+  const [f, setF] = useState({ name: "", age: "", notes: "" });
+  const [err, setErr] = useState("");
+
+  const focusPatientForm = () => {
+    document.getElementById("patient-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("patient-name")?.focus();
+  };
+
   return (
     <div className="space-y-6">
-      <T k="pat-title" as="h1" className="font-display text-3xl text-foreground">Pacientes</T>
-      <p className="text-sm text-muted-foreground">{patients.length} de {MAX_PATIENTS} pacientes cadastrados.</p>
+      <div>
+        <T k="pat-title" as="h1" className="font-display text-3xl text-foreground">Pacientes</T>
+        <p className="mt-1 text-sm text-muted-foreground">{patients.length} de {MAX_PATIENTS} pacientes cadastrados.</p>
+      </div>
+
+      {patients.length === 0 && (
+        <EmptyState
+          icon={<UsersRound className="h-6 w-6" />}
+          title="Comece cadastrando um paciente"
+          description="Adicione a pessoa que receberá os cuidados. Depois, você poderá vincular medicamentos e horários ao cadastro dela."
+          actionLabel="Cadastrar primeiro paciente"
+          onAction={focusPatientForm}
+        />
+      )}
+
       {patients.length < MAX_PATIENTS && (
-        <form className={cls(card, "grid gap-3 sm:grid-cols-[1fr_120px]")} onSubmit={(e) => {
-          e.preventDefault(); setErr("");
+        <form id="patient-form" className={cls(card, "grid gap-3 sm:grid-cols-[1fr_120px]")} onSubmit={(e) => {
+          e.preventDefault();
+          setErr("");
           if (!f.name.trim() || !Number(f.age)) return setErr("Informe nome e idade.");
           if (!canAddPatient(getState(), me.id)) return setErr(`Limite de ${MAX_PATIENTS} pacientes.`);
-          setState((s) => ({ ...s, patients: [...s.patients, { id: uid(), ownerId: me.id, name: f.name.trim(), age: Number(f.age), notes: f.notes.trim() }] }));
+          const patientId = uid();
+          setState((s) => ({ ...s, patients: [...s.patients, { id: patientId, ownerId: me.id, name: f.name.trim(), age: Number(f.age), notes: f.notes.trim() }] }));
+          if (me.role === "cuidador") onSelectPatient(patientId);
           setF({ name: "", age: "", notes: "" });
         }}>
-          <input className={input} placeholder="Nome" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          <input className={input} type="number" placeholder="Idade" value={f.age} onChange={(e) => setF({ ...f, age: e.target.value })} />
-          <textarea className={cls(input, "sm:col-span-2")} placeholder="Observações" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
+          <input id="patient-name" className={input} placeholder="Nome do paciente" aria-label="Nome do paciente" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <input className={input} type="number" min="0" placeholder="Idade" aria-label="Idade" value={f.age} onChange={(e) => setF({ ...f, age: e.target.value })} />
+          <textarea className={cls(input, "sm:col-span-2")} placeholder="Observações (opcional)" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
           {err && <p className="text-sm text-destructive sm:col-span-2">{err}</p>}
           <button className={cls(btnPrimary, "sm:col-span-2")}><Plus className="h-4 w-4" />Adicionar paciente</button>
-        </form>)}
-      <div className="grid gap-4 md:grid-cols-3">
-        {patients.map((p) => (
-          <div key={p.id} className={card}>
-            <div className="flex items-start justify-between"><div><p className="font-display text-lg text-foreground">{p.name}</p><p className="text-sm text-muted-foreground">{p.age} anos</p></div>
-              <button aria-label="Excluir paciente" className="text-destructive" onClick={() => { if (confirm(`Excluir ${p.name} e seus medicamentos?`)) setState((s) => ({ ...s, patients: s.patients.filter((x) => x.id !== p.id), meds: s.meds.filter((m) => m.patientId !== p.id) })); }}><Trash2 className="h-4 w-4" /></button></div>
-            {p.notes && <p className="mt-2 text-sm text-foreground">{p.notes}</p>}
-          </div>))}
-      </div>
+        </form>
+      )}
+
+      {patients.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {patients.map((p) => {
+            const isActive = activePatientId === p.id;
+            return (
+              <article key={p.id} className={cls(card, isActive && me.role === "cuidador" ? "border-primary/50 ring-1 ring-primary/15" : "")}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-display text-lg font-semibold text-foreground">{p.name}</p>
+                    <p className="text-sm text-muted-foreground">{p.age} anos</p>
+                  </div>
+                  <button aria-label={`Excluir paciente ${p.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
+                    if (confirm(`Excluir ${p.name} e seus medicamentos?`)) {
+                      setState((s) => ({ ...s, patients: s.patients.filter((x) => x.id !== p.id), meds: s.meds.filter((m) => m.patientId !== p.id), doses: s.doses.filter((d) => d.patientId !== p.id) }));
+                      if (activePatientId === p.id) onSelectPatient("");
+                    }
+                  }}><Trash2 className="h-4 w-4" /></button>
+                </div>
+                {p.notes && <p className="mt-2 text-sm text-muted-foreground">{p.notes}</p>}
+                {me.role === "cuidador" && (
+                  <button type="button" onClick={() => onSelectPatient(isActive ? "" : p.id)} className={cls("mt-4 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition", isActive ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted")}>
+                    {isActive ? <><CheckCircle2 className="h-4 w-4" />Paciente selecionado</> : "Selecionar paciente"}
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-function Meds({ me }: { me: User }) {
+function Meds({ me, activePatientId = "", go }: {
+  me: User;
+  activePatientId?: string;
+  go: (page: Page) => void;
+}) {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
-  const meds = useStore((s) => s.meds.filter((m) => me.role === "mestre" || m.ownerId === me.id));
-  const [f, setF] = useState({ patientId: "", name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" }); const [err, setErr] = useState("");
+  const allMeds = useStore((s) => s.meds.filter((m) => me.role === "mestre" || m.ownerId === me.id));
+  const meds = allMeds.filter((m) => !activePatientId || m.patientId === activePatientId);
+  const [step, setStep] = useState(1);
+  const [f, setF] = useState({ patientId: activePatientId, name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" });
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (activePatientId) setF((current) => ({ ...current, patientId: activePatientId }));
+  }, [activePatientId]);
+
+  const selectedPatientId = patients.some((p) => p.id === f.patientId)
+    ? f.patientId
+    : activePatientId || patients[0]?.id || "";
+  const parseTimes = () => f.times.split(",").map((time) => time.trim()).filter(Boolean);
+  const validTimes = () => {
+    const times = parseTimes();
+    return times.length > 0 && times.every((time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(time));
+  };
+  const focusMedicationName = () => {
+    setStep(1);
+    document.getElementById("medication-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("medication-name")?.focus();
+  };
+  const nextStep = () => {
+    setErr("");
+    if (step === 1 && (!f.name.trim() || !f.dose.trim())) return setErr("Informe o nome e a dosagem do medicamento.");
+    if (step === 2 && !validTimes()) return setErr("Informe ao menos um horário válido no formato HH:MM. Separe vários horários por vírgula.");
+    setStep((current) => Math.min(3, current + 1));
+  };
+  const saveMedication = (event: React.FormEvent) => {
+    event.preventDefault();
+    setErr("");
+    const times = parseTimes();
+    const patient = patients.find((p) => p.id === selectedPatientId);
+    if (!patient) return setErr("Selecione o paciente que receberá este medicamento.");
+    if (!f.name.trim() || !f.dose.trim()) { setStep(1); return setErr("Informe o nome e a dosagem do medicamento."); }
+    if (!validTimes()) { setStep(2); return setErr("Confira os horários informados."); }
+    if (!Number.isFinite(Number(f.stock)) || Number(f.stock) < 0) return setErr("Informe uma quantidade disponível igual ou maior que zero.");
+    const medicationId = uid();
+    setState((s) => ({
+      ...s,
+      meds: [...s.meds, {
+        id: medicationId,
+        ownerId: patient.ownerId,
+        patientId: patient.id,
+        name: f.name.trim(),
+        dose: f.dose.trim(),
+        times: [...new Set(times)].sort(),
+        stock: Number(f.stock),
+        tolerance: Math.max(0, Number(f.tolerance) || 0),
+      }],
+    }));
+    setF({ patientId: activePatientId || patient.id, name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" });
+    setStep(1);
+  };
+
   return (
     <div className="space-y-6">
-      <T k="med-title" as="h1" className="font-display text-3xl text-foreground">Medicamentos</T>
-      {patients.length === 0 ? <p className="text-muted-foreground">Cadastre um paciente primeiro.</p> : (
-        <form className={cls(card, "grid gap-3 sm:grid-cols-2")} onSubmit={(e) => {
-          e.preventDefault(); setErr("");
-          const times = f.times.split(",").map((t) => t.trim()).filter((t) => /^\d{2}:\d{2}$/.test(t));
-          const patient = patients.find((p) => p.id === f.patientId) ?? patients[0];
-          if (!patient) return;
-          const pid = patient.id;
-          if (!f.name.trim() || !times.length) return setErr("Informe nome e ao menos um horário (HH:MM).");
-          setState((s) => ({ ...s, meds: [...s.meds, { id: uid(), ownerId: patient.ownerId, patientId: pid, name: f.name.trim(), dose: f.dose.trim(), times, stock: Number(f.stock) || 0, tolerance: Number(f.tolerance) || 0 }] }));
-          setF({ ...f, name: "", dose: "" });
-        }}>
-          <select className={input} value={f.patientId} onChange={(e) => setF({ ...f, patientId: e.target.value })}>{patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-          <input className={input} placeholder="Nome do medicamento" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          <input className={input} placeholder="Dose (ex.: 50mg, 1 comprimido)" value={f.dose} onChange={(e) => setF({ ...f, dose: e.target.value })} />
-          <input className={input} placeholder="Horários: 08:00, 20:00" value={f.times} onChange={(e) => setF({ ...f, times: e.target.value })} />
-          <label className="text-sm text-muted-foreground">Estoque (comprimidos)<input className={input} type="number" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} /></label>
-          <label className="text-sm text-muted-foreground">Tolerância de atraso (min)<input className={input} type="number" value={f.tolerance} onChange={(e) => setF({ ...f, tolerance: e.target.value })} /></label>
-          {err && <p className="text-sm text-destructive sm:col-span-2">{err}</p>}
-          <button className={cls(btnPrimary, "sm:col-span-2")}><Plus className="h-4 w-4" />Cadastrar medicamento</button>
-        </form>)}
+      <div>
+        <T k="med-title" as="h1" className="font-display text-3xl text-foreground">Medicamentos</T>
+        <p className="mt-1 text-sm text-muted-foreground">Cadastre cada medicamento em três etapas rápidas.</p>
+      </div>
+
+      {patients.length === 0 ? (
+        <EmptyState
+          icon={<UsersRound className="h-6 w-6" />}
+          title="Primeiro, cadastre um paciente"
+          description="Cada medicamento precisa estar associado à pessoa que vai utilizá-lo. O cadastro do paciente leva poucos instantes."
+          actionLabel="Ir para pacientes"
+          onAction={() => go("pacientes")}
+        />
+      ) : (
+        <form id="medication-form" className={cls(card, "space-y-5")} onSubmit={saveMedication}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-foreground">Novo medicamento</p>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Etapa {step} de 3</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2" aria-label="Progresso do cadastro">
+            {["Medicamento", "Horários", "Paciente e quantidade"].map((label, index) => (
+              <div key={label} className="space-y-1.5">
+                <div className={cls("h-1.5 rounded-full", step >= index + 1 ? "bg-primary" : "bg-muted")} />
+                <p className={cls("text-[10px] leading-tight sm:text-xs", step >= index + 1 ? "font-semibold text-primary" : "text-muted-foreground")}>{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {step === 1 && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="font-display text-xl font-semibold text-foreground">Qual medicamento será cadastrado?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Informe o nome e a dosagem conforme a prescrição ou embalagem.</p>
+              </div>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Nome do medicamento
+                <input id="medication-name" className={input} autoComplete="off" required placeholder="Ex.: Losartana" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+              </label>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Dosagem / apresentação
+                <input className={input} required placeholder="Ex.: 50 mg, 1 comprimido" value={f.dose} onChange={(e) => setF({ ...f, dose: e.target.value })} />
+              </label>
+            </section>
+          )}
+
+          {step === 2 && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="font-display text-xl font-semibold text-foreground">Em quais horários?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Use o formato de 24 horas. Separe os horários por vírgula quando houver mais de um.</p>
+              </div>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Horários
+                <input className={input} required placeholder="08:00, 14:00, 20:00" value={f.times} onChange={(e) => setF({ ...f, times: e.target.value })} />
+              </label>
+              <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">Exemplo: 08:00 para uma vez ao dia ou 08:00, 20:00 para duas vezes ao dia.</p>
+            </section>
+          )}
+
+          {step === 3 && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="font-display text-xl font-semibold text-foreground">Para quem e qual a quantidade?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Vincule o medicamento à pessoa certa e informe quanto há disponível.</p>
+              </div>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Paciente
+                <select className={input} required value={selectedPatientId} onChange={(e) => setF({ ...f, patientId: e.target.value })}>
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Quantidade disponível (unidades)
+                <input className={input} type="number" min="0" step="1" required value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} />
+              </label>
+              <label className="block space-y-1.5 text-sm font-medium text-foreground">
+                Avisar após atraso (minutos)
+                <input className={input} type="number" min="0" value={f.tolerance} onChange={(e) => setF({ ...f, tolerance: e.target.value })} />
+              </label>
+            </section>
+          )}
+
+          {err && <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>}
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+            <button type="button" className={btnOutline} disabled={step === 1} onClick={() => { setErr(""); setStep((current) => Math.max(1, current - 1)); }}>Voltar</button>
+            {step < 3
+              ? <button type="button" className={btnPrimary} onClick={nextStep}>Continuar<ArrowRight className="h-4 w-4" /></button>
+              : <button type="submit" className={btnPrimary}><Plus className="h-4 w-4" />Salvar medicamento</button>}
+          </div>
+        </form>
+      )}
+
+      {patients.length > 0 && meds.length === 0 && (
+        <EmptyState
+          icon={<PillBottle className="h-6 w-6" />}
+          title={activePatientId ? "Nenhum medicamento para este paciente" : "Sua lista de medicamentos está vazia"}
+          description={activePatientId ? "Cadastre o primeiro medicamento associado à pessoa selecionada." : "Depois do cadastro, horários e doses aparecem na agenda automaticamente."}
+          actionLabel="Começar cadastro"
+          onAction={focusMedicationName}
+        />
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         {meds.map((m) => (
-          <div key={m.id} className={card}>
+          <article key={m.id} className={card}>
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><p className="font-display text-lg text-foreground">{m.name} <span className="text-sm text-muted-foreground">{m.dose}</span></p>
-                <p className="text-sm text-muted-foreground">{patients.find((p) => p.id === m.patientId)?.name} · {m.times.join(", ")} · tolerância {m.tolerance} min</p></div>
-              <button aria-label="Excluir medicamento" className="text-destructive" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
+              <div className="min-w-0">
+                <p className="break-words font-display text-lg font-semibold text-foreground">{m.name} <span className="text-sm font-medium text-muted-foreground">{m.dose}</span></p>
+                <p className="mt-1 text-sm text-muted-foreground">{patients.find((p) => p.id === m.patientId)?.name} · {m.times.join(", ")}</p>
+              </div>
+              <button aria-label={`Excluir medicamento ${m.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id), doses: s.doses.filter((d) => d.medId !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
             </div>
-            <div className="mt-3 flex items-center gap-2 text-sm">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
               <span className={cls("rounded-full px-3 py-1 font-bold", stockLevel(m) !== "ok" ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary")}>Estoque: {m.stock}</span>
               <span className="text-xs text-muted-foreground">{stockLevel(m) === "empty" ? "Estoque esgotado" : stockLevel(m) === "low" ? "Estoque baixo" : "Estoque suficiente"}</span>
               <button className={btnOutline} onClick={() => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, stock: x.stock + 30 } : x)) }))}>+30</button>
-              <label className="ml-auto flex items-center gap-1 text-muted-foreground">Tol.<input className="w-16 rounded-lg border border-input bg-card px-2 py-1" type="number" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} /></label>
+              <label className="ml-auto flex items-center gap-1 text-muted-foreground">Tol.<input className="w-16 rounded-lg border border-input bg-card px-2 py-1" type="number" min="0" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} /></label>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Estimativa: {estimateStockDays(m) === null ? "cadastre horários para estimar a duração" : String(estimateStockDays(m)) + " dia(s) restantes, considerando uma unidade por horário"}.
-            </p>
-          </div>))}
+            <p className="mt-2 text-xs text-muted-foreground">Estimativa: {estimateStockDays(m) === null ? "cadastre horários para estimar a duração" : `${estimateStockDays(m)} dia(s) restantes, considerando uma unidade por horário`}.</p>
+          </article>
+        ))}
       </div>
     </div>
   );
 }
 
 function HistoryPage({ me }: { me: User }) {
+
+function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatientId?: string; go: (page: Page) => void }) {
   const all = useStore((s) => s.doses); const meds = useStore((s) => s.meds); const patients = useStore((s) => s.patients);
-  const [pid, setPid] = useState(""); const [st, setSt] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  const [pid, setPid] = useState(activePatientId); const [st, setSt] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
+  useEffect(() => { setPid(activePatientId); }, [activePatientId]);
   const rows = all.filter((d) => (me.role !== "cuidador" || d.ownerId === me.id) && (!pid || d.patientId === pid) && (!st || d.status === st)
     && (!from || d.scheduledAt.slice(0, 10) >= from) && (!to || d.scheduledAt.slice(0, 10) <= to)).sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
   const myPatients = patients.filter((p) => me.role !== "cuidador" || p.ownerId === me.id);
@@ -689,7 +942,7 @@ function HistoryPage({ me }: { me: User }) {
           <div className="rounded-xl bg-destructive/10 p-3"><p className="text-muted-foreground">Não tomadas</p><p className="text-lg font-bold text-foreground">{report.missed}</p></div>
           <div className="rounded-xl bg-muted p-3"><p className="text-muted-foreground">Pendentes</p><p className="text-lg font-bold text-foreground">{report.pending}</p></div>
         </div>
-        {rows.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum registro.</p> :
+        {rows.length === 0 ? (all.length === 0 ? <EmptyState icon={<History className="h-6 w-6" />} title="Seu histórico ainda está vazio" description="Depois que você cadastrar medicamentos e registrar as doses, os acompanhamentos aparecerão aqui." actionLabel="Cadastrar medicamento" onAction={() => go("medicamentos")} /> : <p className="text-sm text-muted-foreground">Nenhum registro corresponde aos filtros selecionados.</p>) :
           <ul className="divide-y divide-border">{rows.map((d) => (
             <li key={d.id} className="flex items-center gap-3 py-2 text-sm"><span className="w-32 shrink-0 text-muted-foreground">{fmtDate(d.scheduledAt)}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{meds.find((m) => m.id === d.medId)?.name ?? "—"} · {patients.find((p) => p.id === d.patientId)?.name ?? "—"}</span><StatusBadge s={d.status} /></li>))}</ul>}
@@ -708,7 +961,7 @@ function Support({ me }: { me: User }) {
       <T k="sup-title" as="h1" className="font-display text-3xl text-foreground">Central de Atendimento</T>
       <T k="sup-sub" as="p" className="text-muted-foreground">Estamos aqui para ajudar com o app e dúvidas sobre bulas e medicamentos.</T>
       {me.role === "cuidador" && (
-        <form className={cls(card, "space-y-3")} onSubmit={(e) => { e.preventDefault(); if (!subject.trim() || !text.trim()) return;
+        <form id="support-form" className={cls(card, "space-y-3")} onSubmit={(e) => { e.preventDefault(); if (!subject.trim() || !text.trim()) return;
           setState((s) => ({ ...s, tickets: [{ id: uid(), userId: me.id, subject: subject.trim(), status: "aberto", messages: [{ from: me.login, text: text.trim(), at: new Date().toISOString() }] }, ...s.tickets] })); setSubject(""); setText(""); }}>
           <h2 className="font-display text-lg text-foreground">Abrir chamado</h2>
           <input className={input} placeholder="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} />
@@ -718,7 +971,13 @@ function Support({ me }: { me: User }) {
       <div className={card}><h2 className="mb-2 font-display text-lg text-foreground">Perguntas frequentes</h2>
         {faq.map(([q, a], i) => <details key={q} className="border-b border-border py-2"><summary className="cursor-pointer font-semibold text-foreground"><T k={`faq-q${i}`}>{q!}</T></summary><T k={`faq-a${i}`} as="p" className="mt-1 text-sm text-muted-foreground">{a!}</T></details>)}</div>
       <div className="space-y-3">
-        {mine.length === 0 && <p className="text-sm text-muted-foreground">Nenhum chamado ainda.</p>}
+        {mine.length === 0 && me.role === "cuidador" && (
+          <EmptyState icon={<LifeBuoy className="h-6 w-6" />} title="Nenhum chamado por aqui" description="Quando surgir uma dúvida sobre o aplicativo, abra um chamado e acompanhe a resposta nesta área." actionLabel="Abrir primeiro chamado" onAction={() => {
+            document.getElementById("support-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            document.querySelector<HTMLInputElement>("#support-form input")?.focus();
+          }} />
+        )}
+        {mine.length === 0 && me.role !== "cuidador" && <p className="text-sm text-muted-foreground">Nenhum chamado recebido ainda.</p>}
         {mine.map((t) => (
           <div key={t.id} className={card}>
             <div className="flex items-center gap-2">
@@ -793,14 +1052,31 @@ function UrgentAlertToast({ me }: { me: User }) {
 function Shell({ me }: { me: User }) {
   const removeDevice = useServerFn(removePushDevice);
   const [page, setPage] = useState<Page>(me.role === "mestre" ? "admin" : "inicio");
+  const patientOptions = useStore((s) => s.patients.filter((p) => p.ownerId === me.id));
+  const patientIdsKey = patientOptions.map((p) => p.id).join("|");
+  const [activePatientId, setActivePatientId] = useState("");
+  useEffect(() => {
+    const saved = localStorage.getItem(`dc-patient-${me.id}`);
+    const next = saved && patientOptions.some((p) => p.id === saved)
+      ? saved
+      : patientOptions.length === 1 ? patientOptions[0].id : "";
+    setActivePatientId(next);
+    if (next) localStorage.setItem(`dc-patient-${me.id}`, next);
+    else localStorage.removeItem(`dc-patient-${me.id}`);
+  }, [me.id, patientIdsKey]);
+  const selectPatient = (patientId: string) => {
+    setActivePatientId(patientId);
+    if (patientId) localStorage.setItem(`dc-patient-${me.id}`, patientId);
+    else localStorage.removeItem(`dc-patient-${me.id}`);
+  };
   const items: { id: Page; label: string; mobileLabel: string; icon: ReactNode; roles: Role[] }[] = [
     { id: "inicio", label: "Início", mobileLabel: "Início", icon: <Home className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "pacientes", label: "Pacientes", mobileLabel: "Pacientes", icon: <UsersRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "medicamentos", label: "Medicamentos", mobileLabel: "Medicamentos", icon: <PillBottle className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "historico", label: "Histórico", mobileLabel: "Histórico", icon: <CalendarDays className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "suporte", label: "Atendimento", mobileLabel: "Suporte", icon: <LifeBuoy className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
-    { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
     { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
+    { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
   useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
@@ -840,17 +1116,56 @@ function Shell({ me }: { me: User }) {
           <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
-        <main className="dc-main flex-1 px-4 pb-36 pt-6 md:px-8 md:pb-10">
-          {page === "inicio" && <Dashboard me={me} go={setPage} />}
-          {page === "pacientes" && <Patients me={me} />}
-          {page === "medicamentos" && <Meds me={me} />}
-          {page === "historico" && <HistoryPage me={me} />}
+        {me.role === "cuidador" && patientOptions.length > 0 && (
+          <div className="no-print border-b border-border/60 bg-card/65 px-4 py-2.5 md:px-8">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-2.5">
+              <UserRound className="h-4 w-4 shrink-0 text-primary" />
+              <label htmlFor="active-patient" className="shrink-0 text-xs font-semibold text-muted-foreground sm:text-sm">Paciente</label>
+              <select
+                id="active-patient"
+                aria-label="Selecionar paciente para visualizar"
+                className="min-h-10 min-w-0 flex-1 max-w-sm rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold text-foreground"
+                value={activePatientId}
+                onChange={(event) => selectPatient(event.target.value)}
+              >
+                <option value="">Todos os pacientes</option>
+                {patientOptions.map((patient) => <option key={patient.id} value={patient.id}>{patient.name}</option>)}
+              </select>
+              <span className="hidden text-xs text-muted-foreground sm:inline">{activePatientId ? "Visualização individual" : "Visão geral"}</span>
+            </div>
+          </div>
+        )}
+        <main className="dc-main flex-1 px-4 pb-40 pt-6 md:px-8 md:pb-10">
+          {page === "inicio" && <Dashboard me={me} go={setPage} activePatientId={activePatientId} />}
+          {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} />}
+          {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
+          {page === "historico" && <HistoryPage me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "suporte" && <Support me={me} />}
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
-        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 items-stretch gap-1 border-t border-border/70 bg-card/95 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
-          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}<span className="w-full truncate text-center">{i.mobileLabel}</span></button>)}
+        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-border/70 bg-card/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
+          <div className="grid w-full grid-cols-6 items-stretch gap-1">
+            {items.filter((item) => item.id !== "admin").slice(0, 6).map((i) => (
+              <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label}
+                className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-center text-[10px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>
+                <span className="grid h-5 w-full place-items-center">{i.icon}</span>
+                <span className="w-full truncate text-center">{i.mobileLabel}</span>
+              </button>
+            ))}
+          </div>
+          {me.role === "mestre" && items.some((item) => item.id === "admin") && (
+            <div className="grid w-full grid-cols-6 items-stretch gap-1 border-t border-border/60 pt-1.5">
+              {items.filter((item) => item.id === "admin").map((i) => (
+                <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label}
+                  className={cls("col-start-3 col-span-2 flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-center text-[10px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>
+                  <span className="grid h-5 w-full place-items-center">{i.icon}</span>
+                  <span className="w-full truncate text-center">{i.mobileLabel}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
         </nav>
       </div>
       <AlarmEngine me={me} />
