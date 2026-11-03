@@ -909,13 +909,12 @@ function Meds({ me, activePatientId = "", go }: {
   );
 }
 
-function HistoryPage({ me }: { me: User }) {
-
 function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatientId?: string; go: (page: Page) => void }) {
   const all = useStore((s) => s.doses); const meds = useStore((s) => s.meds); const patients = useStore((s) => s.patients);
   const [pid, setPid] = useState(activePatientId); const [st, setSt] = useState(""); const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   useEffect(() => { setPid(activePatientId); }, [activePatientId]);
-  const rows = all.filter((d) => (me.role !== "cuidador" || d.ownerId === me.id) && (!pid || d.patientId === pid) && (!st || d.status === st)
+  const visibleDoses = all.filter((d) => me.role !== "cuidador" || d.ownerId === me.id);
+  const rows = visibleDoses.filter((d) => (!pid || d.patientId === pid) && (!st || d.status === st)
     && (!from || d.scheduledAt.slice(0, 10) >= from) && (!to || d.scheduledAt.slice(0, 10) <= to)).sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
   const myPatients = patients.filter((p) => me.role !== "cuidador" || p.ownerId === me.id);
   const csv = () => {
@@ -942,7 +941,7 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
           <div className="rounded-xl bg-destructive/10 p-3"><p className="text-muted-foreground">Não tomadas</p><p className="text-lg font-bold text-foreground">{report.missed}</p></div>
           <div className="rounded-xl bg-muted p-3"><p className="text-muted-foreground">Pendentes</p><p className="text-lg font-bold text-foreground">{report.pending}</p></div>
         </div>
-        {rows.length === 0 ? (all.length === 0 ? <EmptyState icon={<History className="h-6 w-6" />} title="Seu histórico ainda está vazio" description="Depois que você cadastrar medicamentos e registrar as doses, os acompanhamentos aparecerão aqui." actionLabel="Cadastrar medicamento" onAction={() => go("medicamentos")} /> : <p className="text-sm text-muted-foreground">Nenhum registro corresponde aos filtros selecionados.</p>) :
+        {rows.length === 0 ? (visibleDoses.length === 0 ? <EmptyState icon={<History className="h-6 w-6" />} title="Seu histórico ainda está vazio" description="Depois que você cadastrar medicamentos e registrar as doses, os acompanhamentos aparecerão aqui." actionLabel="Cadastrar medicamento" onAction={() => go("medicamentos")} /> : <p className="text-sm text-muted-foreground">Nenhum registro corresponde aos filtros selecionados.</p>) :
           <ul className="divide-y divide-border">{rows.map((d) => (
             <li key={d.id} className="flex items-center gap-3 py-2 text-sm"><span className="w-32 shrink-0 text-muted-foreground">{fmtDate(d.scheduledAt)}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{meds.find((m) => m.id === d.medId)?.name ?? "—"} · {patients.find((p) => p.id === d.patientId)?.name ?? "—"}</span><StatusBadge s={d.status} /></li>))}</ul>}
