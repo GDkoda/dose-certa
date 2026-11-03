@@ -518,3 +518,57 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   --sidebar-accent-foreground: oklch(0.98 0.004 265);
   --sidebar-ring: oklch(0.76 0.008 265);
 }
+
+
+/* Paleta Cobre — terracota, cobre queimado e tons terrosos */
+:root[data-palette="cobre"] {
+  --background: oklch(0.975 0.018 62);
+  --foreground: oklch(0.27 0.045 45);
+  --card: oklch(0.995 0.008 62);
+  --card-foreground: oklch(0.27 0.045 45);
+  --popover: oklch(0.995 0.008 62);
+  --popover-foreground: oklch(0.27 0.045 45);
+  --primary: oklch(0.53 0.12 43);
+  --primary-foreground: oklch(0.99 0.005 65);
+  --secondary: oklch(0.65 0.09 68);
+  --secondary-foreground: oklch(0.25 0.04 45);
+  --muted: oklch(0.93 0.025 62);
+  --muted-foreground: oklch(0.49 0.045 45);
+  --accent: oklch(0.92 0.045 52);
+  --accent-foreground: oklch(0.32 0.075 43);
+  --border: oklch(0.88 0.03 58);
+  --input: oklch(0.88 0.03 58);
+  --ring: oklch(0.53 0.12 43);
+  --chart-1: oklch(0.53 0.12 43); --chart-2: oklch(0.65 0.09 68); --chart-3: oklch(0.38 0.055 38); --chart-4: oklch(0.72 0.1 78); --chart-5: oklch(0.58 0.08 25);
+  --sidebar: oklch(0.34 0.065 42);
+  --sidebar-foreground: oklch(0.97 0.012 62);
+  --sidebar-primary: oklch(0.82 0.1 62);
+  --sidebar-primary-foreground: oklch(0.25 0.045 45);
+  --sidebar-accent: oklch(0.43 0.075 43);
+  --sidebar-accent-foreground: oklch(0.99 0.005 65);
+  --sidebar-border: oklch(0.48 0.06 43);
+  --sidebar-ring: oklch(0.82 0.1 62);
+}
+.dark[data-palette="cobre"] {
+  --background: oklch(0.19 0.022 42);
+  --foreground: oklch(0.95 0.012 62);
+  --card: oklch(0.24 0.028 42);
+  --card-foreground: oklch(0.95 0.012 62);
+  --popover: oklch(0.24 0.028 42);
+  --popover-foreground: oklch(0.95 0.012 62);
+  --primary: oklch(0.72 0.12 55);
+  --primary-foreground: oklch(0.2 0.035 42);
+  --secondary: oklch(0.62 0.09 68);
+  --secondary-foreground: oklch(0.2 0.035 42);
+  --muted: oklch(0.3 0.028 42);
+  --muted-foreground: oklch(0.75 0.025 58);
+  --accent: oklch(0.34 0.045 48);
+  --accent-foreground: oklch(0.96 0.012 62);
+  --sidebar: oklch(0.16 0.022 42);
+  --sidebar-foreground: oklch(0.95 0.012 62);
+  --sidebar-primary: oklch(0.72 0.12 55);
+  --sidebar-primary-foreground: oklch(0.2 0.035 42);
+  --sidebar-accent: oklch(0.29 0.04 45);
+  --sidebar-accent-foreground: oklch(0.99 0.005 65);
+  --sidebar-ring: oklch(0.72 0.12 55);
+}
