@@ -1,363 +1,329 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  Bell, BellRing, Battery, CheckCircle2, ChevronDown, ChevronUp,
-  Download, Info, LockKeyhole, Settings, Smartphone, Volume2, Vibrate,
+  ArrowRight, BellRing, CheckCircle2, Download, Info, Smartphone, Vibrate, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { enablePush } from "@/lib/push-browser";
-import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
+import { registerPushDevice } from "@/lib/push.functions";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import type { Role } from "@/lib/store";
 
-type PushState = "checking" | "prompt" | "granted" | "registered" | "denied" | "unsupported" | "not-configured" | "open-in-new-tab";
-type ManualSetting = "sound" | "screen" | "badge";
-type ManualChecks = Record<ManualSetting, boolean>;
-
-const manualStorageKey = "dc-device-manual-settings";
+type SetupStep = "install" | "notifications";
+type PushState = "idle" | "busy" | "registered" | "denied" | "unsupported" | "not-configured" | "open-in-new-tab" | "error";
 
 function isStandaloneApp() {
+  if (typeof window === "undefined") return false;
   try {
     if (window.matchMedia("(display-mode: standalone)").matches) return true;
     if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
-  } catch { /* Browser antigo. */ }
+  } catch { /* Navegadores antigos. */ }
   return (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
-function loadManualChecks(): ManualChecks {
-  const empty: ManualChecks = { sound: false, screen: false, badge: false };
-  if (typeof window === "undefined") return empty;
-  try {
-    return { ...empty, ...JSON.parse(localStorage.getItem(manualStorageKey) ?? "{}") };
-  } catch { return empty; }
+function setupStorageKey(accountId: string) {
+  return "dc-first-setup-complete-" + accountId;
 }
 
-const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60";
+function wasSetupCompleted(accountId: string) {
+  if (typeof window === "undefined") return true;
+  try { return localStorage.getItem(setupStorageKey(accountId)) === "1"; }
+  catch { return false; }
+}
 
 export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountId: string }) {
-  const pushReadyKey = "dc-push-ready-" + accountId;
   const installFlow = useInstallPrompt();
   const register = useServerFn(registerPushDevice);
-  const sendTest = useServerFn(sendTestPush);
-  const [installed, setInstalled] = useState(false);
-  const [pushState, setPushState] = useState<PushState>("checking");
-  const [expanded, setExpanded] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try { return localStorage.getItem("dc-device-setup-collapsed") !== "1"; }
-    catch { return true; }
+  const [open, setOpen] = useState(() => !wasSetupCompleted(accountId));
+  const [step, setStep] = useState<SetupStep>(() => isStandaloneApp() ? "notifications" : "install");
+  const [installed, setInstalled] = useState(isStandaloneApp);
+  const [pushState, setPushState] = useState<PushState>(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+    if (Notification.permission === "denied") return "denied";
+    return "idle";
   });
-  const [manualChecks, setManualChecks] = useState<ManualChecks>(loadManualChecks);
-  const [vibrationTested, setVibrationTested] = useState(false);
-  const [installBusy, setInstallBusy] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
-  const [testBusy, setTestBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [vibrationMessage, setVibrationMessage] = useState("");
 
-  const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const isAndroid = /Android/i.test(userAgent);
-  const isIos = /iPhone|iPad|iPod/i.test(userAgent) || (/Macintosh/i.test(userAgent) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1);
-  const isMobile = isAndroid || isIos;
+  const finish = useCallback(() => {
+    try { localStorage.setItem(setupStorageKey(accountId), "1"); } catch { /* A sessão continua normalmente sem armazenamento local. */ }
+    setOpen(false);
+  }, [accountId]);
 
-  useEffect(() => {
-    const refreshInstalled = () => setInstalled(isStandaloneApp());
-    const refreshPush = () => {
-      if (!("Notification" in window)) {
-        setPushState("unsupported");
-      } else if (Notification.permission === "denied") {
-        setPushState("denied");
-      } else if (Notification.permission === "granted") {
-        let registered = false;
-        try { registered = !!sessionStorage.getItem("dc-push-token") || localStorage.getItem(pushReadyKey) === "1"; }
-        catch { /* O navegador pode bloquear armazenamento local. */ }
-        setPushState(registered ? "registered" : "granted");
-      } else {
-        setPushState("prompt");
-      }
-    };
-    const refresh = () => { refreshInstalled(); refreshPush(); };
-    refresh();
-    window.addEventListener("appinstalled", refreshInstalled);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("dc-push-ready", refreshPush);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      window.removeEventListener("appinstalled", refreshInstalled);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("dc-push-ready", refreshPush);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, []);
-
-  const setManual = (key: ManualSetting, checked: boolean) => {
-    const next = { ...manualChecks, [key]: checked };
-    setManualChecks(next);
-    try { localStorage.setItem(manualStorageKey, JSON.stringify(next)); } catch { /* Armazenamento opcional. */ }
-  };
-
-  const collapse = () => {
-    setExpanded(false);
-    try { localStorage.setItem("dc-device-setup-collapsed", "1"); } catch { /* Armazenamento opcional. */ }
-  };
-  const reopen = () => {
-    setExpanded(true);
-    try { localStorage.removeItem("dc-device-setup-collapsed"); } catch { /* Armazenamento opcional. */ }
-  };
-
-  const installApp = async () => {
-    setInstallBusy(true);
-    setMessage("");
-    try {
-      if (installFlow.step === "native") {
-        const result = await installFlow.install();
-        if (result === "accepted") {
-          setInstalled(true);
-          setMessage("Pedido de instalação aceito. Termine a confirmação que apareceu no navegador.");
-        } else if (result === "unavailable") {
-          setMessage("O navegador não abriu a instalação agora. Use o menu do navegador e escolha “Instalar app” ou “Adicionar à tela inicial”.");
-        }
-      } else if (installFlow.step === "own-tab") {
-        installFlow.openOwnTab();
-        setMessage("Abra a nova aba e continue a instalação por lá.");
-      } else {
-        setMessage(isIos
-          ? "No Safari, toque em Compartilhar e depois em Adicionar à Tela de Início."
-          : "Abra o menu do navegador (⋮) e escolha “Instalar app” ou “Adicionar à tela inicial”.");
-      }
-    } finally {
-      setInstallBusy(false);
-    }
-  };
-
-  const activateNotifications = async () => {
+  const connectNotifications = useCallback(async () => {
     setPushBusy(true);
+    setPushState("busy");
     setMessage("");
     try {
       const result = await enablePush();
       if (result.status === "registered") {
-        await register({ data: { token: result.token, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
+        await register({
+          data: {
+            token: result.token,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+        });
         try {
           sessionStorage.setItem("dc-push-token", result.token);
-          localStorage.setItem(pushReadyKey, "1");
+          localStorage.setItem("dc-push-ready-" + accountId, "1");
         } catch { /* O registro remoto continua válido mesmo sem armazenamento local. */ }
         setPushState("registered");
+        setMessage("Notificações ativadas. Este aparelho está vinculado à sua conta.");
         window.dispatchEvent(new Event("dc-push-ready"));
-        setMessage("Pronto! Este aparelho foi vinculado para receber os avisos do Dose Certa.");
       } else {
-        const messages = {
-          "not-configured": "O serviço de notificações ainda não está conectado neste ambiente. Peça ao suporte para concluir essa configuração.",
-          unsupported: isIos
-            ? "No iPhone/iPad, primeiro adicione o Dose Certa à Tela de Início e abra pelo ícone instalado. Depois volte aqui para ativar os avisos."
-            : "Este navegador não oferece suporte aos avisos em segundo plano necessários. Atualize o navegador e abra o Dose Certa em uma aba própria.",
-          "open-in-new-tab": "O Dose Certa foi aberto dentro de uma prévia. Abra-o em uma aba própria do navegador para ativar os avisos.",
-          denied: "A permissão foi recusada ou está bloqueada. Abra as configurações de notificações do Dose Certa no aparelho ou do site no navegador e permita os avisos.",
+        setPushState(result.status);
+        const messages: Record<"not-configured" | "unsupported" | "open-in-new-tab" | "denied", string> = {
+          "not-configured": "O serviço de notificações ainda não está conectado neste ambiente.",
+          unsupported: "Este navegador não oferece suporte às notificações em segundo plano do Dose Certa.",
+          "open-in-new-tab": "Abra o Dose Certa em uma aba própria do navegador para ativar as notificações.",
+          denied: "As notificações estão bloqueadas nas permissões atuais do navegador. Ele não permite abrir o pedido novamente por aqui.",
         };
         setMessage(messages[result.status]);
-        setPushState(result.status);
       }
     } catch {
-      setMessage("Não foi possível concluir a ativação. Confira a conexão e tente novamente.");
-      setPushState("prompt");
+      setPushState("error");
+      setMessage("Não foi possível concluir a ativação agora. Confira a conexão e tente novamente.");
     } finally {
       setPushBusy(false);
     }
+  }, [accountId, register]);
+
+  useEffect(() => {
+    const onInstalled = () => {
+      setInstalled(true);
+      setStep("notifications");
+      setMessage("Dose Certa instalado. Agora vamos ativar os avisos.");
+    };
+    window.addEventListener("appinstalled", onInstalled);
+    if (isStandaloneApp()) {
+      setInstalled(true);
+      setStep("notifications");
+    }
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, []);
+
+  useEffect(() => {
+    if (!open || step !== "notifications") return;
+    if (!("Notification" in window)) {
+      setPushState("unsupported");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setPushState("denied");
+      return;
+    }
+    // A permissão já concedida não exige novo prompt: apenas vinculamos o aparelho.
+    if (Notification.permission === "granted" && pushState === "idle" && !pushBusy) {
+      void connectNotifications();
+    }
+  }, [open, step, pushState, pushBusy, connectNotifications]);
+
+  const continueToNotifications = () => {
+    setMessage("");
+    setStep("notifications");
   };
 
-  const testNotification = async () => {
-    setTestBusy(true);
-    setMessage("Enviando um aviso de teste. Minimize o Dose Certa por alguns instantes para conferir se ele aparece.");
-    try {
-      const result = await sendTest();
-      setMessage(result.devices === 0
-        ? "Nenhum aparelho foi vinculado ainda. Ative os avisos primeiro."
-        : result.sent > 0
-          ? "Aviso de teste enviado. Minimize o app e confira a notificação."
-          : "O envio não foi concluído. Confira as permissões e tente ativar os avisos novamente.");
-    } catch {
-      setMessage("Não foi possível enviar o teste agora. Tente novamente quando a conexão estiver estável.");
-    } finally {
-      setTestBusy(false);
+  const installApp = async () => {
+    setMessage("");
+    if (installFlow.step === "native") {
+      const result = await installFlow.install();
+      if (result === "unavailable") {
+        setMessage("O navegador não conseguiu abrir a instalação agora. Você pode continuar sem instalar.");
+        return;
+      }
+      setInstalled(result === "accepted" || isStandaloneApp());
+      setStep("notifications");
+      return;
     }
+    if (installFlow.step === "own-tab") {
+      installFlow.openOwnTab();
+      setMessage("O Dose Certa foi aberto em outra aba. Continue por ela ou siga sem instalar.");
+      return;
+    }
+    // iOS Safari e alguns navegadores não oferecem uma API para abrir
+    // automaticamente o fluxo de instalação. Não exibimos um tutorial longo.
+    continueToNotifications();
   };
 
   const testVibration = () => {
-    if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
-      setMessage("Este navegador não oferece teste de vibração pela página. Ative som e vibração nas configurações de notificações do aparelho.");
+    if (typeof navigator.vibrate !== "function") {
+      setVibrationMessage("Este navegador não oferece vibração pela página.");
       return;
     }
-    const accepted = navigator.vibrate([180, 110, 180]);
-    if (accepted) {
-      setVibrationTested(true);
-      setMessage("O navegador aceitou o teste de vibração. O Android ainda pode silenciar vibrações em modo silencioso ou Não Perturbe.");
-    } else {
-      setMessage("O aparelho não iniciou a vibração. Confira o modo silencioso, Não Perturbe e as configurações de vibração do sistema.");
-    }
+    const accepted = navigator.vibrate([160, 90, 160]);
+    setVibrationMessage(accepted
+      ? "Teste enviado. A vibração dos avisos em segundo plano ainda depende do navegador e do sistema."
+      : "O aparelho não aceitou o teste de vibração.");
   };
 
-  const manualDone = Object.values(manualChecks).filter(Boolean).length;
-  const vibrationSupported = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
-  const completed = Number(installed) + Number(pushState === "registered") + Number(vibrationTested || !vibrationSupported) + manualDone;
-  const total = 5 + Number(vibrationSupported);
+  if (!open || typeof document === "undefined") return null;
 
-  if (!expanded) {
-    return (
-      <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Settings className="h-5 w-5" /></span>
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground">Configuração do aparelho</p>
-            <p className="text-xs text-muted-foreground">{completed} de {total} verificações concluídas · você pode revisar quando quiser</p>
-          </div>
-        </div>
-        <button type="button" onClick={reopen} className={secondaryButton}>Rever configurações<ChevronDown className="h-4 w-4" /></button>
-      </section>
-    );
-  }
+  const installPromptAvailable = installFlow.step === "native";
+  const isCaregiver = role === "cuidador";
 
-  return (
-    <section className="mb-6 overflow-hidden rounded-[1.6rem] border border-primary/20 bg-card shadow-sm">
-      <div className="relative overflow-hidden bg-primary/5 px-5 py-5 sm:px-6">
-        <div className="flex items-start gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Smartphone className="h-6 w-6" /></span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Configuração inicial</p>
-            <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Vamos preparar seu aparelho?</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{role === "cuidador" ? "Para o Dose Certa funcionar por completo e lembrar você dos medicamentos na hora certa, prepare este aparelho para receber avisos mesmo quando estiver usando outro app ou com a tela bloqueada." : "Prepare este aparelho para instalar o Dose Certa e receber os avisos do sistema quando estiverem disponíveis para sua conta."} É rapidinho e você pode mudar tudo depois.</p>
-          </div>
-          <button type="button" onClick={collapse} aria-label="Recolher configuração do aparelho" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"><ChevronUp className="h-5 w-5" /></button>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: (completed / total * 100) + "%" }} />
-          </div>
-          <span className="text-xs font-semibold tabular-nums text-muted-foreground">{completed}/{total}</span>
-        </div>
-      </div>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/55 px-3 py-5 backdrop-blur-sm sm:px-5" role="presentation">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dc-setup-title"
+        className="relative my-auto w-full max-w-md overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-2xl"
+      >
+        <button
+          type="button"
+          onClick={finish}
+          aria-label="Fechar configuração inicial"
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-5 w-5" />
+        </button>
 
-      <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
-        <article className="rounded-2xl border border-border bg-background p-4">
-          <div className="flex items-center gap-2 text-primary"><Download className="h-5 w-5" /><p className="font-semibold text-foreground">1. Instalar no celular</p></div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{installed ? "O Dose Certa já está aberto como aplicativo instalado neste aparelho." : "A instalação deixa o Dose Certa na tela inicial e facilita abrir os alarmes."}</p>
-          {!installed && (
+        <div className="bg-primary/5 px-6 pb-5 pt-7">
+          <span className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            {step === "install" ? <Smartphone className="h-6 w-6" /> : <BellRing className="h-6 w-6" />}
+          </span>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary">
+            {step === "install" ? "Uma configuração rápida" : "Última etapa"}
+          </p>
+          <h2 id="dc-setup-title" className="mt-1 pr-8 font-display text-2xl font-semibold text-foreground">
+            {step === "install" ? "Prepare seu Dose Certa" : "Ative os lembretes"}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {step === "install"
+              ? "Vamos deixar o app mais fácil de abrir e preparar este aparelho para receber os avisos."
+              : isCaregiver
+                ? "Permita as notificações para receber os lembretes dos medicamentos mesmo quando estiver usando outro aplicativo."
+                : "Permita as notificações para receber os avisos do Dose Certa neste aparelho."}
+          </p>
+        </div>
+
+        <div className="space-y-4 p-5 sm:p-6">
+          {step === "install" ? (
             <>
-              {installFlow.step === "ios" ? (
-                <ol className="mt-3 list-inside list-decimal space-y-1 text-xs leading-relaxed text-muted-foreground">
-                  <li>Abra esta página no Safari.</li>
-                  <li>Toque em Compartilhar.</li>
-                  <li>Escolha “Adicionar à Tela de Início” e confirme.</li>
-                </ol>
-              ) : installFlow.step === "own-tab" ? (
-                <p className="mt-3 text-xs text-muted-foreground">Esta janela de prévia não permite instalação. Abra o app em uma aba própria.</p>
+              {installed ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-semibold text-foreground">Dose Certa já está instalado</p>
+                    <p className="text-xs text-muted-foreground">Vamos ativar as notificações agora.</p>
+                  </div>
+                </div>
               ) : (
-                <p className="mt-3 text-xs text-muted-foreground">{isMobile ? "No Android, use o menu ⋮ do navegador e escolha “Instalar app” ou “Adicionar à tela inicial” caso o botão de instalação não apareça." : "Use o ícone de instalação na barra de endereços ou o menu do navegador."}</p>
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Download className="h-5 w-5" /></span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground">Instalar no celular</p>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        {installPromptAvailable
+                          ? "O navegador pode adicionar o Dose Certa à tela inicial."
+                          : installFlow.step === "own-tab"
+                            ? "A instalação precisa ser iniciada em uma aba própria."
+                            : "A instalação automática não está disponível neste navegador agora. Você pode continuar sem instalar."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
-              <Button className="mt-3 w-full" disabled={installBusy} onClick={() => void installApp()}>
-                <Download className="h-4 w-4" />{installBusy ? "Abrindo instalação..." : installFlow.step === "native" ? "Instalar Dose Certa" : installFlow.step === "own-tab" ? "Abrir em nova aba" : "Ver instruções de instalação"}
-              </Button>
-              {installFlow.step !== "native" && (
-                <button type="button" className="mt-2 w-full text-xs font-semibold text-primary hover:underline" onClick={() => setInstalled(true)}>Já instalei no meu aparelho</button>
+
+              {installFlow.step === "own-tab" ? (
+                <>
+                  <Button className="w-full" onClick={() => installFlow.openOwnTab()}>
+                    <Smartphone className="h-4 w-4" />Abrir em outra aba
+                  </Button>
+                  <button type="button" onClick={continueToNotifications} className="w-full py-1 text-sm font-semibold text-muted-foreground transition hover:text-foreground">
+                    Continuar sem instalar
+                  </button>
+                </>
+              ) : installed ? (
+                <Button className="w-full" onClick={continueToNotifications}>
+                  Continuar<ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : installPromptAvailable ? (
+                <>
+                  <Button className="w-full" onClick={() => void installApp()}>
+                    <Download className="h-4 w-4" />Instalar Dose Certa
+                  </Button>
+                  <button type="button" onClick={continueToNotifications} className="w-full py-1 text-sm font-semibold text-muted-foreground transition hover:text-foreground">
+                    Continuar sem instalar
+                  </button>
+                </>
+              ) : (
+                <Button className="w-full" onClick={continueToNotifications}>
+                  Continuar<ArrowRight className="h-4 w-4" />
+                </Button>
               )}
             </>
-          )}
-          {installed && <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary"><CheckCircle2 className="h-4 w-4" />Instalação concluída</p>}
-        </article>
+          ) : (
+            <>
+              <div className={pushState === "registered" ? "flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4" : "flex items-center gap-3 rounded-2xl border border-border bg-background p-4"}>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                  {pushState === "registered" ? <CheckCircle2 className="h-5 w-5" /> : <BellRing className="h-5 w-5" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">
+                    {pushState === "registered" ? "Notificações ativadas" : pushState === "denied" ? "Notificações bloqueadas" : "Permitir notificações"}
+                  </p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {pushState === "registered"
+                      ? "Este aparelho está vinculado à sua conta e pronto para receber avisos."
+                      : pushState === "denied"
+                        ? "O navegador já bloqueou essa permissão e não permite solicitar novamente nesta tela."
+                        : pushState === "unsupported"
+                          ? "Este navegador não oferece suporte às notificações necessárias."
+                          : pushState === "not-configured"
+                            ? "O serviço de notificações ainda não está conectado neste ambiente."
+                            : "Ao tocar no botão, o navegador abrirá a solicitação oficial de permissão."}
+                  </p>
+                </div>
+              </div>
 
-        <article className="rounded-2xl border border-border bg-background p-4">
-          <div className="flex items-center gap-2 text-primary"><BellRing className="h-5 w-5" /><p className="font-semibold text-foreground">2. Ativar notificações</p></div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Ao tocar no botão, o navegador vai perguntar se pode mostrar notificações. Escolha “Permitir” para receber lembretes quando estiver usando outro aplicativo ou com a tela bloqueada.</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className={pushState === "registered" ? "rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary" : "rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"}>
-              {pushState === "registered" ? "Aparelho vinculado" : pushState === "granted" ? "Permissão concedida" : pushState === "denied" ? "Permissão bloqueada" : pushState === "not-configured" ? "Serviço ainda não conectado" : pushState === "open-in-new-tab" ? "Abrir em aba própria" : pushState === "unsupported" ? "Verificar compatibilidade" : "Aguardando ativação"}
-            </span>
-          </div>
-          {pushState !== "registered" && pushState !== "denied" && pushState !== "not-configured" && pushState !== "open-in-new-tab" && (
-            <Button className="mt-3 w-full" disabled={pushBusy} onClick={() => void activateNotifications()}>
-              <Bell className="h-4 w-4" />{pushBusy ? "Ativando..." : pushState === "granted" ? "Concluir ativação neste aparelho" : "Permitir notificações"}
-            </Button>
-          )}
-          {pushState === "open-in-new-tab" && (
-            <Button className="mt-3 w-full" onClick={installFlow.openOwnTab}>
-              <Smartphone className="h-4 w-4" />Abrir em uma aba própria
-            </Button>
-          )}
-          {pushState === "not-configured" && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">O ambiente ainda precisa conectar o serviço de notificações. Depois que ele estiver configurado, volte aqui para ativar.</p>}
-          {pushState === "registered" && (
-            <Button variant="outline" className="mt-3 w-full" disabled={testBusy} onClick={() => void testNotification()}>
-              <BellRing className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar aviso de teste"}
-            </Button>
-          )}
-          {pushState === "denied" && (
-            <details className="mt-3 rounded-xl bg-muted/60 p-3">
-              <summary className="cursor-pointer text-xs font-semibold text-foreground">Como liberar notificações bloqueadas</summary>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{isIos ? "Abra Ajustes → Notificações → Dose Certa e ative Permitir Notificações." : "Abra Informações do app → Notificações → Permitir. Se o app não aparecer, abra as configurações do Chrome → Configurações do site → Notificações, escolha o Dose Certa e marque Permitir."}</p>
-            </details>
-          )}
-          {isIos && !installed && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">No iPhone, os avisos da web exigem que o site seja adicionado à Tela de Início e aberto pelo ícone instalado.</p>}
-        </article>
+              {(pushState === "idle" || pushState === "error") && (
+                <Button className="w-full" disabled={pushBusy} onClick={() => void connectNotifications()}>
+                  <BellRing className="h-4 w-4" />{pushBusy ? "Ativando..." : "Permitir notificações"}
+                </Button>
+              )}
 
-        <article className="rounded-2xl border border-border bg-background p-4">
-          <div className="flex items-center gap-2 text-primary"><Vibrate className="h-5 w-5" /><p className="font-semibold text-foreground">3. Testar vibração</p></div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">A web não pede uma permissão separada para vibrar. Faça um teste e confira se o aparelho está com a vibração ativada.</p>
-          <Button variant="outline" className="mt-3 w-full" onClick={testVibration}><Vibrate className="h-4 w-4" />Testar vibração</Button>
-          {vibrationTested && <p className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-primary"><CheckCircle2 className="h-4 w-4" />Comando de vibração aceito pelo navegador</p>}
-        </article>
+              {pushState === "open-in-new-tab" && (
+                <Button className="w-full" onClick={installFlow.openOwnTab}>
+                  <Smartphone className="h-4 w-4" />Abrir em uma aba própria
+                </Button>
+              )}
 
-        <article className="rounded-2xl border border-border bg-background p-4">
-          <div className="flex items-center gap-2 text-primary"><Settings className="h-5 w-5" /><p className="font-semibold text-foreground">4. Ajustar os avisos do sistema</p></div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{isIos ? "No iPhone/iPad, abra Ajustes → Notificações → Dose Certa." : "No Android, pressione o ícone do Dose Certa, abra Informações do app e entre em Notificações."}</p>
-          <div className="mt-3 space-y-2.5">
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <input type="checkbox" checked={manualChecks.sound} onChange={(event) => setManual("sound", event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-              <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span><strong className="text-foreground">Som e vibração</strong><span className="block text-xs text-muted-foreground">Permita alertas sonoros e vibração para os avisos do Dose Certa.</span></span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <input type="checkbox" checked={manualChecks.screen} onChange={(event) => setManual("screen", event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-              <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span><strong className="text-foreground">Tela bloqueada e banners</strong><span className="block text-xs text-muted-foreground">{isIos ? "Ative Tela Bloqueada, Central de Notificações e Banners." : "Ative Tela de bloqueio e “Pop-up na tela”/“Exibir como pop-up”, se disponível."}</span></span>
-            </label>
-            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-              <input type="checkbox" checked={manualChecks.badge} onChange={(event) => setManual("badge", event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
-              <span><strong className="text-foreground">Ponto no ícone</strong><span className="block text-xs text-muted-foreground">{isIos ? "Ative Selos nas opções de notificação." : "Ative “Ponto de notificação” ou “Selos no ícone do app”."}</span></span>
-            </label>
-          </div>
-          <details className="mt-4 rounded-xl bg-muted/60 p-3">
-            <summary className="cursor-pointer text-xs font-semibold text-foreground">Onde encontro essas opções?</summary>
-            {isIos ? (
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Ajustes do iPhone → Notificações → Dose Certa. Ative Permitir Notificações, Sons, Selos, Tela Bloqueada e Banners.</p>
-            ) : (
-              <ol className="mt-2 list-inside list-decimal space-y-1 text-xs leading-relaxed text-muted-foreground">
-                <li>Pressione o ícone Dose Certa e toque em “Informações do app”.</li>
-                <li>Entre em “Notificações” e permita notificações.</li>
-                <li>Abra cada categoria de aviso e escolha alertas com som e vibração.</li>
-                <li>Ative Tela de bloqueio, Pop-up na tela e Ponto de notificação, quando disponíveis.</li>
-              </ol>
-            )}
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">Os nomes e caminhos mudam conforme a marca e a versão do sistema. Se o Dose Certa não aparecer na lista, procure as permissões do site nas configurações do navegador.</p>
-          </details>
-          {!isIos && (
-            <details className="mt-2 rounded-xl bg-muted/60 p-3">
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground"><Battery className="h-4 w-4 text-primary" />Se os avisos estiverem chegando atrasados</summary>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Abra Informações do app → Bateria e permita atividade em segundo plano, se essa opção existir no seu aparelho. Em alguns modelos, “Sem restrições” melhora a entrega, mas pode consumir mais bateria. Não é necessário desativar a economia de bateria do telefone inteiro.</p>
-            </details>
+              {pushState === "registered" && typeof navigator !== "undefined" && typeof navigator.vibrate === "function" && (
+                <div className="rounded-2xl border border-border bg-background p-3">
+                  <div className="flex items-center gap-2">
+                    <Vibrate className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Testar vibração</p>
+                  </div>
+                  <Button variant="outline" className="mt-2 w-full" onClick={testVibration}>
+                    <Vibrate className="h-4 w-4" />Vibrar aparelho
+                  </Button>
+                  {vibrationMessage && <p role="status" className="mt-2 text-xs text-muted-foreground">{vibrationMessage}</p>}
+                </div>
+              )}
+
+              <div className="flex items-start gap-2 rounded-xl bg-muted/60 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Vibração do sistema, ponto no ícone, banners e exceções ao “Não Perturbe” são controlados pelo Android ou iOS. A versão web não consegue ativar essas opções por conta própria.
+                </p>
+              </div>
+
+              {message && <p role="status" className="rounded-xl bg-primary/5 px-3 py-2.5 text-sm text-muted-foreground">{message}</p>}
+
+              <Button className="w-full" variant={pushState === "registered" ? "default" : "outline"} onClick={finish}>
+                {pushState === "registered" ? "Concluir" : "Continuar para o Dose Certa"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
           )}
-        </article>
-      </div>
-
-      <div className="mx-4 mb-4 flex items-start gap-3 rounded-2xl border border-secondary/30 bg-secondary/10 p-4 sm:mx-5">
-        <Info className="mt-0.5 h-5 w-5 shrink-0 text-secondary" />
-        <div className="min-w-0 space-y-2">
-          <p className="font-semibold text-foreground">Sobre o modo Não Perturbe e os avisos sobre outros apps</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">Como o Dose Certa é instalado pelo navegador (PWA), ele não consegue pedir acesso especial para ignorar o Não Perturbe nem controlar a permissão “Exibir sobre outros apps”. Quando disponível, ative “Pop-up na tela”/“Banners” nas notificações do sistema. O Não Perturbe ainda pode silenciar sons e vibrações.</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">O app pode enviar notificações normais do sistema, mas só um aplicativo Android nativo pode solicitar o acesso especial de política de notificações para criar exceções ao Não Perturbe. A decisão final continua sendo do usuário.</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">A permissão de vibração não é separada no PWA. O teste acima verifica a vibração da página; a vibração de notificações em segundo plano ainda depende do navegador, do Android e das opções de som/vibração do sistema.</p>
+          {step === "install" && message && <p role="status" className="text-xs leading-relaxed text-muted-foreground">{message}</p>}
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
-        <p className="text-xs text-muted-foreground">Você pode rever estes ajustes em qualquer momento.</p>
-        <button type="button" onClick={collapse} className="text-sm font-semibold text-primary hover:underline">Concluir por enquanto</button>
-      </div>
-      {message && <p role="status" className="mx-5 mb-4 rounded-xl bg-primary/5 px-3 py-2.5 text-sm text-muted-foreground">{message}</p>}
-    </section>
+      </section>
+    </div>,
+    document.body,
   );
 }
