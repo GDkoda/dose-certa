@@ -1,6 +1,9 @@
 {
   "name": "Dose Certa",
   "short_name": "Dose Certa",
+  "description": "Seu assistente acolhedor para horários e controle de medicamentos",
+  "id": "/",
+  "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
