@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   Pill, Plus, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -161,14 +161,25 @@ function ThemeToggle() {
 /* ---------------- sound ---------------- */
 function beep() {
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    [0, 0.35, 0.7].forEach((t) => {
-      const o = ctx.createOscillator(); const g = ctx.createGain();
-      o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
-      g.gain.setValueAtTime(0.2, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.3);
-      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.3);
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioContextClass();
+    void ctx.resume();
+    [0, 0.24, 0.68, 0.92].forEach((t, index) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "square";
+      oscillator.frequency.value = index % 2 === 0 ? 880 : 660;
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + t);
+      gain.gain.linearRampToValueAtTime(0.38, ctx.currentTime + t + 0.025);
+      gain.gain.setValueAtTime(0.38, ctx.currentTime + t + 0.13);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+      oscillator.start(ctx.currentTime + t);
+      oscillator.stop(ctx.currentTime + t + 0.21);
     });
-  } catch { /* no audio */ }
+    window.setTimeout(() => { void ctx.close().catch(() => undefined); }, 1800);
+  } catch { /* áudio indisponível ou bloqueado pelo navegador */ }
 }
 
 /* ---------------- auth screens ---------------- */
@@ -303,7 +314,7 @@ function AlarmEngine({ me }: { me: User }) {
       const due = findDueDose(getState().doses, me.id, now);
       if (due) {
         setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
-        setActive(due); beep();
+        setActive(due);
         const m = getState().meds.find((x) => x.id === due.medId);
         if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
           try { new Notification("Hora do seu medicamento", { body: m ? `${m.name} ${m.dose}` : "" }); } catch { /* Mobile background delivery uses Firebase messaging instead. */ }
@@ -315,6 +326,13 @@ function AlarmEngine({ me }: { me: User }) {
     document.addEventListener("visibilitychange", resume); window.addEventListener("focus", resume);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", resume); window.removeEventListener("focus", resume); };
   }, [me.id, me.role]);
+
+  useEffect(() => {
+    if (!active) return;
+    beep();
+    const soundLoop = window.setInterval(beep, 2400);
+    return () => window.clearInterval(soundLoop);
+  }, [active?.id]);
 
   if (!active) return null;
   const d = doses.find((x) => x.id === active.id) ?? active; const m = meds.find((x) => x.id === d.medId); const p = patients.find((x) => x.id === d.patientId);
@@ -328,21 +346,65 @@ function AlarmEngine({ me }: { me: User }) {
     setActive(null);
   };
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm">
-      <div className={cls(card, "relative w-full max-w-sm overflow-hidden text-center")}>
-        <img src={lavender} alt="" className="pointer-events-none absolute -right-10 -top-6 h-48 opacity-30" width={768} height={1152} />
-        <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-accent"><BellRing className="h-8 w-8 animate-pulse text-secondary" /></div>
-        <T k="alarm-title" as="h2" className="font-display text-2xl text-foreground">Hora do seu medicamento</T>
-        <p className="mt-2 text-lg font-bold text-foreground">{m?.name} {m?.dose}</p>
-        <p className="text-sm text-muted-foreground">{p?.name} · {fmtTime(d.scheduledAt)}</p>
-        <div className="mt-5 space-y-2">
-          <button className={cls(btnPrimary, "w-full")} onClick={() => act("tomado")}><T k="alarm-yes">Já tomei meu medicamento</T></button>
-          <button className={cls(btnLavender, "w-full")} onClick={() => act("snooze")}><T k="alarm-snooze">Lembrar em 5 minutos</T></button>
-          <button className={cls(btnOutline, "w-full")} onClick={() => act("nao")}><T k="alarm-no">Não tomei</T></button>
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/65 p-3 backdrop-blur-md sm:p-6" role="alertdialog" aria-modal="true" aria-labelledby="dose-alarm-title" aria-describedby="dose-alarm-description">
+      <section className="relative my-auto w-full max-w-lg overflow-hidden rounded-[2rem] border border-primary/25 bg-card text-card-foreground shadow-2xl shadow-primary/20">
+        <div className="relative overflow-hidden bg-primary px-5 pb-6 pt-5 text-primary-foreground sm:px-7 sm:pb-7">
+          <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full border-[22px] border-primary-foreground/10" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-extrabold tracking-[0.16em]">
+              <AlarmClock className="h-5 w-5" /> DOSE CERTA
+            </div>
+            <span className="rounded-full border border-primary-foreground/30 bg-primary-foreground/15 px-3 py-1 text-[11px] font-extrabold tracking-wider">DOSE PENDENTE</span>
+          </div>
+          <div className="relative mt-6 flex flex-col items-center text-center">
+            <span className="mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-primary-foreground/15 ring-1 ring-primary-foreground/25">
+              <BellRing className="h-9 w-9 animate-pulse" />
+            </span>
+            <h2 id="dose-alarm-title" className="font-display text-3xl font-bold leading-tight sm:text-4xl">Hora do remédio!</h2>
+            <p id="dose-alarm-description" className="mt-2 max-w-sm text-sm font-medium text-primary-foreground/85 sm:text-base">Está na hora de registrar esta dose.</p>
+          </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">Se não houver resposta, o alarme repete a cada 5 minutos.</p>
-      </div>
+
+        <div className="space-y-3 p-4 sm:space-y-4 sm:p-6">
+          <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:p-5">
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary"><UserRound className="h-6 w-6" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Paciente</p>
+                <p className="mt-0.5 break-words text-2xl font-extrabold leading-tight text-foreground sm:text-3xl">{p?.name ?? "Paciente não identificado"}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted/55 p-4 sm:p-5">
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Medicamento</p>
+            <p className="mt-1 break-words text-xl font-extrabold leading-snug text-foreground sm:text-2xl">{m?.name ?? "Medicamento não identificado"}</p>
+            {m?.dose && <p className="mt-1 text-base font-semibold text-muted-foreground">{m.dose}</p>}
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+              <span className="text-sm font-semibold text-muted-foreground">Horário programado</span>
+              <span className="font-display text-3xl font-bold tabular-nums text-primary sm:text-4xl">{fmtTime(d.scheduledAt)}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 pt-1">
+            <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-base font-extrabold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 sm:min-h-16 sm:text-lg" onClick={() => act("tomado")}>
+              <CheckCircle2 className="h-5 w-5" /><T k="alarm-yes">Já tomei meu medicamento</T>
+            </button>
+            <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary/35 bg-primary/8 px-5 py-3.5 text-sm font-bold text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 sm:text-base" onClick={() => act("snooze")}>
+              <Clock3 className="h-5 w-5" /><T k="alarm-snooze">Lembrar em 5 minutos</T>
+            </button>
+            <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" onClick={() => act("nao")}>
+              <X className="h-4 w-4" /><T k="alarm-no">Não tomei</T>
+            </button>
+          </div>
+          <p className="flex items-center justify-center gap-2 px-2 text-center text-xs leading-relaxed text-muted-foreground">
+            <Bell className="h-3.5 w-3.5 shrink-0 text-primary" />
+            O alarme sonoro se repete enquanto este aviso estiver aberto. Se adiar, ele retorna em 5 minutos.
+          </p>
+        </div>
+      </section>
     </div>
+  );
   );
 }
 
