@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useServerFn } from '@tanstack/react-start';
-import { Activity, ArrowUpRight, BellRing, ClipboardList, Clock3, Pill, Plus, RefreshCw, Save, Search, Shield, Trash2, Upload, UserRoundCheck, Users, UsersRound } from 'lucide-react';
+import { Activity, ArrowUpRight, BellRing, ClipboardList, Clock3, Pill, Plus, RefreshCw, Save, Search, Shield, Trash2, Upload, Users, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { manageAccount } from '@/lib/accounts.functions';
 import { flushCloudWrites, refreshCloud } from '@/lib/cloud-store';
@@ -124,41 +124,53 @@ export function AccountAdmin({ me, onNavigate }: { me: User; onNavigate: (page: 
         <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Cuidadores</p><p className="mt-1 text-2xl font-semibold text-foreground">{caregivers}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Operadores</p><p className="mt-1 text-2xl font-semibold text-foreground">{operators}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Mestres</p><p className="mt-1 text-2xl font-semibold text-foreground">{users.filter((user) => user.role === 'mestre').length}</p></div></div>
       </section>
     </> : <>
-      <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-        <div className="mb-4"><h2 className="font-display text-xl font-semibold text-foreground">Criar operador</h2><p className="mt-1 text-sm text-muted-foreground">Cadastre uma conta para auxiliar no atendimento.</p></div>
-        <form className="grid gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
-          <input className={field} required placeholder="Login do novo operador" value={login} onChange={(event) => setLogin(event.target.value)} />
-          <input className={field} required minLength={4} type="password" placeholder="Senha do operador (mín. 4)" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <Button disabled={busy}><Plus className="h-4 w-4" />Criar operador</Button>
-        </form>
-      </section>
-      <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-        <div><h2 className="font-display text-xl font-semibold text-foreground">Contas cadastradas</h2><p className="mt-1 text-sm text-muted-foreground">{users.length} contas · pesquise pelo login ou filtre por função.</p></div>
-        <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
-          <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><input aria-label="Buscar conta" className={`${field} pl-10`} placeholder="Buscar conta" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="font-display text-xl font-semibold text-foreground">Usuários e contas</h2><p className="mt-1 text-sm text-muted-foreground">{visible.length} de {users.length} contas</p></div>
+          <details className="relative">
+            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" />Novo operador</summary>
+            <form className="absolute right-0 z-20 mt-2 grid w-[min( min( calc(100vw - 2rem), 340px), 340px)] gap-3 rounded-2xl border border-border bg-card p-4 shadow-xl" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
+              <p className="font-semibold text-foreground">Cadastrar operador</p>
+              <input className={field} required placeholder="Login" value={login} onChange={(event) => setLogin(event.target.value)} />
+              <input className={field} required minLength={8} type="password" placeholder="Senha (mín. 8 caracteres)" value={password} onChange={(event) => setPassword(event.target.value)} />
+              <Button disabled={busy} type="submit"><Plus className="h-4 w-4" />Criar conta</Button>
+            </form>
+          </details>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+          <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><input aria-label="Buscar conta" className={`${field} pl-10`} placeholder="Buscar por login..." value={search} onChange={(event) => setSearch(event.target.value)} /></label>
           <select aria-label="Filtrar função" className={field} value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">Todas as funções</option><option value="cuidador">Cuidadores</option><option value="operador">Operadores</option><option value="mestre">Mestres</option></select>
         </div>
-        <div className="space-y-3">{visible.map((user) => <AccountRow key={`${user.id}-${user.login}-${user.role}`} user={user} self={user.id === me.id} busy={busy} onSave={(patch) => void perform(() => manage({ data: { action: 'update', id: user.id, ...patch } }), 'Conta atualizada.')} onDelete={() => { if (confirm(`Excluir ${user.login}, seus pacientes e registros?`)) void perform(() => manage({ data: { action: 'delete', id: user.id } }), 'Conta excluída.'); }} />)}
-          {!visible.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma conta encontrada.</p>}</div>
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+          <div className="hidden grid-cols-[minmax(0,1fr)_150px_110px] items-center gap-3 border-b border-border bg-muted/40 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:grid"><span>Conta</span><span>Perfil</span><span className="text-right">Ação</span></div>
+          {visible.map((user) => <AccountRow key={`${user.id}-${user.login}-${user.role}`} user={user} self={user.id === me.id} busy={busy} onSave={(patch) => void perform(() => manage({ data: { action: 'update', id: user.id, ...patch } }), 'Conta atualizada.')} onDelete={() => { if (confirm(`Excluir ${user.login}, seus pacientes e registros?`)) void perform(() => manage({ data: { action: 'delete', id: user.id } }), 'Conta excluída.'); }} />)}
+          {!visible.length && <p className="px-4 py-10 text-center text-sm text-muted-foreground">Nenhuma conta encontrada. Ajuste a busca ou o filtro.</p>}
+        </div>
       </section>
-      <details className="rounded-2xl border border-border/70 bg-card p-5"><summary className="cursor-pointer text-sm font-semibold text-foreground">Recuperar contas antigas deste aparelho</summary>
-        <p className="my-3 max-w-2xl text-sm text-muted-foreground">As contas antigas estavam salvas somente no aparelho onde foram criadas. Entre como Mestre nesse aparelho para importá-las. Elas serão importadas como cuidadores; contas já compartilhadas não serão substituídas.</p>
-        <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha das contas importadas (mín. 8)" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload className="h-4 w-4" />Importar contas</Button></div>
+      <details className="rounded-xl border border-border/70 px-4 py-3"><summary className="cursor-pointer text-sm font-medium text-muted-foreground">Importar contas antigas deste aparelho</summary>
+        <p className="my-3 max-w-2xl text-sm text-muted-foreground">Use esta opção somente se houver contas antigas salvas localmente neste aparelho. As contas já compartilhadas não serão substituídas.</p>
+        <div className="flex flex-wrap gap-3"><input className={`${field} sm:max-w-sm`} type="password" placeholder="Nova senha para contas importadas (mín. 8)" value={importPassword} onChange={(event) => setImportPassword(event.target.value)} /><Button variant="outline" disabled={busy} onClick={() => void perform(importLocal, 'Contas importadas. Informe a nova senha aos titulares; eles deverão trocá-la ao entrar.')}><Upload className="h-4 w-4" />Importar contas</Button></div>
       </details>
     </>}
   </section>;
 }
 
 function AccountRow({ user, self, busy, onSave, onDelete }: { user: User; self: boolean; busy: boolean; onSave: (patch: { login?: string; password?: string; role?: Role }) => void; onDelete: () => void }) {
-  const [login, setLogin] = useState(user.login); const [password, setPassword] = useState('');
-  return <div className="rounded-xl border border-border/70 bg-background p-4">
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-foreground">{user.login}{self && <span className="ml-2 text-xs text-muted-foreground">Você</span>}</p><span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-semibold capitalize text-muted-foreground"><Shield className="h-3.5 w-3.5" />{user.role}</span></div>
-    <div className="grid items-center gap-3 lg:grid-cols-[1fr_1fr_160px_auto]">
-      <input aria-label={`Login de ${user.login}`} className={field} disabled={self || busy} value={login} onChange={(event) => setLogin(event.target.value)} />
-      <input aria-label={`Nova senha de ${user.login}`} className={field} disabled={self || busy} type="password" placeholder="Nova senha (opcional)" value={password} onChange={(event) => setPassword(event.target.value)} />
-      <select aria-label={`Função de ${user.login}`} className={field} disabled={self || busy} value={user.role} onChange={(event) => onSave({ role: event.target.value as Role })}><option value="cuidador">Cuidador</option><option value="operador">Operador</option><option value="mestre">Mestre</option></select>
-      <div className="flex gap-2"><Button variant="outline" size="icon" title="Salvar conta" aria-label={`Salvar ${user.login}`} disabled={self || busy} onClick={() => { onSave({ ...(login !== user.login ? { login } : {}), ...(password ? { password } : {}) }); setPassword(''); }}><Save /></Button><Button variant="ghost" size="icon" title="Excluir conta" aria-label={`Excluir ${user.login}`} disabled={self || busy} onClick={onDelete}><Trash2 className="text-destructive" /></Button></div>
+  const [login, setLogin] = useState(user.login);
+  const [password, setPassword] = useState('');
+  const [editing, setEditing] = useState(false);
+  return <div className="border-b border-border/70 last:border-b-0">
+    <div className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_150px_110px] sm:items-center">
+      <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{user.login}{self && <span className="ml-2 text-xs font-normal text-muted-foreground">Sua conta</span>}</p><p className="mt-0.5 text-xs text-muted-foreground">{user.role === 'mestre' ? 'Administrador' : user.role === 'operador' ? 'Atendimento' : 'Cuidador'}</p></div>
+      <span className="w-fit rounded-full bg-muted px-3 py-1 text-xs font-medium capitalize text-muted-foreground">{user.role}</span>
+      <div className="flex justify-start sm:justify-end"><Button variant="ghost" size="sm" disabled={self || busy} onClick={() => setEditing((value) => !value)}>{editing ? 'Fechar' : 'Gerenciar'}</Button></div>
     </div>
-    {!self && user.role === 'cuidador' && <Button className="mt-3" variant="secondary" disabled={busy} onClick={() => onSave({ role: 'operador' })}><UserRoundCheck />Tornar operador</Button>}
+    {editing && <div className="grid gap-3 border-t border-border/60 bg-muted/20 p-4 sm:grid-cols-2">
+      <label className="space-y-1 text-xs font-medium text-muted-foreground">Login<input aria-label={`Login de ${user.login}`} className={field} disabled={self || busy} value={login} onChange={(event) => setLogin(event.target.value)} /></label>
+      <label className="space-y-1 text-xs font-medium text-muted-foreground">Nova senha<input aria-label={`Nova senha de ${user.login}`} className={field} disabled={self || busy} type="password" minLength={8} placeholder="Deixe em branco para manter" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+      <label className="space-y-1 text-xs font-medium text-muted-foreground sm:col-span-2">Tipo de conta<select aria-label={`Função de ${user.login}`} className={field} disabled={self || busy} value={user.role} onChange={(event) => onSave({ role: event.target.value as Role })}><option value="cuidador">Cuidador</option><option value="operador">Operador</option><option value="mestre">Mestre</option></select></label>
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2"><Button variant="destructive" size="sm" disabled={self || busy} onClick={onDelete}><Trash2 className="h-4 w-4" />Excluir conta</Button><Button size="sm" disabled={self || busy || (!password && login === user.login)} onClick={() => { onSave({ ...(login !== user.login ? { login } : {}), ...(password ? { password } : {}) }); setPassword(''); setEditing(false); }}><Save className="h-4 w-4" />Salvar alterações</Button></div>
+      {self && <p className="text-xs text-muted-foreground sm:col-span-2">A conta atualmente conectada não pode ser alterada por aqui.</p>}
+    </div>}
   </div>;
 }
