@@ -32,7 +32,6 @@ function loadManualChecks(): ManualChecks {
   } catch { return empty; }
 }
 
-const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60";
 
 export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountId: string }) {
@@ -67,7 +66,9 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
       } else if (Notification.permission === "denied") {
         setPushState("denied");
       } else if (Notification.permission === "granted") {
-        const registered = !!sessionStorage.getItem("dc-push-token") || localStorage.getItem(pushReadyKey) === "1";
+        let registered = false;
+        try { registered = !!sessionStorage.getItem("dc-push-token") || localStorage.getItem(pushReadyKey) === "1"; }
+        catch { /* O navegador pode bloquear armazenamento local. */ }
         setPushState(registered ? "registered" : "granted");
       } else {
         setPushState("prompt");
@@ -134,8 +135,10 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
       const result = await enablePush();
       if (result.status === "registered") {
         await register({ data: { token: result.token, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
-        sessionStorage.setItem("dc-push-token", result.token);
-        localStorage.setItem(pushReadyKey, "1");
+        try {
+          sessionStorage.setItem("dc-push-token", result.token);
+          localStorage.setItem(pushReadyKey, "1");
+        } catch { /* O registro remoto continua válido mesmo sem armazenamento local. */ }
         setPushState("registered");
         window.dispatchEvent(new Event("dc-push-ready"));
         setMessage("Pronto! Este aparelho foi vinculado para receber os avisos do Dose Certa.");
