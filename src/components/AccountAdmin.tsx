@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { Activity, ArrowUpRight, BellRing, ClipboardList, Clock3, Pill, Plus, RefreshCw, Save, Search, Shield, Trash2, Upload, UserRoundCheck, Users, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ export function AccountAdmin({ me, onNavigate }: { me: User; onNavigate: (page: 
     setImportPassword('');
   };
   const visible = users.filter((user) => user.login.includes(search.trim().toLowerCase()) && (filter === 'all' || user.role === filter));
-  const metric = (label: string, value: string | number, detail: string, icon: React.ReactNode) => (
+  const metric = (label: string, value: string | number, detail: string, icon: ReactNode) => (
     <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">{label}</span><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">{icon}</span></div>
       <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
