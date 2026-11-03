@@ -17,3 +17,7 @@ export function authorizeAccountChange(actorRole: Role, actorId: string, targetI
 export function formatAuthPassword(password: string): string {
   return `dc#${password}#9!`;
 }
+
+export function hasMinimumPasswordLength(password: string): boolean {
+  return password.length >= 8;
+}
