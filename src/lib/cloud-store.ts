@@ -78,7 +78,8 @@ export async function cloudLogin(login: string, password: string) {
   const transformed = await supabase.auth.signInWithPassword({ email, password: formatAuthPassword(password) });
   let user = transformed.data.user;
   if (transformed.error || !user) {
-    // Compatibilidade com contas criadas antes da transformação de senha.
+    // Só tenta o formato legado quando o provedor rejeita as credenciais.
+    if (transformed.error?.code !== 'invalid_credentials') throw new Error('Não foi possível autenticar agora. Tente novamente.');
     const legacy = await supabase.auth.signInWithPassword({ email, password });
     if (legacy.error || !legacy.data.user) throw new Error('Login ou senha incorretos.');
     user = legacy.data.user;
@@ -96,6 +97,7 @@ export async function updateOwnPassword(currentPassword: string, newPassword: st
   const email = accountEmail(me.login);
   const transformed = await supabase.auth.signInWithPassword({ email, password: formatAuthPassword(currentPassword) });
   if (transformed.error) {
+    if (transformed.error.code !== 'invalid_credentials') throw new Error('Não foi possível verificar a senha atual. Tente novamente.');
     // Contas legadas ainda podem validar a senha sem transformação.
     const legacy = await supabase.auth.signInWithPassword({ email, password: currentPassword });
     if (legacy.error) throw new Error('Senha atual incorreta.');
