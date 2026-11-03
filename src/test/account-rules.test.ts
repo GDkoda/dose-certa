@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountEmail, authorizeAccountChange, formatAuthPassword } from '@/lib/account-rules';
+import { accountEmail, authorizeAccountChange, formatAuthPassword, hasMinimumPasswordLength } from '@/lib/account-rules';
 describe('Account administration rules', () => {
   it('only the Master can promote an existing account to operator', () => {
     expect(() => authorizeAccountChange('mestre', 'master', 'existing')).not.toThrow();
@@ -23,5 +23,18 @@ describe('Auth password formatting', () => {
 
   it('preserves arbitrary characters inside the wrapper', () => {
     expect(formatAuthPassword('áç! @#$%')).toBe('dc#áç! @#$%#9!');
+  });
+});
+
+describe('Minimum password length', () => {
+  it('requires at least eight characters for new passwords', () => {
+    expect(hasMinimumPasswordLength('1234567')).toBe(false);
+    expect(hasMinimumPasswordLength('12345678')).toBe(true);
+    expect(hasMinimumPasswordLength('aaaaaaaa')).toBe(true);
+    expect(hasMinimumPasswordLength('11111111')).toBe(true);
+  });
+
+  it('does not impose a new length rule on legacy sign-in credentials', () => {
+    expect(hasMinimumPasswordLength('batata')).toBe(false);
   });
 });
