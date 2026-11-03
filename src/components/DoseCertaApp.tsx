@@ -35,7 +35,7 @@ const btnPrimary = `${btn} bg-primary text-primary-foreground hover:opacity-90`;
 const btnLavender = `${btn} bg-secondary text-secondary-foreground hover:opacity-90`;
 const btnOutline = `${btn} border border-border bg-card text-foreground hover:bg-muted`;
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
-const card = "rounded-[1.5rem] border border-border/80 bg-card p-5 shadow-[var(--shadow-soft)]";
+const card = "dc-surface-texture rounded-[1.5rem] border border-border/80 bg-card p-5 shadow-[var(--shadow-soft)]";
 
 function useMe(): User | null {
   return useStore((s) => s.users.find((u) => u.id === s.sessionId) ?? null);
@@ -96,17 +96,17 @@ function createGeometryTiles(variant: GeometricVariant): GeometryTile[] {
     for (let column = 0; column < 12; column += 1) {
       const noise = ((column * 37 + row * 61 + column * row * 13) % 101) / 101;
       const flow = (row + column) / 22;
-      const threshold = variant === "dense" ? 0.62 + flow * 0.27 : 0.16 + flow * 0.43;
+      const threshold = variant === "dense" ? 0.58 + flow * 0.3 : 0.12 + flow * 0.48;
       if (noise > threshold) continue;
-      const size = 3.5 + ((column * 11 + row * 7) % 10) * 1.05;
+      const size = 4 + ((column * 11 + row * 7) % 10) * 1.12;
       const jitterX = ((column * 17 + row * 5) % 17) - 8;
       const jitterY = ((row * 19 + column * 3) % 17) - 8;
       tiles.push({
         x: column * 51 + 8 + jitterX,
         y: row * 51 + 8 + jitterY,
         size,
-        opacity: Math.min(0.55, 0.12 + flow * 0.38) * (variant === "dense" ? 1 : 0.88),
-        rotation: ((column * 13 + row * 9) % 22) - 11,
+        opacity: Math.min(0.58, 0.14 + flow * 0.4) * (variant === "dense" ? 1 : 0.82),
+        rotation: ((column * 13 + row * 9) % 28) - 14,
       });
     }
   }
@@ -130,6 +130,28 @@ function GeometricDissolve({ variant = "dense", className }: {
       className={cls("pointer-events-none absolute", className)}
       fill="none"
     >
+      <g stroke="currentColor" strokeWidth="1.15" opacity={variant === "dense" ? 0.14 : 0.09}>
+        <path d="M42 112 112 42h396l70 70v396l-70 70H112l-70-70Z" />
+        <path d="M112 182 182 112h256l70 70v256l-70 70H182l-70-70Z" />
+        <path d="M182 252 252 182h116l70 70v116l-70 70H252l-70-70Z" />
+        <path d="M310 18v584M18 310h584" opacity="0.32" />
+        <path d="M62 62 558 558M558 62 62 558" opacity="0.28" />
+        <circle cx="310" cy="310" r="210" />
+        <circle cx="310" cy="310" r="142" strokeDasharray="4 9" />
+        <circle cx="310" cy="310" r="74" />
+      </g>
+      <g fill="currentColor" opacity={variant === "dense" ? 0.11 : 0.075}>
+        <path d="m310 56 58 58-58 58-58-58z" />
+        <path d="m564 310-58 58-58-58 58-58z" />
+        <path d="m310 564-58-58 58-58 58 58z" />
+        <path d="m56 310 58-58 58 58-58 58z" />
+        <path d="m310 244 66 66-66 66-66-66z" opacity="0.55" />
+        <circle cx="310" cy="310" r="24" />
+        <circle cx="112" cy="112" r="5" />
+        <circle cx="508" cy="112" r="5" />
+        <circle cx="112" cy="508" r="5" />
+        <circle cx="508" cy="508" r="5" />
+      </g>
       <g fill="currentColor">
         {tiles.map((tile, index) => (
           <rect
@@ -138,16 +160,17 @@ function GeometricDissolve({ variant = "dense", className }: {
             y={tile.y}
             width={tile.size}
             height={tile.size}
-            rx={tile.size > 9 ? 2 : 1}
+            rx={tile.size > 9 ? 2.5 : 1.25}
             opacity={tile.opacity}
             transform={`rotate(${tile.rotation} ${tile.x + tile.size / 2} ${tile.y + tile.size / 2})`}
           />
         ))}
       </g>
-      <g stroke="currentColor" strokeWidth="1.25" opacity={variant === "dense" ? 0.075 : 0.05}>
+      <g stroke="currentColor" strokeWidth="1.25" opacity={variant === "dense" ? 0.11 : 0.07}>
         <path d="M330 44h166v166H330z" />
         <path d="M382 96h62v62h-62z" />
         <path d="M116 362h118v118H116z" />
+        <path d="m175 362 59 59-59 59-59-59z" />
       </g>
     </svg>
   );
@@ -156,15 +179,17 @@ function GeometricDissolve({ variant = "dense", className }: {
 function Logo({ size = 40 }: { size?: number }) {
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-[30%] bg-primary/10 text-primary"
+      className="dc-logo-mark grid shrink-0 place-items-center rounded-[30%] bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 text-primary"
       style={{ width: size, height: size }}
     >
-      <svg viewBox="0 0 24 24" width="76%" height="76%" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Dose Certa: cápsula protegida">
-        <path d="M12 2.4 19.4 5.3v5.3c0 5.1-3.3 8.6-7.4 10.9-4.1-2.3-7.4-5.8-7.4-10.9V5.3L12 2.4Z" />
-        <g transform="rotate(-45 12 12)">
-          <rect x="8.7" y="7.4" width="6.6" height="9.2" rx="3.3" />
-          <path d="M8.9 12h6.2" />
+      <svg viewBox="0 0 32 32" width="78%" height="78%" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Dose Certa: cápsula protegida">
+        <path d="M16 2.7 26.2 6.6v7.1c0 7.2-4.4 12.3-10.2 15.5C10.2 26 5.8 20.9 5.8 13.7V6.6L16 2.7Z" />
+        <path d="M16 5.1 24 8.2v5.4c0 6-3.6 10.3-8 12.8-4.4-2.5-8-6.8-8-12.8V8.2l8-3.1Z" opacity="0.35" />
+        <g transform="rotate(-45 16 16)">
+          <rect x="11.7" y="9.2" width="8.6" height="13.6" rx="4.3" />
+          <path d="M11.9 16h8.2" />
         </g>
+        <path d="m22.1 7.8 2 2" opacity="0.7" />
       </svg>
     </span>
   );
@@ -362,8 +387,8 @@ function AuthScreen() {
 
   return (
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-background p-4">
-      <GeometricDissolve variant="dense" className="-right-24 -bottom-24 h-[38rem] w-[38rem] text-primary opacity-30" />
-      <GeometricDissolve variant="sparse" className="-left-28 -top-28 h-[29rem] w-[29rem] text-secondary opacity-25" />
+      <GeometricDissolve variant="dense" className="-right-24 -bottom-24 h-[38rem] w-[38rem] dc-geometry-ink opacity-65" />
+      <GeometricDissolve variant="sparse" className="-left-28 -top-28 h-[29rem] w-[29rem] dc-geometry-ink opacity-45" />
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className={cls(card, "relative w-full max-w-md")}>
         <div className="mb-6 flex items-center gap-3">
@@ -601,7 +626,7 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
     <div className="mx-auto w-full max-w-7xl space-y-7">
       <section className="relative isolate overflow-hidden rounded-[2rem] bg-primary px-6 py-7 text-primary-foreground shadow-[var(--shadow-soft)] sm:px-9 sm:py-9">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary via-primary to-secondary opacity-95" />
-        <GeometricDissolve variant="dense" className="-right-5 -top-10 -z-10 h-64 w-64 text-primary-foreground opacity-30 sm:right-5 sm:top-0 sm:h-80 sm:w-80" />
+        <GeometricDissolve variant="dense" className="-right-5 -top-10 -z-10 h-64 w-64 dc-geometry-ink opacity-70 sm:right-5 sm:top-0 sm:h-80 sm:w-80" />
         <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] opacity-80">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
         <h1 className="max-w-2xl font-display text-3xl font-semibold leading-tight sm:text-4xl">{hello}, {me.login}.</h1>
         <T k="dash-sub" as="p" className="mt-2 max-w-lg text-sm leading-relaxed opacity-85 sm:text-base">Seu cuidado de hoje, organizado em um só lugar.</T>
@@ -613,7 +638,7 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
 
 
       <section aria-label="Resumo das doses de hoje" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:col-span-2">
+        <div className="rounded-[1.5rem] border border-border/70 bg-card dc-surface-texture p-5 shadow-sm sm:col-span-2">
           <div className="flex items-start justify-between gap-4">
             <div><p className="text-sm font-semibold text-muted-foreground">Rotina de hoje</p><p className="mt-1 text-3xl font-bold tracking-tight text-foreground">{progress}% <span className="text-base font-medium text-muted-foreground">concluído</span></p></div>
             <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary"><ClipboardList className="h-5 w-5" /></span>
@@ -624,12 +649,12 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
         {[
           { l: "Tomadas", v: taken, icon: <CheckCircle2 className="h-5 w-5" />, tone: "bg-primary/10 text-primary" },
           { l: "Pendentes", v: pend, icon: <Clock3 className="h-5 w-5" />, tone: "bg-warning/20 text-foreground" },
-        ].map((x) => <div key={x.l} className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm"><span className={cls("grid h-12 w-12 shrink-0 place-items-center rounded-2xl", x.tone)}>{x.icon}</span><div><p className="text-sm font-medium text-muted-foreground">{x.l}</p><p className="text-3xl font-bold tracking-tight text-foreground">{x.v}</p></div></div>)}
-        <div className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-destructive/10 text-destructive"><BellRing className="h-5 w-5" /></span><div><p className="text-sm font-medium text-muted-foreground">Não tomadas</p><p className="text-3xl font-bold tracking-tight text-foreground">{miss}</p></div></div>
+        ].map((x) => <div key={x.l} className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card dc-surface-texture p-5 shadow-sm"><span className={cls("grid h-12 w-12 shrink-0 place-items-center rounded-2xl", x.tone)}>{x.icon}</span><div><p className="text-sm font-medium text-muted-foreground">{x.l}</p><p className="text-3xl font-bold tracking-tight text-foreground">{x.v}</p></div></div>)}
+        <div className="flex items-center gap-4 rounded-[1.5rem] border border-border/70 bg-card dc-surface-texture p-5 shadow-sm"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-destructive/10 text-destructive"><BellRing className="h-5 w-5" /></span><div><p className="text-sm font-medium text-muted-foreground">Não tomadas</p><p className="text-3xl font-bold tracking-tight text-foreground">{miss}</p></div></div>
       </section>
 
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.8fr)]">
-        <div className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-card shadow-sm">
+        <div className="overflow-hidden rounded-[1.75rem] border border-border/70 bg-card dc-surface-texture shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-5 sm:px-6">
             <div><h2 className="font-display text-xl font-semibold text-foreground sm:text-2xl">Agenda de medicamentos</h2><p className="mt-1 text-sm text-muted-foreground">Confira os horários previstos para hoje.</p></div>
             <button className="shrink-0 rounded-full px-3 py-2 text-sm font-bold text-primary transition hover:bg-primary/10" onClick={() => go("medicamentos")}>Ver todos <ArrowRight className="ml-1 inline h-4 w-4" /></button>
@@ -645,7 +670,7 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
             </ul>}
         </div>
         <aside className="space-y-4">
-          <div className="rounded-[1.75rem] border border-border/70 bg-card p-5 shadow-sm sm:p-6">
+          <div className="rounded-[1.75rem] border border-border/70 bg-card dc-surface-texture p-5 shadow-sm sm:p-6">
             <p className="text-sm font-semibold text-muted-foreground">Visão geral</p>
             <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Seu cuidado em números</h2>
             <div className="mt-5 space-y-4">
@@ -1138,7 +1163,7 @@ function Shell({ me }: { me: User }) {
           {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>{i.icon}{i.label}</button>)}
           <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-sidebar-accent"><LogOut className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />Sair</button>
         </nav>
-        <GeometricDissolve variant="sparse" className="-bottom-16 -left-16 h-96 w-96 text-sidebar-foreground opacity-30" />
+        <GeometricDissolve variant="sparse" className="-bottom-16 -left-16 h-96 w-96 dc-geometry-ink opacity-70" />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
