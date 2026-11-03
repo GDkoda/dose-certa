@@ -6,13 +6,12 @@ import {
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { InstallPrompt } from "@/components/InstallPrompt";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
-import { PushBanner, PushSettings } from "./PushSettings";
 import { registerPushDevice } from "@/lib/push.functions";
 import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
+import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
@@ -495,9 +494,21 @@ function AlarmEngine({ me }: { me: User }) {
 
   useEffect(() => {
     if (!active) return;
+    const vibrate = () => {
+      try { if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate([350, 160, 350, 160, 650]); } catch { /* Vibração pode não estar disponível. */ }
+    };
+    const stopVibration = () => {
+      try { if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(0); } catch { /* Sem suporte. */ }
+    };
     beep();
+    vibrate();
     const soundLoop = window.setInterval(beep, 2400);
-    return () => window.clearInterval(soundLoop);
+    const vibrationLoop = window.setInterval(vibrate, 2400);
+    return () => {
+      window.clearInterval(soundLoop);
+      window.clearInterval(vibrationLoop);
+      stopVibration();
+    };
   }, [active?.id]);
 
   if (!active) return null;
@@ -573,26 +584,6 @@ function AlarmEngine({ me }: { me: User }) {
   );
 }
 
-function PermissionPrompt() {
-  const [show, setShow] = useState(false);
-  useEffect(() => { if (typeof Notification !== "undefined" && Notification.permission === "default" && !sessionStorage.getItem("dc-perm")) setShow(true); }, []);
-  if (!show) return null;
-  const close = () => { sessionStorage.setItem("dc-perm", "1"); setShow(false); };
-  return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-foreground/30 p-4">
-      <div className={cls(card, "w-full max-w-sm text-center")}>
-        <Bell className="mx-auto h-10 w-10 text-primary" />
-        <T k="perm-title" as="h2" className="mt-2 font-display text-xl text-foreground">Vamos cuidar juntos 💜</T>
-        <T k="perm-body" as="p" className="mt-2 text-sm text-muted-foreground">Para lembrar você na hora certa de cada dose, permita os avisos e pop-ups do Dose Certa. Prometemos só avisar o que importa.</T>
-        <div className="mt-4 flex gap-2">
-          <button className={cls(btnOutline, "flex-1")} onClick={close}>Agora não</button>
-          <button className={cls(btnPrimary, "flex-1")} onClick={async () => { try { await Notification.requestPermission(); } catch { /* */ } close(); }}>Permitir avisos</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- pages ---------------- */
 type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | "perfil" | "admin";
 
@@ -620,7 +611,6 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
         </div>
       </section>
 
-      {me.role === "cuidador" && <PushBanner />}
 
       <section aria-label="Resumo das doses de hoje" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:col-span-2">
@@ -1050,7 +1040,6 @@ function Profile({ me }: { me: User }) {
       <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
       <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
       <PalettePicker />
-      {me.role === "cuidador" && <PushSettings />}
       <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
         try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
         catch (error) { setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." }); } }}>
@@ -1129,6 +1118,8 @@ function Shell({ me }: { me: User }) {
       if (result.status !== "registered") return;
       await registerDevice({ data: { token: result.token, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
       sessionStorage.setItem("dc-push-token", result.token);
+      localStorage.setItem("dc-push-ready", "1");
+      window.dispatchEvent(new Event("dc-push-ready"));
     }).catch(() => undefined);
   }, [me.id, me.role]);
   const logout = async () => {
@@ -1176,6 +1167,7 @@ function Shell({ me }: { me: User }) {
           </div>
         )}
         <main className="dc-main flex-1 px-4 pb-40 pt-6 md:px-8 md:pb-10">
+          <DeviceSetupAssistant role={me.role} />
           {page === "inicio" && <Dashboard me={me} go={setPage} activePatientId={activePatientId} />}
           {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} />}
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
@@ -1239,8 +1231,6 @@ export function DoseCertaApp() {
   return (
     <>
       {cloudError && <div role="alert" className="fixed inset-x-4 top-4 z-50 rounded-lg border border-destructive bg-card p-3 text-sm text-destructive">{cloudError}<Button variant="ghost" size="sm" onClick={() => setCloudError("")}>Fechar</Button></div>}
-      <InstallPrompt />
-      <PermissionPrompt />
       {!me ? <AuthScreen /> : me.mustChange ? <ForceChangePassword me={me} /> : <Shell me={me} />}
     </>
   );
