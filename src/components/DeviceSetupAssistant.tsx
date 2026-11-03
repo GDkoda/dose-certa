@@ -327,7 +327,7 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
               <div className="flex items-start gap-2 rounded-xl bg-muted/60 p-3">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Vibração do sistema, ponto no ícone, banners e exceções ao “Não Perturbe” são controlados pelo Android ou iOS. A versão web não consegue ativar essas opções por conta própria.
+                  Vibração do sistema, ponto no ícone, banners, “Exibir sobre outros apps” e exceções ao “Não Perturbe” são controlados pelo Android ou iOS. A versão web não consegue ativar essas opções por conta própria.
                 </p>
               </div>
 
