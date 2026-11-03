@@ -612,3 +612,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Mobile navigation: six centered actions, with a second Master-only row. */
+.dc-mobile-nav { min-height: 0; }
+.dc-mobile-nav button { min-width: 0; min-height: 2.8rem; text-align: center; }
+.dc-mobile-nav button svg { display: block; margin-inline: auto; width: 1.05rem; height: 1.05rem; }
+.dc-mobile-nav > div { align-items: center; }
+@media (max-width: 380px) {
+  .dc-mobile-nav { gap: 0.25rem; padding-inline: 0.25rem; }
+  .dc-mobile-nav button { font-size: 8px; padding-inline: 0; }
+  .dc-mobile-nav button svg { width: 0.95rem; height: 0.95rem; }
+}
