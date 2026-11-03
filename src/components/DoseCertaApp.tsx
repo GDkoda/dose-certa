@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
-  Pill, Plus, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
+  Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,52 @@ function ThemeToggle() {
     <button onClick={toggle} aria-label="Alternar modo noturno" className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
       {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </button>
+  );
+}
+
+function PaletteQuickAccess() {
+  const { palette, setPalette } = usePalette();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Escolher tema de cores"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="Temas e cores"
+        onClick={() => setOpen((value) => !value)}
+        className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted"
+      >
+        <PaletteIcon className="h-5 w-5" />
+      </button>
+      {open && (
+        <div role="dialog" aria-label="Escolher tema de cores" className={cls(card, "absolute right-0 z-40 mt-2 w-[min(19rem,calc(100vw-2rem))] !p-3 shadow-xl")}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground">Tema de cores</p>
+            <button type="button" aria-label="Fechar temas" onClick={() => setOpen(false)} className="rounded-full p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={palette === p.id}
+                onClick={() => { setPalette(p.id); setOpen(false); }}
+                className={cls("flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}
+              >
+                <span className="flex shrink-0 overflow-hidden rounded-full border border-border">
+                  <span className="h-4 w-4" style={{ background: p.light }} />
+                  <span className="h-4 w-4" style={{ background: p.dark }} />
+                </span>
+                <span className="truncate text-xs font-medium text-foreground">{p.name}</span>
+                {palette === p.id && <CheckCircle2 className="ml-auto h-4 w-4 shrink-0 text-primary" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -788,7 +834,7 @@ function Shell({ me }: { me: User }) {
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
           <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{items.find((item) => item.id === page)?.label ?? "Dose Certa"}</p></div>
-          <div className="flex items-center gap-2"><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
+          <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
         <main className="dc-main flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10">
