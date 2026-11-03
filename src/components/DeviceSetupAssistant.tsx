@@ -275,12 +275,14 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
                           ? "Este navegador não oferece suporte às notificações necessárias."
                           : pushState === "not-configured"
                             ? "O serviço de notificações ainda não está conectado neste ambiente."
-                            : "Ao tocar no botão, o navegador abrirá a solicitação oficial de permissão."}
+                            : pushState === "busy"
+                              ? "Solicitando a permissão e preparando este aparelho..."
+                              : "Ao tocar no botão, o navegador abrirá a solicitação oficial de permissão."}
                   </p>
                 </div>
               </div>
 
-              {(pushState === "idle" || pushState === "error") && (
+              {(pushState === "idle" || pushState === "error" || pushState === "busy") && (
                 <Button className="w-full" disabled={pushBusy} onClick={() => void connectNotifications()}>
                   <BellRing className="h-4 w-4" />{pushBusy ? "Ativando..." : "Permitir notificações"}
                 </Button>
