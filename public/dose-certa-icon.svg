@@ -1,10 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="18" fill="#557B68"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 8.5 51.5 16v14c0 13.1-8.7 22.1-19.5 27-10.8-4.9-19.5-13.9-19.5-27V16L32 8.5Z"/>
-    <g transform="rotate(-45 32 32)">
-      <rect x="23.5" y="19.5" width="17" height="25" rx="8.5"/>
-      <path d="M23.8 32h16.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
+  <title id="title">Dose Certa</title>
+  <desc id="desc">Escudo com cápsula central e detalhes geométricos em tons de verde.</desc>
+  <defs>
+    <linearGradient id="base" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6E9882"/>
+      <stop offset="1" stop-color="#315C4D"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="28" y1="24" x2="100" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity=".025"/>
+    </linearGradient>
+    <linearGradient id="capsule" x1="44" y1="40" x2="84" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E9F5EE"/>
+    </linearGradient>
+    <clipPath id="icon-clip">
+      <rect width="128" height="128" rx="34"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#icon-clip)">
+    <rect width="128" height="128" fill="url(#base)"/>
+    <g fill="none" stroke="#F5FFFA" stroke-opacity=".13" stroke-width="1.5">
+      <path d="M-12 36 36-12l104 104-48 48z"/>
+      <path d="M18 128 128 18M-14 78 78-14"/>
+      <circle cx="100" cy="28" r="34"/>
+      <circle cx="100" cy="28" r="20"/>
+      <path d="m10 102 24-24 24 24-24 24z"/>
     </g>
+    <path d="M64 12 105 28v29c0 27-17.9 45.5-41 57-23.1-11.5-41-30-41-57V28L64 12Z" fill="url(#glass)" stroke="#F8FFFB" stroke-opacity=".96" stroke-width="4.2" stroke-linejoin="round"/>
+    <path d="M64 20 97 33v24c0 22-14.2 37.3-33 47-18.8-9.7-33-25-33-47V33l33-13Z" fill="none" stroke="#F8FFFB" stroke-opacity=".26" stroke-width="1.5" stroke-linejoin="round"/>
+    <g transform="rotate(-42 64 64)">
+      <rect x="49" y="39" width="30" height="50" rx="15" fill="url(#capsule)" stroke="#315C4D" stroke-opacity=".42" stroke-width="2"/>
+      <path d="M49.6 64h28.8" stroke="#4F8069" stroke-width="2.4"/>
+      <path d="M53 48c3-5 8-7 13-7" stroke="#FFFFFF" stroke-opacity=".88" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <path d="m89 29 5 5m-1-11 5 5" stroke="#CBE7D5" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>
+    <circle cx="28" cy="92" r="3" fill="#F7FFFA" fill-opacity=".72"/>
+    <circle cx="98" cy="92" r="2" fill="#F7FFFA" fill-opacity=".6"/>
   </g>
 </svg>
