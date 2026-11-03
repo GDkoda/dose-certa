@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { accountEmail } from './account-rules';
+import { accountEmail, formatAuthPassword } from './account-rules';
 import { connectCloudWriter, getState, replaceCloudState, type State, type User } from './store';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -74,19 +74,32 @@ export async function initializeCloud() {
 }
 
 export async function cloudLogin(login: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email: accountEmail(login), password });
-  if (error || !data.user) throw new Error('Login ou senha incorretos.');
-  currentId = data.user.id; await refreshCloud();
+  const email = accountEmail(login);
+  const transformed = await supabase.auth.signInWithPassword({ email, password: formatAuthPassword(password) });
+  let user = transformed.data.user;
+  if (transformed.error || !user) {
+    // Compatibilidade com contas criadas antes da transformação de senha.
+    const legacy = await supabase.auth.signInWithPassword({ email, password });
+    if (legacy.error || !legacy.data.user) throw new Error('Login ou senha incorretos.');
+    user = legacy.data.user;
+  }
+  currentId = user.id;
+  await refreshCloud();
 }
 export async function cloudLogout() {
   await queue; await supabase.auth.signOut(); currentId = null; await refreshCloud();
 }
-export async function updateOwnPassword(currentPassword: string, password: string) {
+export async function updateOwnPassword(currentPassword: string, newPassword: string) {
+  if (newPassword.length < 8) throw new Error('A senha precisa ter pelo menos 8 caracteres.');
   const me = getState().users.find((user) => user.id === currentId);
   if (!me) throw new Error('Entre novamente.');
-  const { error: verified } = await supabase.auth.signInWithPassword({ email: accountEmail(me.login), password: currentPassword });
-  if (verified) throw new Error('Senha atual incorreta.');
-  if (password.length < 4) throw new Error('Use uma senha com pelo menos 4 caracteres.');
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw new Error('Não foi possível salvar a nova senha. Tente outra.');
+  const email = accountEmail(me.login);
+  const transformed = await supabase.auth.signInWithPassword({ email, password: formatAuthPassword(currentPassword) });
+  if (transformed.error) {
+    // Contas legadas ainda podem validar a senha sem transformação.
+    const legacy = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (legacy.error) throw new Error('Senha atual incorreta.');
+  }
+  const { error } = await supabase.auth.updateUser({ password: formatAuthPassword(newPassword) });
+  if (error) throw new Error('Não foi possível salvar a nova senha. Tente novamente.');
 }
