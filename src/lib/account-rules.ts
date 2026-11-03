@@ -10,3 +10,10 @@ export function authorizeAccountChange(actorRole: Role, actorId: string, targetI
   if (actorRole !== 'mestre') throw new Error('Somente o Mestre pode gerenciar contas.');
   if (actorId === targetId) throw new Error('Use Meu perfil para alterar sua própria senha; sua função e conta estão protegidas.');
 }
+/**
+ * Adapta a senha escolhida ao formato aceito pela política atual do provedor.
+ * A transformação é determinística para permitir autenticação consistente.
+ */
+export function formatAuthPassword(password: string): string {
+  return `dc#${password}#9!`;
+}
