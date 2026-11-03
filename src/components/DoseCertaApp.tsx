@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
 import { PushBanner, PushSettings } from "./PushSettings";
@@ -761,6 +762,7 @@ export function DoseCertaApp() {
   return (
     <>
       {cloudError && <div role="alert" className="fixed inset-x-4 top-4 z-50 rounded-lg border border-destructive bg-card p-3 text-sm text-destructive">{cloudError}<Button variant="ghost" size="sm" onClick={() => setCloudError("")}>Fechar</Button></div>}
+      <InstallPrompt />
       <PermissionPrompt />
       {!me ? <AuthScreen /> : me.mustChange ? <ForceChangePassword me={me} /> : <Shell me={me} />}
     </>
