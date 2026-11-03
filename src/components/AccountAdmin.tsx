@@ -129,7 +129,7 @@ export function AccountAdmin({ me, onNavigate }: { me: User; onNavigate: (page: 
           <div><h2 className="font-display text-xl font-semibold text-foreground">Usuários e contas</h2><p className="mt-1 text-sm text-muted-foreground">{visible.length} de {users.length} contas</p></div>
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" />Novo operador</summary>
-            <form className="absolute right-0 z-20 mt-2 grid w-[min( min( calc(100vw - 2rem), 340px), 340px)] gap-3 rounded-2xl border border-border bg-card p-4 shadow-xl" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
+            <form className="absolute right-0 z-20 mt-2 grid w-[min(340px,calc(100vw-2rem))] gap-3 rounded-2xl border border-border bg-card p-4 shadow-xl" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await manage({ data: { action: 'create', login, password, role: 'operador' } }); setLogin(''); setPassword(''); }, 'Operador criado.'); }}>
               <p className="font-semibold text-foreground">Cadastrar operador</p>
               <input className={field} required placeholder="Login" value={login} onChange={(event) => setLogin(event.target.value)} />
               <input className={field} required minLength={8} type="password" placeholder="Senha (mín. 8 caracteres)" value={password} onChange={(event) => setPassword(event.target.value)} />
