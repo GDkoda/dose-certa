@@ -572,3 +572,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   --sidebar-accent-foreground: oklch(0.99 0.005 65);
   --sidebar-ring: oklch(0.72 0.12 55);
 }
+
+
+/* Ajustes de usabilidade para telas pequenas */
+.dc-mobile-nav {
+  min-height: 6.5rem;
+}
+
+.dc-mobile-nav button {
+  min-height: 2.75rem;
+}
+
+[role="dialog"][aria-label="Escolher tema de cores"] button,
+[role="radiogroup"][aria-label="Cor do aplicativo"] button {
+  min-height: 2.75rem;
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (max-width: 380px) {
+  .dc-mobile-nav {
+    gap: 0.125rem;
+    padding-inline: 0.375rem;
+  }
+
+  .dc-mobile-nav button {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
