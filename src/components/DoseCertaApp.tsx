@@ -104,18 +104,21 @@ function useTheme() {
   return { dark, toggle };
 }
 
-export type Palette = "verde" | "azul" | "rosa" | "lavanda";
+export type Palette = "verde" | "azul" | "rosa" | "lavanda" | "ruby" | "dourado" | "onix";
 export const PALETTES: { id: Palette; name: string; light: string; dark: string }[] = [
   { id: "verde", name: "Sálvia", light: "oklch(0.52 0.05 165)", dark: "oklch(0.66 0.06 165)" },
   { id: "azul", name: "Oceano", light: "oklch(0.52 0.11 245)", dark: "oklch(0.7 0.11 240)" },
   { id: "rosa", name: "Peônia", light: "oklch(0.56 0.15 8)", dark: "oklch(0.72 0.13 8)" },
   { id: "lavanda", name: "Lavanda", light: "oklch(0.54 0.12 292)", dark: "oklch(0.73 0.1 292)" },
+  { id: "ruby", name: "Ruby", light: "oklch(0.48 0.19 25)", dark: "oklch(0.68 0.17 25)" },
+  { id: "dourado", name: "Dourado", light: "oklch(0.68 0.14 78)", dark: "oklch(0.78 0.13 82)" },
+  { id: "onix", name: "Ônix", light: "oklch(0.32 0.015 265)", dark: "oklch(0.76 0.012 265)" },
 ];
 function usePalette() {
   const [palette, setPaletteState] = useState<Palette>("verde");
   useEffect(() => {
     const saved = localStorage.getItem("dc-palette");
-    const p: Palette = saved === "azul" || saved === "rosa" || saved === "lavanda" ? saved : "verde";
+    const p: Palette = saved === "azul" || saved === "rosa" || saved === "lavanda" || saved === "ruby" || saved === "dourado" || saved === "onix" ? saved : "verde";
     setPaletteState(p);
     if (p === "verde") delete document.documentElement.dataset['palette'];
     else document.documentElement.dataset['palette'] = p;
@@ -815,7 +818,7 @@ export function DoseCertaApp() {
     // and color mode use separate preferences, so switching modes never resets
     // the selected palette.
     const savedPalette = localStorage.getItem("dc-palette");
-    if (savedPalette === "azul" || savedPalette === "rosa" || savedPalette === "lavanda") {
+    if (savedPalette === "azul" || savedPalette === "rosa" || savedPalette === "lavanda" || savedPalette === "ruby" || savedPalette === "dourado" || savedPalette === "onix") {
       document.documentElement.dataset["palette"] = savedPalette;
     } else {
       delete document.documentElement.dataset["palette"];
