@@ -6,6 +6,7 @@ export async function enablePush(): Promise<PushResult> {
   if (!config.apiKey || !config.projectId || !appId || !vapidKey || !config.messagingSenderId) return { status: "not-configured" };
   if (!("Notification" in window) || !("serviceWorker" in navigator)) return { status: "unsupported" };
   if (window.top !== window.self) return { status: "open-in-new-tab" };
+  if (Notification.permission === "denied") return { status: "denied" };
   const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
   if (permission !== "granted") return { status: "denied" };
   const [{ initializeApp, getApps }, { getMessaging, getToken, isSupported }] = await Promise.all([import("firebase/app"), import("firebase/messaging")]);
