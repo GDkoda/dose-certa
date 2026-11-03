@@ -315,9 +315,17 @@ function AlarmEngine({ me }: { me: User }) {
       if (due) {
         setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
         setActive(due);
-        const m = getState().meds.find((x) => x.id === due.medId);
+        const currentState = getState();
+        const m = currentState.meds.find((x) => x.id === due.medId);
+        const p = currentState.patients.find((x) => x.id === due.patientId);
         if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
-          try { new Notification("Hora do seu medicamento", { body: m ? `${m.name} ${m.dose}` : "" }); } catch { /* Mobile background delivery uses Firebase messaging instead. */ }
+          try {
+            new Notification(`Dose Certa • ${p?.name ?? "Paciente"}`, {
+              body: `${m?.name ?? "Medicamento"} ${m?.dose ?? ""} · Horário: ${fmtTime(due.scheduledAt)}`,
+              tag: `dose-${due.id}`,
+              renotify: true,
+            });
+          } catch { /* Mobile background delivery uses Firebase messaging instead. */ }
         }
       }
     };
