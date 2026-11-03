@@ -7,7 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
-import { PushSettings } from "./PushSettings";
+import { PushBanner, PushSettings } from "./PushSettings";
 import { registerPushDevice } from "@/lib/push.functions";
 import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
@@ -393,6 +393,8 @@ function Dashboard({ me, go }: { me: User; go: (p: Page) => void }) {
           <button onClick={() => go("pacientes")} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary-foreground/35 bg-primary-foreground/10 px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary-foreground/20"><Users className="h-4 w-4" />Ver pacientes<ArrowRight className="h-4 w-4" /></button>
         </div>
       </section>
+
+      {me.role === "cuidador" && <PushBanner />}
 
       <section aria-label="Resumo das doses de hoje" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:col-span-2">
