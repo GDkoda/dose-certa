@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicDoseActionRouteImport } from './routes/api/public/dose-action'
 import { Route as ApiPublicJobsMedicationRemindersRouteImport } from './routes/api/public/jobs/medication-reminders'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDoseActionRoute = ApiPublicDoseActionRouteImport.update({
+  id: '/api/public/dose-action',
+  path: '/api/public/dose-action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicJobsMedicationRemindersRoute =
@@ -26,27 +32,36 @@ const ApiPublicJobsMedicationRemindersRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/dose-action': typeof ApiPublicDoseActionRoute
   '/api/public/jobs/medication-reminders': typeof ApiPublicJobsMedicationRemindersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/dose-action': typeof ApiPublicDoseActionRoute
   '/api/public/jobs/medication-reminders': typeof ApiPublicJobsMedicationRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/dose-action': typeof ApiPublicDoseActionRoute
   '/api/public/jobs/medication-reminders': typeof ApiPublicJobsMedicationRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/jobs/medication-reminders'
+  fullPaths:
+    '/' | '/api/public/dose-action' | '/api/public/jobs/medication-reminders'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/jobs/medication-reminders'
-  id: '__root__' | '/' | '/api/public/jobs/medication-reminders'
+  to: '/' | '/api/public/dose-action' | '/api/public/jobs/medication-reminders'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/public/dose-action'
+    | '/api/public/jobs/medication-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicDoseActionRoute: typeof ApiPublicDoseActionRoute
   ApiPublicJobsMedicationRemindersRoute: typeof ApiPublicJobsMedicationRemindersRoute
 }
 
@@ -57,6 +72,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dose-action': {
+      id: '/api/public/dose-action'
+      path: '/api/public/dose-action'
+      fullPath: '/api/public/dose-action'
+      preLoaderRoute: typeof ApiPublicDoseActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/jobs/medication-reminders': {
@@ -71,6 +93,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicDoseActionRoute: ApiPublicDoseActionRoute,
   ApiPublicJobsMedicationRemindersRoute: ApiPublicJobsMedicationRemindersRoute,
 }
 export const routeTree = rootRouteImport
