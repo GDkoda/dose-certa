@@ -3,14 +3,13 @@ import { authenticateCronRequest } from "@/integrations/supabase/cron-auth";
 import { pushSlot, scheduledInTimezone } from "@/lib/push-rules";
 import type { Dose } from "@/lib/store";
 import { z } from "zod";
+import { sendPush, signDoseAction } from "@/lib/push-server";
 
 export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
   server: { handlers: { POST: async ({ request }) => {
     const failure = await authenticateCronRequest(request);
     if (failure) return failure;
-    const key = process.env["LOVABLE_API_KEY"];
-    const connection = process.env["FIREBASE_MESSAGING_API_KEY"];
-    if (!key || !connection) return new Response("Notification service unavailable", { status: 503 });
+    if (!process.env["LOVABLE_API_KEY"] || !process.env["FIREBASE_MESSAGING_API_KEY"]) return new Response("Notification service unavailable", { status: 503 });
     const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
     const { data: devices, error } = await db.from("push_devices").select("*");
     if (error) return new Response("Could not load devices", { status: 500 });
@@ -45,22 +44,38 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
           if (!createError) doses.push(dose);
         }
       }
+      // Group pending doses of the same patient at the same time into one notification.
+      const names = new Map<string, string>(); const medInfo = new Map<string, { name: string; dose: string }>();
+      const { data: pats } = await db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients");
+      for (const p of pats ?? []) names.set(p.id, String((p.payload as Record<string, unknown>)?.["name"] ?? "Paciente"));
+      for (const r of records ?? []) if (r.kind === "meds") { const m = r.payload as Record<string, unknown>; medInfo.set(r.id, { name: String(m?.["name"] ?? "Medicamento"), dose: String(m?.["dose"] ?? "") }); }
+      const groups = new Map<string, { patientId: string; scheduledAt: string; slot: number; doses: Dose[] }>();
       for (const dose of doses) {
         const slot = pushSlot(dose, now); if (slot === null) continue;
-        // Re-read the current status so a completed or snoozed dose is not sent from stale data.
         const { data: latest } = await db.from("app_records").select("payload").eq("id", dose.id).maybeSingle();
         const current = doseSchema.safeParse(latest?.payload);
         if (!current.success || pushSlot(current.data, now) === null) continue;
+        const gk = `${dose.patientId}|${dose.scheduledAt}`;
+        const g = groups.get(gk) ?? { patientId: dose.patientId, scheduledAt: dose.scheduledAt, slot, doses: [] };
+        g.slot = Math.max(g.slot, slot); g.doses.push(dose); groups.set(gk, g);
+      }
+      for (const g of groups.values()) {
+        const hhmm = new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(g.scheduledAt));
+        const patient = names.get(g.patientId) ?? "Paciente";
+        const lines = g.doses.map((d) => { const m = medInfo.get(d.medId); return m ? `${m.name}${m.dose ? ` — ${m.dose}` : ""}` : "Medicamento"; });
+        const title = g.doses.length > 1 ? `${patient}: ${g.doses.length} medicamentos às ${hhmm}` : `${patient}: hora do remédio (${hhmm})`;
+        const doseIds = g.doses.map((d) => d.id);
+        const sig = await signDoseAction(owner, doseIds);
+        const groupId = `${g.patientId}-${g.scheduledAt}`;
         for (const device of owned) {
-          const deliveryKey = `${dose.id}:${device.token}:${slot}`;
-          const { data: claimed, error: claimError } = await db.rpc("claim_push_delivery", { p_key: deliveryKey, p_token: device.token, p_dose: dose.id });
+          const deliveryKey = `${groupId}:${device.token}:${g.slot}`;
+          const { data: claimed, error: claimError } = await db.rpc("claim_push_delivery", { p_key: deliveryKey, p_token: device.token, p_dose: doseIds[0]! });
           if (claimError || !claimed) continue;
           try {
-            const response = await fetch("https://connector-gateway.lovable.dev/firebase_messaging/v1/projects/_/messages:send", { method: "POST", headers: { Authorization: `Bearer ${key}`, "X-Connection-Api-Key": connection, "Content-Type": "application/json" }, body: JSON.stringify({ message: { token: device.token, notification: { title: "Dose Certa", body: "Há um medicamento no horário. Abra o Dose Certa para conferir e registrar a dose." }, webpush: { headers: { TTL: "300", Urgency: "high" }, notification: { tag: dose.id }, fcm_options: { link: new URL("/", request.url).href } } } }) });
-            if (!response.ok) {
-              const body = await response.text();
-              console.error("Medication push failed", response.status);
-              if (response.status === 404 && body.includes("UNREGISTERED")) await db.from("push_devices").delete().eq("token", device.token);
+            const r = await sendPush(device.token, { title, body: lines.join("\n"), tag: `dc-${groupId}`, url: new URL("/", request.url).href, owner, doseIds, sig });
+            if (!r.ok) {
+              console.error("Medication push failed", r.status, r.body.slice(0, 300));
+              if (r.status === 404 || (r.status === 400 && r.body.includes("INVALID_ARGUMENT") && r.body.includes("token"))) await db.from("push_devices").delete().eq("token", device.token);
               failed++; continue;
             }
             await db.from("push_deliveries").update({ sent_at: new Date().toISOString() }).eq("delivery_key", deliveryKey); sent++;
