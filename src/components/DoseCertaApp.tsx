@@ -413,7 +413,6 @@ function AlarmEngine({ me }: { me: User }) {
       </section>
     </div>
   );
-  );
 }
 
 function PermissionPrompt() {
