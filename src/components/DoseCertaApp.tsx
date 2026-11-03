@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
@@ -15,7 +15,6 @@ import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
-import lavender from "@/assets/lavender.png";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
 import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
 import { summarizeDoseStatuses } from "@/lib/report-rules";
@@ -88,38 +87,86 @@ function T({ k, children, as: Tag = "span", className }: { k: string; children: 
     </Tag>
   );
 }
-function useImage(k: string, fallback: string) { return useStore((s) => s.images[k]) ?? fallback; }
-function ImageEditButton({ k, className }: { k: string; className?: string }) {
-  const me = useMe();
-  const ref = useRef<HTMLInputElement>(null);
-  if (me?.role !== "mestre") return null;
+type GeometricVariant = "dense" | "sparse";
+
+type GeometryTile = { x: number; y: number; size: number; opacity: number; rotation: number };
+
+function createGeometryTiles(variant: GeometricVariant): GeometryTile[] {
+  const tiles: GeometryTile[] = [];
+  for (let row = 0; row < 12; row += 1) {
+    for (let column = 0; column < 12; column += 1) {
+      const noise = ((column * 37 + row * 61 + column * row * 13) % 101) / 101;
+      const flow = (row + column) / 22;
+      const threshold = variant === "dense" ? 0.62 + flow * 0.27 : 0.16 + flow * 0.43;
+      if (noise > threshold) continue;
+      const size = 3.5 + ((column * 11 + row * 7) % 10) * 1.05;
+      const jitterX = ((column * 17 + row * 5) % 17) - 8;
+      const jitterY = ((row * 19 + column * 3) % 17) - 8;
+      tiles.push({
+        x: column * 51 + 8 + jitterX,
+        y: row * 51 + 8 + jitterY,
+        size,
+        opacity: Math.min(0.32, 0.055 + flow * 0.23) * (variant === "dense" ? 1 : 0.88),
+        rotation: ((column * 13 + row * 9) % 22) - 11,
+      });
+    }
+  }
+  return tiles;
+}
+
+const DENSE_GEOMETRY = createGeometryTiles("dense");
+const SPARSE_GEOMETRY = createGeometryTiles("sparse");
+
+function GeometricDissolve({ variant = "dense", className }: {
+  variant?: GeometricVariant;
+  className?: string;
+}) {
+  const tiles = variant === "dense" ? DENSE_GEOMETRY : SPARSE_GEOMETRY;
   return (
-    <>
-      <button aria-label="Trocar imagem" onClick={() => ref.current?.click()} className={cls("no-print z-10 grid h-7 w-7 place-items-center rounded-full bg-card/80 text-foreground opacity-60 shadow hover:opacity-100", className)}>
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
-      <input ref={ref} type="file" accept="image/*" hidden onChange={(e) => {
-        const f = e.target.files?.[0]; if (!f) return;
-        const r = new FileReader(); r.onload = () => setState((s) => ({ ...s, images: { ...s.images, [k]: String(r.result) } })); r.readAsDataURL(f);
-      }} />
-    </>
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 620 620"
+      preserveAspectRatio="xMidYMid meet"
+      className={cls("pointer-events-none absolute", className)}
+      fill="none"
+    >
+      <g fill="currentColor">
+        {tiles.map((tile, index) => (
+          <rect
+            key={index}
+            x={tile.x}
+            y={tile.y}
+            width={tile.size}
+            height={tile.size}
+            rx={tile.size > 9 ? 2 : 1}
+            opacity={tile.opacity}
+            transform={`rotate(${tile.rotation} ${tile.x + tile.size / 2} ${tile.y + tile.size / 2})`}
+          />
+        ))}
+      </g>
+      <g stroke="currentColor" strokeWidth="1.25" opacity={variant === "dense" ? 0.075 : 0.05}>
+        <path d="M330 44h166v166H330z" />
+        <path d="M382 96h62v62h-62z" />
+        <path d="M116 362h118v118H116z" />
+      </g>
+    </svg>
   );
 }
+
 function Logo({ size = 40 }: { size?: number }) {
-  const icon = useStore((s) => s.images["app-icon"]);
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
-      {icon ? (
-        <img src={icon} alt="Ícone personalizado do Dose Certa" className="h-full w-full rounded-xl object-cover" />
-      ) : (
-        <span className="grid h-full w-full place-items-center rounded-xl bg-primary/10 text-primary">
-          <svg viewBox="0 0 24 24" width="72%" height="72%" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Dose Certa">
-            <path d="M7.2 4.8a5.7 5.7 0 0 1 8.1 0l3.9 3.9a5.7 5.7 0 0 1-8.1 8.1l-3.9-3.9a5.7 5.7 0 0 1 0-8.1Z" />
-            <path d="m9 6.6 8.4 8.4" />
-          </svg>
-        </span>
-      )}
-      <ImageEditButton k="app-icon" className="absolute -right-2 -top-2 h-5 w-5" />
+    <span
+      className="grid shrink-0 place-items-center rounded-[30%] bg-primary/10 text-primary"
+      style={{ width: size, height: size }}
+    >
+      <svg viewBox="0 0 24 24" width="76%" height="76%" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label="Dose Certa: cápsula protegida">
+        <path d="M12 2.4 19.4 5.3v5.3c0 5.1-3.3 8.6-7.4 10.9-4.1-2.3-7.4-5.8-7.4-10.9V5.3L12 2.4Z" />
+        <g transform="rotate(-45 12 12)">
+          <rect x="8.7" y="7.4" width="6.6" height="9.2" rx="3.3" />
+          <path d="M8.9 12h6.2" />
+        </g>
+      </svg>
     </span>
   );
 }
@@ -300,7 +347,6 @@ function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup" | "recover">("login");
   const [login, setLogin] = useState(""); const [pass, setPass] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const bg = useImage("auth-bg", lavender);
 
   const register = useServerFn(registerAccount);
   const [busy, setBusy] = useState(false);
@@ -317,9 +363,8 @@ function AuthScreen() {
 
   return (
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-background p-4">
-      <img src={bg} alt="" className="pointer-events-none absolute -right-20 bottom-0 h-[90%] opacity-60" width={768} height={1152} />
-      <img src={lavender} alt="" className="pointer-events-none absolute -left-24 -top-10 h-[60%] rotate-180 opacity-25" width={768} height={1152} />
-      <ImageEditButton k="auth-bg" className="absolute right-4 top-20" />
+      <GeometricDissolve variant="dense" className="-right-24 -bottom-24 h-[38rem] w-[38rem] text-primary opacity-30" />
+      <GeometricDissolve variant="sparse" className="-left-28 -top-28 h-[29rem] w-[29rem] text-secondary opacity-25" />
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className={cls(card, "relative w-full max-w-md")}>
         <div className="mb-6 flex items-center gap-3">
@@ -559,15 +604,13 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
   const miss = doses.filter((d) => d.status === "nao_tomado").length;
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
-  const heroImg = useImage("dash-bg", lavender);
   const nextDoses = [...doses].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   const progress = doses.length ? Math.round((taken / doses.length) * 100) : 0;
   return (
     <div className="mx-auto w-full max-w-7xl space-y-7">
       <section className="relative isolate overflow-hidden rounded-[2rem] bg-primary px-6 py-7 text-primary-foreground shadow-[var(--shadow-soft)] sm:px-9 sm:py-9">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary via-primary to-secondary opacity-95" />
-        <img src={heroImg} alt="" className="pointer-events-none absolute -right-5 -top-10 -z-10 h-64 opacity-20 sm:right-5 sm:top-0 sm:h-80" width={768} height={1152} />
-        <ImageEditButton k="dash-bg" className="absolute right-3 top-3" />
+        <GeometricDissolve variant="dense" className="-right-5 -top-10 -z-10 h-64 w-64 text-primary-foreground opacity-30 sm:right-5 sm:top-0 sm:h-80 sm:w-80" />
         <p className="mb-2 text-sm font-bold uppercase tracking-[0.16em] opacity-80">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
         <h1 className="max-w-2xl font-display text-3xl font-semibold leading-tight sm:text-4xl">{hello}, {me.login}.</h1>
         <T k="dash-sub" as="p" className="mt-2 max-w-lg text-sm leading-relaxed opacity-85 sm:text-base">Seu cuidado de hoje, organizado em um só lugar.</T>
@@ -1077,7 +1120,6 @@ function Shell({ me }: { me: User }) {
     { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
-  const sideImg = useImage("side-bg", lavender);
   useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
   const registerDevice = useServerFn(registerPushDevice);
   // Re-link this phone to the signed-in caregiver on every open, so tokens stay fresh and follow the account in use.
@@ -1105,8 +1147,7 @@ function Shell({ me }: { me: User }) {
           {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} className={cls("flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition", page === i.id ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>{i.icon}{i.label}</button>)}
           <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-sidebar-accent"><LogOut className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />Sair</button>
         </nav>
-        <img src={sideImg} alt="" className="pointer-events-none absolute -bottom-10 -left-10 h-80 opacity-40" width={768} height={1152} />
-        <ImageEditButton k="side-bg" className="absolute bottom-4 right-4" />
+        <GeometricDissolve variant="sparse" className="-bottom-16 -left-16 h-96 w-96 text-sidebar-foreground opacity-30" />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
