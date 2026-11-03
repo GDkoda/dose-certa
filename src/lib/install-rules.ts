@@ -5,7 +5,7 @@
  * Pure rules only: the browser glue lives in install-prompt.ts.
  */
 
-/** After a decline (or an install) the request comes back after three days. */
+/** After declining or snoozing, offer installation again after three days. */
 export const REINSTALL_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 
 export type InstallStep = "none" | "native" | "ios" | "desktop" | "own-tab";
