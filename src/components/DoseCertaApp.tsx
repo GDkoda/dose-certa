@@ -106,14 +106,17 @@ function useTheme() {
 
 export type Palette = "verde" | "azul" | "rosa" | "lavanda" | "ruby" | "dourado" | "onix" | "cobre";
 export const PALETTES: { id: Palette; name: string; light: string; dark: string }[] = [
+  // Ordem visual aproximada do espectro: vermelho, tons quentes, amarelo,
+  // verde, azul e violeta. Peônia (rosa) fica junto dos tons magenta;
+  // Ônix, por ser neutro, fecha a sequência.
+  { id: "ruby", name: "Ruby", light: "oklch(0.48 0.19 25)", dark: "oklch(0.68 0.17 25)" },
+  { id: "rosa", name: "Peônia", light: "oklch(0.56 0.15 8)", dark: "oklch(0.72 0.13 8)" },
+  { id: "cobre", name: "Cobre", light: "oklch(0.53 0.12 43)", dark: "oklch(0.72 0.12 55)" },
+  { id: "dourado", name: "Dourado", light: "oklch(0.68 0.14 78)", dark: "oklch(0.78 0.13 82)" },
   { id: "verde", name: "Sálvia", light: "oklch(0.52 0.05 165)", dark: "oklch(0.66 0.06 165)" },
   { id: "azul", name: "Oceano", light: "oklch(0.52 0.11 245)", dark: "oklch(0.7 0.11 240)" },
-  { id: "rosa", name: "Peônia", light: "oklch(0.56 0.15 8)", dark: "oklch(0.72 0.13 8)" },
   { id: "lavanda", name: "Lavanda", light: "oklch(0.54 0.12 292)", dark: "oklch(0.73 0.1 292)" },
-  { id: "ruby", name: "Ruby", light: "oklch(0.48 0.19 25)", dark: "oklch(0.68 0.17 25)" },
-  { id: "dourado", name: "Dourado", light: "oklch(0.68 0.14 78)", dark: "oklch(0.78 0.13 82)" },
   { id: "onix", name: "Ônix", light: "oklch(0.32 0.015 265)", dark: "oklch(0.76 0.012 265)" },
-  { id: "cobre", name: "Cobre", light: "oklch(0.53 0.12 43)", dark: "oklch(0.72 0.12 55)" },
 ];
 function usePalette() {
   const [palette, setPaletteState] = useState<Palette>("verde");
