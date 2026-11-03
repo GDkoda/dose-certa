@@ -221,7 +221,7 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Configuração inicial</p>
             <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Vamos preparar seu aparelho?</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{role === "cuidador" ? "Esses ajustes ajudam o Dose Certa a lembrar você dos medicamentos na hora certa, inclusive quando estiver usando outro app ou com o celular bloqueado." : "Esses ajustes deixam o Dose Certa pronto neste aparelho e ajudam os avisos do sistema a aparecerem como esperado."} É rapidinho e você pode mudar tudo depois.</p>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{role === "cuidador" ? "Para o Dose Certa funcionar por completo e lembrar você dos medicamentos na hora certa, prepare este aparelho para receber avisos mesmo quando estiver usando outro app ou com a tela bloqueada." : "Prepare este aparelho para instalar o Dose Certa e receber os avisos do sistema quando estiverem disponíveis para sua conta."} É rapidinho e você pode mudar tudo depois.</p>
           </div>
           <button type="button" onClick={collapse} aria-label="Recolher configuração do aparelho" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"><ChevronUp className="h-5 w-5" /></button>
         </div>
@@ -263,7 +263,7 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
 
         <article className="rounded-2xl border border-border bg-background p-4">
           <div className="flex items-center gap-2 text-primary"><BellRing className="h-5 w-5" /><p className="font-semibold text-foreground">2. Ativar notificações</p></div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Autorize os avisos para receber lembretes quando estiver usando outro aplicativo ou com a tela bloqueada.</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Ao tocar no botão, o navegador vai perguntar se pode mostrar notificações. Escolha “Permitir” para receber lembretes quando estiver usando outro aplicativo ou com a tela bloqueada.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={pushState === "registered" ? "rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary" : "rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"}>
               {pushState === "registered" ? "Aparelho vinculado" : pushState === "granted" ? "Permissão concedida" : pushState === "denied" ? "Permissão bloqueada" : pushState === "not-configured" ? "Serviço ainda não conectado" : pushState === "open-in-new-tab" ? "Abrir em aba própria" : pushState === "unsupported" ? "Verificar compatibilidade" : "Aguardando ativação"}
