@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { installOutcome, installStep, isIosDevice, type InstallStep } from "./install-rules";
 
 const DISMISS_KEY = "dc-install-dismissed";
+const INSTALLED_KEY = "dc-app-installed";
 
 type DeferredPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -20,8 +21,10 @@ if (typeof window !== "undefined") {
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
-    // Treat a finished install like a decline: the request rests for three days.
-    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+    try {
+      localStorage.setItem(INSTALLED_KEY, "1");
+      localStorage.removeItem(DISMISS_KEY);
+    } catch { /* storage unavailable */ }
     window.dispatchEvent(new Event("dc-install-done"));
   });
 }
@@ -34,18 +37,19 @@ function readDismissedAt(): number | null {
   } catch { return null; }
 }
 
-function isStandalone(): boolean {
+function isInstalled(): boolean {
   try {
     if (window.matchMedia?.("(display-mode: standalone)").matches) return true;
     if (window.matchMedia?.("(display-mode: window-controls-overlay)").matches) return true;
-  } catch { /* older browsers */ }
-  return (navigator as { standalone?: boolean }).standalone === true;
+    if ((navigator as { standalone?: boolean }).standalone === true) return true;
+    return localStorage.getItem(INSTALLED_KEY) === "1";
+  } catch { return false; }
 }
 
 function currentStep(): InstallStep {
   if (typeof window === "undefined") return "none";
   return installStep({
-    standalone: isStandalone(),
+    standalone: isInstalled(),
     canPrompt: deferredPrompt !== null,
     isIos: isIosDevice(navigator.userAgent, navigator.maxTouchPoints ?? 0),
     inFrame: window.top !== window.self,
@@ -62,9 +66,15 @@ export function useInstallPrompt() {
     const refresh = () => setStep(currentStep());
     window.addEventListener("dc-install-available", refresh);
     window.addEventListener("dc-install-done", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       window.removeEventListener("dc-install-available", refresh);
       window.removeEventListener("dc-install-done", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
 
