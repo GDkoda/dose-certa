@@ -1118,7 +1118,7 @@ function Shell({ me }: { me: User }) {
       if (result.status !== "registered") return;
       await registerDevice({ data: { token: result.token, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
       sessionStorage.setItem("dc-push-token", result.token);
-      localStorage.setItem("dc-push-ready", "1");
+      localStorage.setItem("dc-push-ready-" + me.id, "1");
       window.dispatchEvent(new Event("dc-push-ready"));
     }).catch(() => undefined);
   }, [me.id, me.role]);
@@ -1167,7 +1167,7 @@ function Shell({ me }: { me: User }) {
           </div>
         )}
         <main className="dc-main flex-1 px-4 pb-40 pt-6 md:px-8 md:pb-10">
-          <DeviceSetupAssistant role={me.role} />
+          <DeviceSetupAssistant role={me.role} accountId={me.id} />
           {page === "inicio" && <Dashboard me={me} go={setPage} activePatientId={activePatientId} />}
           {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} />}
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
