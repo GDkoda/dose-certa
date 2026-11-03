@@ -182,7 +182,7 @@ function PaletteQuickAccess() {
         <PaletteIcon className="h-5 w-5" />
       </button>
       {open && (
-        <div role="dialog" aria-label="Escolher tema de cores" className={cls(card, "absolute right-0 z-40 mt-2 w-[min(19rem,calc(100vw-2rem))] !p-3 shadow-xl")}>
+        <div role="dialog" aria-label="Escolher tema de cores" className={cls(card, "absolute right-0 z-50 mt-2 max-h-[70dvh] w-[min(20rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-y-auto !p-3 shadow-xl")}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">Tema de cores</p>
             <button type="button" aria-label="Fechar temas" onClick={() => setOpen(false)} className="rounded-full p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
@@ -796,7 +796,7 @@ function Shell({ me }: { me: User }) {
   const items: { id: Page; label: string; mobileLabel: string; icon: ReactNode; roles: Role[] }[] = [
     { id: "inicio", label: "Início", mobileLabel: "Início", icon: <Home className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "pacientes", label: "Pacientes", mobileLabel: "Pacientes", icon: <UsersRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
-    { id: "medicamentos", label: "Medicamentos", mobileLabel: "Remédios", icon: <PillBottle className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
+    { id: "medicamentos", label: "Medicamentos", mobileLabel: "Medicamentos", icon: <PillBottle className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "historico", label: "Histórico", mobileLabel: "Histórico", icon: <CalendarDays className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "suporte", label: "Atendimento", mobileLabel: "Suporte", icon: <LifeBuoy className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
@@ -840,7 +840,7 @@ function Shell({ me }: { me: User }) {
           <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
-        <main className="dc-main flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10">
+        <main className="dc-main flex-1 px-4 pb-36 pt-6 md:px-8 md:pb-10">
           {page === "inicio" && <Dashboard me={me} go={setPage} />}
           {page === "pacientes" && <Patients me={me} />}
           {page === "medicamentos" && <Meds me={me} />}
@@ -849,8 +849,8 @@ function Shell({ me }: { me: User }) {
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
-        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 items-stretch gap-0.5 border-t border-border/70 bg-card/95 px-1.5 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
-          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[9px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}<span className="w-full truncate text-center">{i.mobileLabel}</span></button>)}
+        <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 items-stretch gap-1 border-t border-border/70 bg-card/95 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
+          {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}<span className="w-full truncate text-center">{i.mobileLabel}</span></button>)}
         </nav>
       </div>
       <AlarmEngine me={me} />
