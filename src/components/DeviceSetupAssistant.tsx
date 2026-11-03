@@ -22,6 +22,12 @@ function isStandaloneApp() {
   return (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
+function isIosDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
 function setupStorageKey(accountId: string) {
   return "dc-first-setup-complete-" + accountId;
 }
@@ -110,6 +116,11 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
 
   useEffect(() => {
     if (!open || step !== "notifications") return;
+    if (isIosDevice() && !isStandaloneApp()) {
+      setPushState("unsupported");
+      setMessage("No iPhone, o iOS só libera notificações web depois que o Dose Certa é adicionado à Tela de Início e aberto pelo ícone instalado.");
+      return;
+    }
     if (!("Notification" in window)) {
       setPushState("unsupported");
       return;
@@ -225,7 +236,9 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
                           ? "O navegador pode adicionar o Dose Certa à tela inicial."
                           : installFlow.step === "own-tab"
                             ? "A instalação precisa ser iniciada em uma aba própria."
-                            : "A instalação automática não está disponível neste navegador agora. Você pode continuar sem instalar."}
+                            : installFlow.step === "ios"
+                              ? "No iPhone, adicione o Dose Certa à Tela de Início pelo menu Compartilhar do Safari e depois abra pelo ícone."
+                              : "A instalação automática não está disponível neste navegador agora. Você pode continuar sem instalar."}
                       </p>
                     </div>
                   </div>
