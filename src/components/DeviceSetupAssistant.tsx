@@ -35,7 +35,7 @@ function wasSetupCompleted(accountId: string) {
 export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountId: string }) {
   const installFlow = useInstallPrompt();
   const register = useServerFn(registerPushDevice);
-  const [open, setOpen] = useState(() => !wasSetupCompleted(accountId));
+  const [open, setOpen] = useState(false);
   const [step, setStep] = useState<SetupStep>(() => isStandaloneApp() ? "notifications" : "install");
   const [installed, setInstalled] = useState(isStandaloneApp);
   const [pushState, setPushState] = useState<PushState>(() => {
@@ -89,6 +89,10 @@ export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountI
       setPushBusy(false);
     }
   }, [accountId, register]);
+
+  useEffect(() => {
+    if (!wasSetupCompleted(accountId)) setOpen(true);
+  }, [accountId]);
 
   useEffect(() => {
     const onInstalled = () => {
