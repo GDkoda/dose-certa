@@ -15,7 +15,6 @@ type ManualSetting = "sound" | "screen" | "badge";
 type ManualChecks = Record<ManualSetting, boolean>;
 
 const manualStorageKey = "dc-device-manual-settings";
-const pushReadyKey = "dc-push-ready";
 
 function isStandaloneApp() {
   try {
@@ -36,7 +35,8 @@ function loadManualChecks(): ManualChecks {
 const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-60";
 
-export function DeviceSetupAssistant({ role }: { role: Role }) {
+export function DeviceSetupAssistant({ role, accountId }: { role: Role; accountId: string }) {
+  const pushReadyKey = "dc-push-ready-" + accountId;
   const installFlow = useInstallPrompt();
   const register = useServerFn(registerPushDevice);
   const sendTest = useServerFn(sendTestPush);
@@ -266,17 +266,28 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
               {pushState === "registered" ? "Aparelho vinculado" : pushState === "granted" ? "Permissão concedida" : pushState === "denied" ? "Permissão bloqueada" : pushState === "not-configured" ? "Serviço ainda não conectado" : pushState === "open-in-new-tab" ? "Abrir em aba própria" : pushState === "unsupported" ? "Verificar compatibilidade" : "Aguardando ativação"}
             </span>
           </div>
-          {pushState !== "registered" && (
+          {pushState !== "registered" && pushState !== "denied" && pushState !== "not-configured" && pushState !== "open-in-new-tab" && (
             <Button className="mt-3 w-full" disabled={pushBusy} onClick={() => void activateNotifications()}>
               <Bell className="h-4 w-4" />{pushBusy ? "Ativando..." : pushState === "granted" ? "Concluir ativação neste aparelho" : "Permitir notificações"}
             </Button>
           )}
+          {pushState === "open-in-new-tab" && (
+            <Button className="mt-3 w-full" onClick={installFlow.openOwnTab}>
+              <Smartphone className="h-4 w-4" />Abrir em uma aba própria
+            </Button>
+          )}
+          {pushState === "not-configured" && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">O ambiente ainda precisa conectar o serviço de notificações. Depois que ele estiver configurado, volte aqui para ativar.</p>}
           {pushState === "registered" && (
             <Button variant="outline" className="mt-3 w-full" disabled={testBusy} onClick={() => void testNotification()}>
               <BellRing className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar aviso de teste"}
             </Button>
           )}
-          {pushState === "denied" && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Para liberar: abra as configurações do Dose Certa no Android ou as configurações do site no navegador e permita notificações.</p>}
+          {pushState === "denied" && (
+            <details className="mt-3 rounded-xl bg-muted/60 p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-foreground">Como liberar notificações bloqueadas</summary>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{isIos ? "Abra Ajustes → Notificações → Dose Certa e ative Permitir Notificações." : "Abra Informações do app → Notificações → Permitir. Se o app não aparecer, abra as configurações do Chrome → Configurações do site → Notificações, escolha o Dose Certa e marque Permitir."}</p>
+            </details>
+          )}
           {isIos && !installed && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">No iPhone, os avisos da web exigem que o site seja adicionado à Tela de Início e aberto pelo ícone instalado.</p>}
         </article>
 
