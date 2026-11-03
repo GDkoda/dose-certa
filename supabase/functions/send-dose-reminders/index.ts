@@ -5,6 +5,7 @@ type Dose = {
   scheduledAt: string; status: string; snoozeUntil?: string; lastShown?: string;
 };
 type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number };
+type Patient = { id: string; name: string };
 type Device = { owner_id: string; token: string; timezone: string };
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret" };
@@ -57,17 +58,23 @@ Deno.serve(async (request) => {
   const now = Date.now();
   const isoNow = new Date(now).toISOString();
   const minDate = new Date(now - 12 * 60 * 60 * 1000).toISOString();
-  const [doseRows, medRows, deviceRows] = await Promise.all([
+  const [doseRows, medRows, patientRows, deviceRows] = await Promise.all([
     supabase.from("app_records").select("id, owner_id, payload").eq("kind", "doses"),
     supabase.from("app_records").select("id, owner_id, payload").eq("kind", "meds"),
+    supabase.from("app_records").select("id, payload").eq("kind", "patients"),
     supabase.from("push_devices").select("owner_id, token, timezone"),
   ]);
-  if (doseRows.error || medRows.error || deviceRows.error) return json({ error: "Could not load reminder data" }, 500);
+  if (doseRows.error || medRows.error || patientRows.error || deviceRows.error) return json({ error: "Could not load reminder data" }, 500);
 
   const meds = new Map<string, Med>();
   for (const row of medRows.data ?? []) {
     const payload = row.payload as Record<string, unknown>;
     meds.set(row.id, { ...payload, id: row.id, ownerId: row.owner_id } as Med);
+  }
+  const patients = new Map<string, Patient>();
+  for (const row of patientRows.data ?? []) {
+    const payload = row.payload as Record<string, unknown>;
+    patients.set(row.id, { id: row.id, name: String(payload.name ?? "Paciente") });
   }
   const devicesByOwner = new Map<string, Device[]>();
   for (const device of (deviceRows.data ?? []) as Device[]) {
@@ -85,6 +92,7 @@ Deno.serve(async (request) => {
     if (dose.lastShown && now - Date.parse(dose.lastShown) < 5 * 60_000) { skipped++; continue; }
     const med = meds.get(dose.medId);
     if (!med || med.ownerId !== dose.ownerId) { skipped++; continue; }
+    const patient = patients.get(dose.patientId)?.name ?? "Paciente";
     const devices = devicesByOwner.get(dose.ownerId) ?? [];
     if (!devices.length) { skipped++; continue; }
     const slot = Math.floor((now - scheduled) / (5 * 60_000));
@@ -92,8 +100,8 @@ Deno.serve(async (request) => {
     for (const device of devices) {
       // Normal reminders repeat every five minutes; the overdue-care alert is one-time per dose/device.
       const messages = [
-        { key: `${dose.id}:${slot}:${device.token.slice(-12)}`, title: "Hora do seu medicamento", body: `Está na hora de tomar ${med.name}${med.dose ? ` — ${med.dose}` : ""}. Abra o Dose Certa para confirmar.` },
-        ...(late ? [{ key: `late:${dose.id}:${device.token.slice(-12)}`, title: "Dose ainda não confirmada", body: `A dose de ${med.name} continua pendente após o período de tolerância. Confira o Dose Certa; o registro não confirma se o medicamento foi tomado.` }] : []),
+        { key: `${dose.id}:${slot}:${device.token.slice(-12)}`, title: `Dose Certa • ${patient}`, body: `Está na hora de tomar ${med.name}${med.dose ? ` — ${med.dose}` : ""}. Abra o Dose Certa para confirmar.` },
+        ...(late ? [{ key: `late:${dose.id}:${device.token.slice(-12)}`, title: `Dose pendente • ${patient}`, body: `A dose de ${med.name} continua pendente após o período de tolerância. Confira o Dose Certa; o registro não confirma se o medicamento foi tomado.` }] : []),
       ];
       for (const item of messages) {
         const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", { p_dose: dose.id, p_key: item.key, p_token: device.token });
