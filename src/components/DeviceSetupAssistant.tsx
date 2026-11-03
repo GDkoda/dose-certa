@@ -10,7 +10,7 @@ import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import type { Role } from "@/lib/store";
 
-type PushState = "checking" | "prompt" | "granted" | "registered" | "denied" | "unsupported";
+type PushState = "checking" | "prompt" | "granted" | "registered" | "denied" | "unsupported" | "not-configured" | "open-in-new-tab";
 type ManualSetting = "sound" | "screen" | "badge";
 type ManualChecks = Record<ManualSetting, boolean>;
 
@@ -44,7 +44,8 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
   const [pushState, setPushState] = useState<PushState>("checking");
   const [expanded, setExpanded] = useState(() => {
     if (typeof window === "undefined") return true;
-    return localStorage.getItem("dc-device-setup-collapsed") !== "1";
+    try { return localStorage.getItem("dc-device-setup-collapsed") !== "1"; }
+    catch { return true; }
   });
   const [manualChecks, setManualChecks] = useState<ManualChecks>(loadManualChecks);
   const [vibrationTested, setVibrationTested] = useState(false);
@@ -148,7 +149,7 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
           denied: "A permissão foi recusada ou está bloqueada. Abra as configurações de notificações do Dose Certa no aparelho ou do site no navegador e permita os avisos.",
         };
         setMessage(messages[result.status]);
-        setPushState(result.status === "denied" ? "denied" : result.status === "unsupported" || result.status === "open-in-new-tab" || result.status === "not-configured" ? "unsupported" : "prompt");
+        setPushState(result.status);
       }
     } catch {
       setMessage("Não foi possível concluir a ativação. Confira a conexão e tente novamente.");
@@ -190,8 +191,9 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
   };
 
   const manualDone = Object.values(manualChecks).filter(Boolean).length;
-  const completed = Number(installed) + Number(pushState === "registered") + Number(vibrationTested) + manualDone;
-  const total = 6;
+  const vibrationSupported = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+  const completed = Number(installed) + Number(pushState === "registered") + Number(vibrationTested || !vibrationSupported) + manualDone;
+  const total = 5 + Number(vibrationSupported);
 
   if (!expanded) {
     return (
@@ -216,7 +218,7 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Configuração inicial</p>
             <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Vamos preparar seu aparelho?</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">Esses ajustes ajudam o Dose Certa a avisar você na hora certa, inclusive quando o app estiver fechado ou o celular bloqueado. É rapidinho e você pode mudar tudo depois.</p>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{role === "cuidador" ? "Esses ajustes ajudam o Dose Certa a lembrar você dos medicamentos na hora certa, inclusive quando estiver usando outro app ou com o celular bloqueado." : "Esses ajustes deixam o Dose Certa pronto neste aparelho e ajudam os avisos do sistema a aparecerem como esperado."} É rapidinho e você pode mudar tudo depois.</p>
           </div>
           <button type="button" onClick={collapse} aria-label="Recolher configuração do aparelho" className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"><ChevronUp className="h-5 w-5" /></button>
         </div>
@@ -261,7 +263,7 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Autorize os avisos para receber lembretes quando estiver usando outro aplicativo ou com a tela bloqueada.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className={pushState === "registered" ? "rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary" : "rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"}>
-              {pushState === "registered" ? "Aparelho vinculado" : pushState === "granted" ? "Permissão concedida" : pushState === "denied" ? "Permissão bloqueada" : pushState === "unsupported" ? "Verificar compatibilidade" : "Aguardando ativação"}
+              {pushState === "registered" ? "Aparelho vinculado" : pushState === "granted" ? "Permissão concedida" : pushState === "denied" ? "Permissão bloqueada" : pushState === "not-configured" ? "Serviço ainda não conectado" : pushState === "open-in-new-tab" ? "Abrir em aba própria" : pushState === "unsupported" ? "Verificar compatibilidade" : "Aguardando ativação"}
             </span>
           </div>
           {pushState !== "registered" && (
@@ -291,10 +293,12 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
           <div className="mt-3 space-y-2.5">
             <label className="flex cursor-pointer items-start gap-2.5 text-sm">
               <input type="checkbox" checked={manualChecks.sound} onChange={(event) => setManual("sound", event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+              <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span><strong className="text-foreground">Som e vibração</strong><span className="block text-xs text-muted-foreground">Permita alertas sonoros e vibração para os avisos do Dose Certa.</span></span>
             </label>
             <label className="flex cursor-pointer items-start gap-2.5 text-sm">
               <input type="checkbox" checked={manualChecks.screen} onChange={(event) => setManual("screen", event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" />
+              <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span><strong className="text-foreground">Tela bloqueada e banners</strong><span className="block text-xs text-muted-foreground">{isIos ? "Ative Tela Bloqueada, Central de Notificações e Banners." : "Ative Tela de bloqueio e “Pop-up na tela”/“Exibir como pop-up”, se disponível."}</span></span>
             </label>
             <label className="flex cursor-pointer items-start gap-2.5 text-sm">
@@ -316,6 +320,12 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
             )}
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">Os nomes e caminhos mudam conforme a marca e a versão do sistema. Se o Dose Certa não aparecer na lista, procure as permissões do site nas configurações do navegador.</p>
           </details>
+          {!isIos && (
+            <details className="mt-2 rounded-xl bg-muted/60 p-3">
+              <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground"><Battery className="h-4 w-4 text-primary" />Se os avisos estiverem chegando atrasados</summary>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">Abra Informações do app → Bateria e permita atividade em segundo plano, se essa opção existir no seu aparelho. Em alguns modelos, “Sem restrições” melhora a entrega, mas pode consumir mais bateria. Não é necessário desativar a economia de bateria do telefone inteiro.</p>
+            </details>
+          )}
         </article>
       </div>
 
@@ -325,6 +335,7 @@ export function DeviceSetupAssistant({ role }: { role: Role }) {
           <p className="font-semibold text-foreground">Sobre o modo Não Perturbe e os avisos sobre outros apps</p>
           <p className="text-xs leading-relaxed text-muted-foreground">Como o Dose Certa é instalado pelo navegador (PWA), ele não consegue pedir acesso especial para ignorar o Não Perturbe nem controlar a permissão “Exibir sobre outros apps”. Quando disponível, ative “Pop-up na tela”/“Banners” nas notificações do sistema. O Não Perturbe ainda pode silenciar sons e vibrações.</p>
           <p className="text-xs leading-relaxed text-muted-foreground">O app pode enviar notificações normais do sistema, mas só um aplicativo Android nativo pode solicitar o acesso especial de política de notificações para criar exceções ao Não Perturbe. A decisão final continua sendo do usuário.</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">A permissão de vibração não é separada no PWA. O teste acima verifica a vibração da página; a vibração de notificações em segundo plano ainda depende do navegador, do Android e das opções de som/vibração do sistema.</p>
         </div>
       </div>
 
