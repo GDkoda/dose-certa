@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, Leaf, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -90,7 +90,7 @@ function Logo({ size = 40 }: { size?: number }) {
   return (
     <span className="relative inline-flex">
       {icon ? <img src={icon} alt="Ícone do app" style={{ width: size, height: size }} className="rounded-xl object-cover" />
-        : <span style={{ width: size, height: size }} className="grid place-items-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Leaf className="h-1/2 w-1/2" /></span>}
+        : <img src="/dose-certa-icon.svg" alt="Dose Certa" style={{ width: size, height: size }} className="rounded-xl object-cover" />}
       <ImageEditButton k="app-icon" className="absolute -right-2 -top-2 h-5 w-5" />
     </span>
   );
