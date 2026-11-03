@@ -669,18 +669,18 @@ function UrgentAlertToast({ me }: { me: User }) {
 /* ---------------- shell ---------------- */
 function Shell({ me }: { me: User }) {
   const removeDevice = useServerFn(removePushDevice);
-  const [page, setPage] = useState<Page>(me.role === "cuidador" ? "inicio" : "suporte");
+  const [page, setPage] = useState<Page>(me.role === "mestre" ? "admin" : "inicio");
   const items: { id: Page; label: string; mobileLabel: string; icon: ReactNode; roles: Role[] }[] = [
     { id: "inicio", label: "Início", mobileLabel: "Início", icon: <Home className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "pacientes", label: "Pacientes", mobileLabel: "Pacientes", icon: <UsersRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "medicamentos", label: "Medicamentos", mobileLabel: "Remédios", icon: <PillBottle className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "mestre"] },
     { id: "historico", label: "Histórico", mobileLabel: "Histórico", icon: <CalendarDays className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "suporte", label: "Atendimento", mobileLabel: "Suporte", icon: <LifeBuoy className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
-    { id: "admin", label: "Contas", mobileLabel: "Contas", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
+    { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
     { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
   const sideImg = useImage("side-bg", lavender);
-  useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "cuidador" ? "inicio" : "suporte"); }, [me.role, page]);
+  useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
   const registerDevice = useServerFn(registerPushDevice);
   // Re-link this phone to the signed-in caregiver on every open, so tokens stay fresh and follow the account in use.
   useEffect(() => {
@@ -724,7 +724,7 @@ function Shell({ me }: { me: User }) {
           {page === "historico" && <HistoryPage me={me} />}
           {page === "suporte" && <Support me={me} />}
           {page === "perfil" && <Profile me={me} />}
-          {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} />}
+          {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
         <nav aria-label="Navegação móvel" className="dc-mobile-nav no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 items-stretch gap-0.5 border-t border-border/70 bg-card/95 px-1.5 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_28px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl md:hidden">
           {items.map((i) => <button key={i.id} aria-current={page === i.id ? "page" : undefined} onClick={() => setPage(i.id)} title={i.label} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-2 text-[9px] font-semibold leading-tight transition-colors", page === i.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted")}>{i.icon}<span className="w-full truncate text-center">{i.mobileLabel}</span></button>)}
