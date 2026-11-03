@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
-import { accountEmail, authorizeAccountChange, normalizeUsername } from './account-rules';
+import { accountEmail, authorizeAccountChange, formatAuthPassword, normalizeUsername } from './account-rules';
 import type { Role } from './store';
 
 export const registerAccount = createServerFn({ method: 'POST' })
@@ -12,7 +12,7 @@ export const registerAccount = createServerFn({ method: 'POST' })
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     const { error } = await supabaseAdmin.auth.admin.createUser({
       email: accountEmail(username),
-      password: data.password,
+      password: formatAuthPassword(data.password),
       email_confirm: true,
       user_metadata: { username },
     });
@@ -72,7 +72,7 @@ export const manageAccount = createServerFn({ method: 'POST' })
     if (data.action === 'create') {
       if (!data.login || !data.password) throw new Error('Informe login e senha.');
       const username = normalizeUsername(data.login);
-      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({ email: accountEmail(username), password: data.password, email_confirm: true, user_metadata: { username } });
+      const { data: created, error } = await supabaseAdmin.auth.admin.createUser({ email: accountEmail(username), password: formatAuthPassword(data.password), email_confirm: true, user_metadata: { username } });
       if (error || !created.user) throw new Error('Não foi possível criar a conta; confira se o login existe e use uma senha forte.');
       const { error: updateError } = await supabaseAdmin.from('user_roles').update({ role: data.role ?? 'operador' }).eq('user_id', created.user.id);
       if (updateError) throw new Error('A conta foi criada, mas a função não foi alterada. Atualize a lista.');
@@ -84,7 +84,7 @@ export const manageAccount = createServerFn({ method: 'POST' })
         const { data: original, error: originalError } = await context.supabase.from('profiles').select('username').eq('id', data.id).single();
         if (originalError || !original) throw new Error('Conta não encontrada.');
         const username = data.login ? normalizeUsername(data.login) : undefined;
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(data.id, { ...(username ? { email: accountEmail(username), email_confirm: true } : {}), ...(data.password ? { password: data.password } : {}) });
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(data.id, { ...(username ? { email: accountEmail(username), email_confirm: true } : {}), ...(data.password ? { password: formatAuthPassword(data.password) } : {}) });
         if (error) throw new Error('Não foi possível salvar: login já utilizado ou senha fraca.');
         const { error: profileError } = await supabaseAdmin.from('profiles').update({ ...(username ? { username } : {}), ...(data.password ? { must_change: true } : {}) }).eq('id', data.id);
         if (profileError) {
