@@ -106,7 +106,7 @@ function createGeometryTiles(variant: GeometricVariant): GeometryTile[] {
         x: column * 51 + 8 + jitterX,
         y: row * 51 + 8 + jitterY,
         size,
-        opacity: Math.min(0.32, 0.055 + flow * 0.23) * (variant === "dense" ? 1 : 0.88),
+        opacity: Math.min(0.55, 0.12 + flow * 0.38) * (variant === "dense" ? 1 : 0.88),
         rotation: ((column * 13 + row * 9) % 22) - 11,
       });
     }
