@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
 import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
-import { enablePush } from "@/lib/push-browser";
+import { enablePush, registerAppServiceWorker } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { PatientIdentityCard } from "./PatientIdentityCard";
@@ -2198,6 +2198,9 @@ export function DoseCertaApp() {
       delete document.documentElement.dataset["palette"];
     }
     document.documentElement.classList.toggle("dark", localStorage.getItem("dc-theme") === "dark");
+
+    // Prepare offline app shell even when the user has not enabled notifications.
+    void registerAppServiceWorker().catch(() => undefined);
 
     let disposed = false; let cleanup: (() => void) | undefined;
     onCloudError(setCloudError);
