@@ -149,6 +149,12 @@ export type Database = {
         Args: { p_dose: string; p_key: string; p_token: string }
         Returns: boolean
       }
+      confirm_doses_and_deduct_stock: {
+        Args: { p_dose_ids: string[]; p_owner: string; p_taken_at?: string }
+        Returns: {
+          dose_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

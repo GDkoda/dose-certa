@@ -15,6 +15,13 @@
       "when": 1792975393242,
       "tag": "0001_medication_push_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793768801936,
+      "tag": "0002_atomic_dose_confirmation",
+      "breakpoints": true
     }
   ]
 }
