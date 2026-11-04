@@ -20,7 +20,7 @@ import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
 import { summarizeDoseStatuses } from "@/lib/report-rules";
 import {
   canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
-  type Dose, type DosePeriod, type DoseSchedule, type Role, type User,
+  type Dose, type DosePeriod, type DoseSchedule, type Med, type Role, type User,
 } from "@/lib/store";
 
 /* ---------------- helpers ---------------- */
@@ -932,6 +932,178 @@ function TimeWheelColumn({ label, values, selected, onChange }: {
   );
 }
 
+type MedicationEditorForm = {
+  patientId: string;
+  name: string;
+  strengthValue: string;
+  strengthUnit: string;
+  presentation: string;
+  quantityPerDose: string;
+  quantityUnit: string;
+  schedule: DoseSchedule[];
+  stock: string;
+  tolerance: string;
+};
+
+function MedicationEditor({ med, patients, onCancel, onSave }: {
+  med: Med;
+  patients: { id: string; name: string }[];
+  onCancel: () => void;
+  onSave: (updated: Med) => void;
+}) {
+  const [form, setForm] = useState<MedicationEditorForm>(() => ({
+    patientId: med.patientId,
+    name: med.name,
+    strengthValue: med.strengthValue === undefined ? "" : String(med.strengthValue),
+    strengthUnit: med.strengthUnit ?? "mg",
+    presentation: med.presentation ?? "Outro",
+    quantityPerDose: String(med.quantityPerDose ?? 1),
+    quantityUnit: med.quantityUnit ?? (med.presentation ? defaultQuantityUnit(med.presentation) : "Unidade(s)"),
+    schedule: med.schedule?.length
+      ? med.schedule.map((slot) => ({ ...slot }))
+      : med.times.map((time) => ({ time, period: "personalizado" as DosePeriod })),
+    stock: String(med.stock),
+    tolerance: String(med.tolerance ?? 0),
+  }));
+  const [error, setError] = useState("");
+
+  const updateSchedule = (index: number, patch: Partial<DoseSchedule>) => {
+    setForm((current) => ({
+      ...current,
+      schedule: current.schedule.map((slot, slotIndex) => slotIndex === index ? { ...slot, ...patch } : slot),
+    }));
+  };
+
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    const name = form.name.trim();
+    const quantity = Number(form.quantityPerDose);
+    const stock = Number(form.stock);
+    const strengthText = form.strengthValue.trim();
+    const strength = strengthText === "" ? undefined : Number(strengthText);
+    const times = form.schedule.map((slot) => slot.time);
+
+    if (!name) return setError("Informe o nome do medicamento.");
+    if (!patients.some((patient) => patient.id === form.patientId)) return setError("Selecione um paciente válido.");
+    if (strengthText !== "" && (!Number.isFinite(strength) || (strength ?? 0) <= 0)) return setError("A concentração precisa ser maior que zero ou ficar em branco para manter o cadastro antigo.");
+    if (!Number.isFinite(quantity) || quantity <= 0) return setError("Informe uma quantidade por dose maior que zero.");
+    if (!Number.isFinite(stock) || stock < 0) return setError("Informe o estoque atual, igual ou maior que zero.");
+    if (!form.schedule.length || form.schedule.length > 6
+      || times.some((time) => !/^([01]\\d|2[0-3]):([0-5]\\d)$/.test(time))
+      || new Set(times).size !== times.length) {
+      return setError("Use de 1 a 6 horários válidos e diferentes.");
+    }
+
+    const orderedSchedule = [...form.schedule].sort((a, b) => a.time.localeCompare(b.time));
+    const dose = strength === undefined
+      ? med.dose
+      : strength + " " + form.strengthUnit + " · " + quantity + " " + form.quantityUnit.toLowerCase();
+    const updated: Med = {
+      ...med,
+      patientId: form.patientId,
+      name,
+      dose,
+      times: orderedSchedule.map((slot) => slot.time),
+      schedule: orderedSchedule,
+      ...(strength === undefined ? {} : { strengthValue: strength, strengthUnit: form.strengthUnit }),
+      presentation: form.presentation,
+      quantityPerDose: quantity,
+      quantityUnit: form.quantityUnit,
+      stock,
+      initialStock: Math.max(med.initialStock ?? med.stock, stock),
+      tolerance: Math.max(0, Number(form.tolerance) || 0),
+    };
+    onSave(updated);
+  };
+
+  return (
+    <form className="space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-3 sm:p-4" onSubmit={save}>
+      <div>
+        <p className="text-sm font-bold text-foreground">Editar medicamento</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Atualize os dados, o paciente, os horários e o estoque. O histórico de doses já registradas será preservado.</p>
+      </div>
+      <label className="block space-y-1 text-xs font-semibold text-foreground">
+        Nome do medicamento
+        <input autoFocus className={input} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Concentração
+          <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+            <input className={input} type="number" min="0.001" step="any" inputMode="decimal" placeholder="Ex.: 500" value={form.strengthValue} onChange={(event) => setForm((current) => ({ ...current, strengthValue: event.target.value }))} />
+            <select aria-label="Unidade da concentração" className={input} value={form.strengthUnit} onChange={(event) => setForm((current) => ({ ...current, strengthUnit: event.target.value }))}>
+              {STRENGTH_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+            </select>
+          </div>
+        </label>
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Apresentação
+          <select className={input} value={form.presentation} onChange={(event) => setForm((current) => ({ ...current, presentation: event.target.value, quantityUnit: defaultQuantityUnit(event.target.value) }))}>
+            {PRESENTATIONS.map((presentation) => <option key={presentation} value={presentation}>{presentation}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Quantidade por dose
+          <div className="grid grid-cols-[minmax(0,1fr)_9rem] gap-2">
+            <input className={input} type="number" min="0.01" step="0.01" inputMode="decimal" value={form.quantityPerDose} onChange={(event) => setForm((current) => ({ ...current, quantityPerDose: event.target.value }))} />
+            <select aria-label="Unidade por dose" className={input} value={form.quantityUnit} onChange={(event) => setForm((current) => ({ ...current, quantityUnit: event.target.value }))}>
+              {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+            </select>
+          </div>
+        </label>
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Paciente
+          <select className={input} value={form.patientId} onChange={(event) => setForm((current) => ({ ...current, patientId: event.target.value }))}>
+            {patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name}</option>)}
+          </select>
+        </label>
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Estoque atual ({form.quantityUnit.toLowerCase()})
+          <input className={input} type="number" min="0" step="0.01" inputMode="decimal" value={form.stock} onChange={(event) => setForm((current) => ({ ...current, stock: event.target.value }))} />
+        </label>
+        <label className="block space-y-1 text-xs font-semibold text-foreground">
+          Tolerância do atraso (minutos)
+          <input className={input} type="number" min="0" step="1" value={form.tolerance} onChange={(event) => setForm((current) => ({ ...current, tolerance: event.target.value }))} />
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-bold text-foreground">Horários e períodos</p>
+          <button type="button" disabled={form.schedule.length >= 6} className={cls(btnOutline, "px-2.5 py-1.5 text-xs")} onClick={() => setForm((current) => ({
+            ...current,
+            schedule: [...current.schedule, { time: "", period: "personalizado" }],
+          }))}><Plus className="h-3.5 w-3.5" />Adicionar horário</button>
+        </div>
+        {form.schedule.map((slot, index) => (
+          <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_2.25rem] items-center gap-2">
+            <label className="sr-only" htmlFor={"med-edit-time-" + med.id + "-" + index}>Horário da dose {index + 1}</label>
+            <input id={"med-edit-time-" + med.id + "-" + index} className={input} type="time" value={slot.time} onChange={(event) => updateSchedule(index, { time: event.target.value })} />
+            <select className={input} aria-label={"Período da dose " + (index + 1)} value={slot.period} onChange={(event) => updateSchedule(index, { period: event.target.value as DosePeriod })}>
+              {DOSE_PERIODS.map((period) => <option key={period.value} value={period.value}>{period.label}</option>)}
+            </select>
+            <button type="button" aria-label={"Remover horário " + (index + 1)} disabled={form.schedule.length <= 1} className="grid h-10 w-9 place-items-center rounded-xl text-destructive hover:bg-destructive/10 disabled:opacity-30" onClick={() => setForm((current) => ({ ...current, schedule: current.schedule.filter((_, slotIndex) => slotIndex !== index) }))}>
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {med.strengthValue === undefined && (
+        <p className="rounded-xl bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+          Este medicamento veio de um cadastro antigo. A concentração não foi presumida: deixe o campo em branco para manter a descrição original ou preencha conforme a embalagem.
+        </p>
+      )}
+      {error && <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>}
+      <div className="flex flex-wrap gap-2 border-t border-border/70 pt-3">
+        <button type="submit" className={cls(btnPrimary, "flex-1")}><CheckCircle2 className="h-4 w-4" />Salvar alterações</button>
+        <button type="button" className={btnOutline} onClick={onCancel}>Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
 function Meds({ me, activePatientId = "", go }: {
   me: User;
   activePatientId?: string;
@@ -942,6 +1114,7 @@ function Meds({ me, activePatientId = "", go }: {
   const meds = allMeds.filter((m) => !activePatientId || m.patientId === activePatientId);
   const [step, setStep] = useState(1);
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
+  const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
   const [f, setF] = useState<{
     patientId: string;
     name: string;
