@@ -1,10 +1,22 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { accountEmail, authorizeAccountChange, formatAuthPassword, normalizeUsername } from './account-rules';
-import type { Role } from './store';
+import { z } from 'zod';
+
+const registerAccountSchema = z.object({
+  login: z.string().trim().min(3).max(40),
+  password: z.string().min(8).max(128),
+});
+const manageAccountSchema = z.object({
+  action: z.enum(['create', 'update', 'delete']),
+  id: z.string().optional(),
+  login: z.string().optional(),
+  password: z.string().optional(),
+  role: z.enum(['cuidador', 'operador', 'mestre']).optional(),
+});
 
 export const registerAccount = createServerFn({ method: 'POST' })
-  .inputValidator((data: { login: string; password: string }) => data)
+  .inputValidator((data: unknown) => registerAccountSchema.parse(data))
   .handler(async ({ data }) => {
     const username = normalizeUsername(data.login);
     if (username === 'koda') throw new Error('Este login está reservado.');
@@ -58,7 +70,7 @@ export const registerAccount = createServerFn({ method: 'POST' })
 
 export const manageAccount = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { action: 'create' | 'update' | 'delete'; id?: string; login?: string; password?: string; role?: Role }) => data)
+  .inputValidator((data: unknown) => manageAccountSchema.parse(data))
   .handler(async ({ context, data }) => {
     const { data: allowed, error: roleError } = await context.supabase.rpc('has_role', { _user_id: context.userId, _role: 'mestre' });
     if (roleError || !allowed) throw new Error('Somente o Mestre pode gerenciar contas.');
@@ -102,7 +114,23 @@ export const manageAccount = createServerFn({ method: 'POST' })
 
 export const finishPasswordChange = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((data: unknown) => z.object({ newPassword: z.string().min(8).max(128) }).parse(data))
+  .handler(async ({ context, data }) => {
+    const { data: profile, error: profileError } = await context.supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', context.userId)
+      .single();
+    if (profileError || !profile) throw new Error('Não foi possível validar a conta.');
+
+    const verified = await context.supabase.auth.signInWithPassword({
+      email: accountEmail(profile.username),
+      password: formatAuthPassword(data.newPassword),
+    });
+    if (verified.error || verified.data.user?.id !== context.userId) {
+      throw new Error('A nova senha ainda não foi confirmada. Faça a troca de senha novamente.');
+    }
+
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     const { error } = await supabaseAdmin.from('profiles').update({ must_change: false }).eq('id', context.userId);
     if (error) throw new Error('Não foi possível concluir a alteração.');

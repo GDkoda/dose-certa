@@ -71,6 +71,7 @@ export function AccountAdmin({ me, onNavigate }: { me: User; onNavigate: (page: 
       return next;
     });
     await flushCloudWrites();
+    localStorage.removeItem('dose-certa-v1');
     setImportPassword('');
   };
   const visible = users.filter((user) => user.login.includes(search.trim().toLowerCase()) && (filter === 'all' || user.role === filter));

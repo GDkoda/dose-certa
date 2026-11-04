@@ -18,7 +18,7 @@ CREATE TABLE public.app_records (id text PRIMARY KEY, kind text NOT NULL CHECK (
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.app_records TO authenticated;
 GRANT ALL ON public.app_records TO service_role;
 ALTER TABLE public.app_records ENABLE ROW LEVEL SECURITY;
-CREATE POLICY records_read ON public.app_records FOR SELECT TO authenticated USING (owner_id = auth.uid() OR public.has_role(auth.uid(),'mestre') OR (public.has_role(auth.uid(),'operador') AND kind IN ('patients','meds','doses','tickets')) OR kind = 'config');
+CREATE POLICY records_read ON public.app_records FOR SELECT TO authenticated USING (owner_id = auth.uid() OR public.has_role(auth.uid(),'mestre') OR (public.has_role(auth.uid(),'operador') AND kind = 'tickets') OR kind = 'config');
 CREATE POLICY records_insert ON public.app_records FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config'));
 CREATE POLICY records_update ON public.app_records FOR UPDATE TO authenticated USING (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador'))) WITH CHECK (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador')));
 CREATE POLICY records_delete ON public.app_records FOR DELETE TO authenticated USING (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config'));

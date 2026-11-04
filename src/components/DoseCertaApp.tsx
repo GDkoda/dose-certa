@@ -451,9 +451,9 @@ function ForceChangePassword({ me }: { me: User }) {
     <div className="grid min-h-screen place-items-center bg-background p-4">
       <form className={cls(card, "w-full max-w-md space-y-3")} onSubmit={async (e) => {
         e.preventDefault();
-        if (p1.length < 4 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter pelo menos 4 caracteres e ser única.");
+        if (p1.length < 8 || p1 === RESET_PASSWORD) return setErr("A nova senha precisa ter pelo menos 8 caracteres e ser única.");
         if (p1 !== p2) return setErr("As senhas não conferem.");
-        try { await updateOwnPassword(current, p1); await finish(); await refreshCloud(); } catch (error) { setErr(error instanceof Error ? error.message : "Não foi possível alterar."); }
+        try { await updateOwnPassword(current, p1); await finish({ data: { newPassword: p1 } }); await refreshCloud(); } catch (error) { setErr(error instanceof Error ? error.message : "Não foi possível alterar."); }
       }}>
         <Shield className="h-8 w-8 text-primary" />
         <h2 className="font-display text-xl text-foreground">Cadastre uma nova senha</h2>
@@ -1687,10 +1687,14 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
   const rows = visibleDoses.filter((d) => (!pid || d.patientId === pid) && (!st || d.status === st)
     && (!from || d.scheduledAt.slice(0, 10) >= from) && (!to || d.scheduledAt.slice(0, 10) <= to)).sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
   const myPatients = patients.filter((p) => me.role !== "cuidador" || p.ownerId === me.id);
+  const medById = new Map(meds.map((med) => [med.id, med]));
+  const patientById = new Map(patients.map((patient) => [patient.id, patient]));
   const csv = () => {
-    const lines = [["Data", "Paciente", "Medicamento", "Status"], ...rows.map((d) => [fmtDate(d.scheduledAt), patients.find((p) => p.id === d.patientId)?.name ?? "", meds.find((m) => m.id === d.medId)?.name ?? "", d.status])];
+    const lines = [["Data", "Paciente", "Medicamento", "Status"], ...rows.map((d) => [fmtDate(d.scheduledAt), patientById.get(d.patientId)?.name ?? "", medById.get(d.medId)?.name ?? "", d.status])];
     const blob = new Blob(["\uFEFF", lines.map((l) => l.map(csvCell).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "historico-dose-certa.csv"; a.click();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "historico-dose-certa.csv"; a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
   const report = summarizeDoseStatuses(rows.map((row) => row.status));
   return (
@@ -1714,7 +1718,7 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
         {rows.length === 0 ? (visibleDoses.length === 0 ? <EmptyState icon={<History className="h-6 w-6" />} title="Seu histórico ainda está vazio" description="Depois que você cadastrar medicamentos e registrar as doses, os acompanhamentos aparecerão aqui." actionLabel="Cadastrar medicamento" onAction={() => go("medicamentos")} /> : <p className="text-sm text-muted-foreground">Nenhum registro corresponde aos filtros selecionados.</p>) :
           <ul className="divide-y divide-border">{rows.map((d) => (
             <li key={d.id} className="flex items-center gap-3 py-2 text-sm"><span className="w-32 shrink-0 text-muted-foreground">{fmtDate(d.scheduledAt)}</span>
-              <span className="min-w-0 flex-1 truncate text-foreground">{meds.find((m) => m.id === d.medId)?.name ?? "—"} · {patients.find((p) => p.id === d.patientId)?.name ?? "—"}</span><StatusBadge s={d.status} /></li>))}</ul>}
+              <span className="min-w-0 flex-1 truncate text-foreground">{medById.get(d.medId)?.name ?? "—"} · {patientById.get(d.patientId)?.name ?? "—"}</span><StatusBadge s={d.status} /></li>))}</ul>}
       </div>
     </div>
   );
