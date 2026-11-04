@@ -866,7 +866,7 @@ function compressPatientPhoto(file: File): Promise<string> {
   });
 }
 
-function Patients({ me, activePatientId = "", onSelectPatient }: {
+function Patients({ me, activePatientId = "", onSelectPatient, onOpenRoutine }: {
   me: User;
   activePatientId?: string;
   onSelectPatient: (patientId: string) => void;
