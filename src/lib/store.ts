@@ -19,12 +19,12 @@ export interface Patient {
   age: number;
   notes: string;
   /** Optional identification details shown on the patient's private information card. */
-  birthDate?: string;
-  susCard?: string;
-  healthPlan?: string;
-  identityNumber?: string;
-  cpf?: string;
-  photoDataUrl?: string;
+  birthDate?: string | undefined;
+  susCard?: string | undefined;
+  healthPlan?: string | undefined;
+  identityNumber?: string | undefined;
+  cpf?: string | undefined;
+  photoDataUrl?: string | undefined;
   cardTheme?: PatientCardTheme;
 }
 export type DosePeriod =

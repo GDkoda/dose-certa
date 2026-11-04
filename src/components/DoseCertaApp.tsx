@@ -28,6 +28,17 @@ import {
 } from "@/lib/store";
 
 /* ---------------- helpers ---------------- */
+const DOSE_PERIODS: { value: DosePeriod; label: string }[] = [
+  { value: "manhã", label: "Manhã" }, { value: "tarde", label: "Tarde" }, { value: "noite", label: "Noite" }, { value: "madrugada", label: "Madrugada" },
+  { value: "antes-almoco", label: "Antes do almoço" }, { value: "depois-almoco", label: "Depois do almoço" },
+  { value: "antes-jantar", label: "Antes do jantar" }, { value: "depois-jantar", label: "Depois do jantar" },
+  { value: "personalizado", label: "Personalizado" },
+];
+const DEFAULT_TIMES = ["08:00", "14:00", "20:00", "02:00", "11:00", "17:00"];
+const DEFAULT_PERIODS: DosePeriod[] = ["manhã", "tarde", "noite", "madrugada", "personalizado", "personalizado"];
+const STRENGTH_UNITS = ["mg", "g", "mcg", "mL", "mg/mL", "UI", "%", "gotas"];
+const PRESENTATIONS = ["Comprimido", "Cápsula", "Drágea", "Solução oral", "Suspensão", "Gotas", "Sachê", "Ampola", "Spray", "Creme", "Pomada", "Outro"];
+const QUANTITY_UNITS = ["Comprimido(s)", "Cápsula(s)", "Drágea(s)", "mL", "Gota(s)", "Sachê(s)", "Ampola(s)", "Jato(s)", "Aplicação(ões)", "Unidade(s)"];
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 const csvCell = (value: string) => {
@@ -509,7 +520,6 @@ function AlarmEngine({ me }: { me: User }) {
             new Notification(`Dose Certa • ${p?.name ?? "Paciente"}`, {
               body: `${m?.name ?? "Medicamento"} ${m?.dose ?? ""} · Horário: ${fmtTime(due.scheduledAt)}`,
               tag: `dose-${due.id}`,
-              renotify: true,
             });
           } catch { /* Mobile background delivery uses Firebase messaging instead. */ }
         }
@@ -2292,7 +2302,7 @@ function Shell({ me }: { me: User }) {
     const saved = localStorage.getItem(`dc-patient-${me.id}`);
     const next = saved && patientOptions.some((p) => p.id === saved)
       ? saved
-      : patientOptions.length === 1 ? patientOptions[0].id : "";
+      : patientOptions.length === 1 ? (patientOptions[0]?.id ?? "") : "";
     setActivePatientId(next);
     if (next) localStorage.setItem(`dc-patient-${me.id}`, next);
     else localStorage.removeItem(`dc-patient-${me.id}`);

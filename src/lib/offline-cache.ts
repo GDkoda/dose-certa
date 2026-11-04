@@ -124,7 +124,7 @@ export async function cacheServerSnapshot(userId: string, snapshot: State): Prom
 }
 
 function ownerFor(kind: string, record: Record<string, unknown>, fallback: string): string {
-  return String(kind === "tickets" ? record.userId ?? fallback : record.ownerId ?? fallback);
+  return String(kind === "tickets" ? record["userId"] ?? fallback : record["ownerId"] ?? fallback);
 }
 
 export async function persistLocalMutation(userId: string, before: State, after: State): Promise<number> {
@@ -138,11 +138,11 @@ export async function persistLocalMutation(userId: string, before: State, after:
       for (const kind of kinds) {
         const previousRecords = before[kind] as unknown as Record<string, unknown>[];
         const nextRecords = after[kind] as unknown as Record<string, unknown>[];
-        const previousById = new Map(previousRecords.map((record) => [String(record.id), record]));
-        const nextIds = new Set(nextRecords.map((record) => String(record.id)));
+        const previousById = new Map(previousRecords.map((record) => [String(record["id"]), record]));
+        const nextIds = new Set(nextRecords.map((record) => String(record["id"])));
 
         for (const record of nextRecords) {
-          const id = String(record.id);
+          const id = String(record["id"]);
           const previous = previousById.get(id);
           if (previous && JSON.stringify(previous) === JSON.stringify(record)) continue;
           const key = kind + ":" + id;
@@ -157,7 +157,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
         }
 
         for (const record of previousRecords) {
-          const id = String(record.id);
+          const id = String(record["id"]);
           if (nextIds.has(id)) continue;
           const key = kind + ":" + id;
           pending.set(key, {
@@ -246,16 +246,16 @@ export function applyPendingChanges(remote: State, changes: OfflineChange[]): St
     if (!["patients", "meds", "doses", "alerts", "tickets"].includes(change.kind)) continue;
     const kind = change.kind as "patients" | "meds" | "doses" | "alerts" | "tickets";
     const list = merged[kind] as unknown as Record<string, unknown>[];
-    const index = list.findIndex((record) => record.id === change.id);
+    const index = list.findIndex((record) => record["id"] === change.id);
     if (change.payload === null) {
       if (index >= 0) list.splice(index, 1);
       continue;
     }
 
     const payload = clone(change.payload as Record<string, unknown>);
-    payload.id = change.id;
-    if (kind === "tickets") payload.userId = change.ownerId;
-    else payload.ownerId = change.ownerId;
+    payload["id"] = change.id;
+    if (kind === "tickets") payload["userId"] = change.ownerId;
+    else payload["ownerId"] = change.ownerId;
     if (index >= 0) list[index] = payload;
     else list.push(payload);
   }

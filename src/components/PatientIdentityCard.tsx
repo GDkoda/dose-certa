@@ -187,7 +187,7 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
     photoDataUrl: patient.photoDataUrl ?? "",
     cardTheme: patient.cardTheme ?? "folhas" as PatientCardTheme,
   });
-  const theme = themes.find((item) => item.id === (form.cardTheme ?? "folhas")) ?? themes[4];
+  const theme = themes.find((item) => item.id === (form.cardTheme ?? "folhas")) ?? themes[4]!;
   const age = calculateAge(form.birthDate) ?? patient.age;
   const dateLabel = formattedDate(form.birthDate);
 
