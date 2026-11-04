@@ -2,16 +2,17 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
-  Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, X,
+  Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { AccountAdmin } from "./AccountAdmin";
 import { TicketManagement } from "./TicketManagement";
-import { registerPushDevice } from "@/lib/push.functions";
+import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
 import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
+import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
@@ -1045,51 +1046,63 @@ function Meds({ me, activePatientId = "", go }: {
           </div>
 
           {step === 1 && (
-            <section className="space-y-3">
-              <div>
-                <h2 className="font-display text-xl font-semibold text-foreground">Qual medicamento será cadastrado?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Informe a concentração, a apresentação e a quantidade utilizada em cada horário.</p>
+            <section className="space-y-4">
+              <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.06] p-3.5">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary">
+                  <Pill className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="font-display text-xl font-semibold text-foreground">Identifique o medicamento</h2>
+                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">Use as informações da embalagem ou da prescrição.</p>
+                </div>
               </div>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                Nome do medicamento
-                <input id="medication-name" className={input} autoComplete="off" required placeholder="Ex.: Losartana" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-              </label>
-              <div className="grid grid-cols-[minmax(0,1fr)_7.25rem] gap-2">
-                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
-                  Concentração / dose
-                  <input className={input} type="number" inputMode="decimal" min="0.001" step="any" required placeholder="Ex.: 500" value={f.strengthValue} onChange={(e) => setF({ ...f, strengthValue: e.target.value })} />
-                </label>
-                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
-                  Unidade
-                  <select className={input} value={f.strengthUnit} onChange={(e) => setF({ ...f, strengthUnit: e.target.value })}>
-                    {STRENGTH_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                  </select>
+
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-background/65 p-4">
+                <label className="block space-y-1.5 text-sm font-bold text-foreground">
+                  Nome do medicamento
+                  <input id="medication-name" className={cls(input, "min-h-12 text-base font-semibold")} autoComplete="off" required placeholder="Ex.: Losartana" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+                  <span className="block text-xs font-normal text-muted-foreground">Digite o nome como aparece na embalagem.</span>
                 </label>
               </div>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                Apresentação
-                <select
-                  className={input}
-                  value={f.presentation}
-                  onChange={(e) => {
-                    const presentation = e.target.value;
-                    setF((current) => ({ ...current, presentation, quantityUnit: defaultQuantityUnit(presentation) }));
-                  }}
-                >
-                  {PRESENTATIONS.map((presentation) => <option key={presentation} value={presentation}>{presentation}</option>)}
-                </select>
-              </label>
-              <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
-                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
-                  Quantidade por dose
-                  <input className={input} type="number" inputMode="decimal" min="0.01" step="0.01" required value={f.quantityPerDose} onChange={(e) => setF({ ...f, quantityPerDose: e.target.value })} />
-                </label>
-                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
-                  Unidade
-                  <select className={input} value={f.quantityUnit} onChange={(e) => setF({ ...f, quantityUnit: e.target.value })}>
-                    {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                  </select>
-                </label>
+
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-background/65 p-4">
+                <div>
+                  <p className="text-sm font-bold text-foreground">Dosagem e apresentação</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Essas informações ajudam a identificar exatamente qual versão do medicamento será usada.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block min-w-0 space-y-1.5 text-sm font-semibold text-foreground">
+                    Concentração da embalagem
+                    <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+                      <input className={input} type="number" inputMode="decimal" min="0.001" step="any" required placeholder="Ex.: 500" value={f.strengthValue} onChange={(e) => setF({ ...f, strengthValue: e.target.value })} />
+                      <select aria-label="Unidade da concentração" className={input} value={f.strengthUnit} onChange={(e) => setF({ ...f, strengthUnit: e.target.value })}>
+                        {STRENGTH_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                      </select>
+                    </div>
+                  </label>
+
+                  <label className="block min-w-0 space-y-1.5 text-sm font-semibold text-foreground">
+                    Forma de apresentação
+                    <select className={input} value={f.presentation} onChange={(e) => {
+                      const presentation = e.target.value;
+                      setF((current) => ({ ...current, presentation, quantityUnit: defaultQuantityUnit(presentation) }));
+                    }}>
+                      {PRESENTATIONS.map((presentation) => <option key={presentation} value={presentation}>{presentation}</option>)}
+                    </select>
+                  </label>
+
+                  <label className="block min-w-0 space-y-1.5 text-sm font-semibold text-foreground sm:col-span-2">
+                    Quantidade utilizada em cada horário
+                    <div className="grid grid-cols-[minmax(0,1fr)_9rem] gap-2">
+                      <input className={input} type="number" inputMode="decimal" min="0.01" step="0.01" required placeholder="Ex.: 1" value={f.quantityPerDose} onChange={(e) => setF({ ...f, quantityPerDose: e.target.value })} />
+                      <select aria-label="Unidade utilizada em cada dose" className={input} value={f.quantityUnit} onChange={(e) => setF({ ...f, quantityUnit: e.target.value })}>
+                        {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                      </select>
+                    </div>
+                    <span className="block text-xs font-normal text-muted-foreground">Exemplo: 1 comprimido, 5 mL ou 2 gotas, conforme a orientação recebida.</span>
+                  </label>
+                </div>
               </div>
             </section>
           )}
@@ -1101,10 +1114,13 @@ function Meds({ me, activePatientId = "", go }: {
                   <h2 className="font-display text-xl font-semibold text-foreground">Horários das doses</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Escolha quantas vezes ao dia e configure cada alarme.</p>
                 </div>
-                <label className="w-36 space-y-1 text-xs font-semibold text-muted-foreground">
-                  Vezes ao dia
-                  <select className={cls(input, "py-2 text-sm")} value={f.schedule.length} onChange={(e) => setFrequency(Number(e.target.value))}>
-                    {[1, 2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} {count === 1 ? "vez" : "vezes"}</option>)}
+                <label className="w-full rounded-2xl border border-primary/35 bg-primary/[0.08] p-3 text-foreground shadow-sm sm:w-44">
+                  <span className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-extrabold text-foreground">Vezes ao dia</span>
+                    <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-extrabold tabular-nums text-primary-foreground">{f.schedule.length}x</span>
+                  </span>
+                  <select className={cls(input, "min-h-11 border-primary/35 bg-card py-2 text-sm font-bold text-foreground")} value={f.schedule.length} onChange={(e) => setFrequency(Number(e.target.value))}>
+                    {[1, 2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} {count === 1 ? "vez ao dia" : "vezes ao dia"}</option>)}
                   </select>
                 </label>
               </div>
@@ -1384,12 +1400,222 @@ function Support({ me }: { me: User }) {
 }
 
 function Profile({ me }: { me: User }) {
-  const [cur, setCur] = useState(""); const [p1, setP1] = useState(""); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [cur, setCur] = useState("");
+  const [p1, setP1] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() =>
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
+  const [pushRegistered, setPushRegistered] = useState(() => {
+    try { return typeof window !== "undefined" && localStorage.getItem("dc-push-ready-" + me.id) === "1"; }
+    catch { return false; }
+  });
+  const [pushBusy, setPushBusy] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [vibrationMessage, setVibrationMessage] = useState("");
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const installFlow = useInstallPrompt();
+  const registerDevice = useServerFn(registerPushDevice);
+  const testPush = useServerFn(sendTestPush);
+
+  useEffect(() => {
+    const syncDeviceState = () => {
+      setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+      try { setPushRegistered(localStorage.getItem("dc-push-ready-" + me.id) === "1"); }
+      catch { setPushRegistered(false); }
+    };
+    syncDeviceState();
+    window.addEventListener("dc-push-ready", syncDeviceState);
+    window.addEventListener("focus", syncDeviceState);
+    return () => {
+      window.removeEventListener("dc-push-ready", syncDeviceState);
+      window.removeEventListener("focus", syncDeviceState);
+    };
+  }, [me.id]);
+
+  const activateNotifications = async () => {
+    setPushBusy(true);
+    setNotificationMessage("");
+    try {
+      const result = await enablePush();
+      setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+      if (result.status !== "registered") {
+        const messages: Record<"not-configured" | "unsupported" | "open-in-new-tab" | "denied", string> = {
+          "not-configured": "O serviço de notificações ainda não está configurado neste ambiente.",
+          unsupported: "Este navegador não oferece suporte às notificações em segundo plano.",
+          "open-in-new-tab": "Abra o Dose Certa em uma aba própria do navegador para ativar os avisos.",
+          denied: "A permissão foi recusada ou está bloqueada. Libere as notificações nas configurações do navegador ou do aparelho.",
+        };
+        setNotificationMessage(messages[result.status]);
+        return;
+      }
+
+      await registerDevice({
+        data: {
+          token: result.token,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+      });
+      try {
+        sessionStorage.setItem("dc-push-token", result.token);
+        localStorage.setItem("dc-push-ready-" + me.id, "1");
+      } catch { /* O vínculo remoto segue ativo mesmo sem armazenamento local. */ }
+      setPushRegistered(true);
+      setPermission("granted");
+      setNotificationMessage("Notificações ativadas e este aparelho vinculado à sua conta.");
+      window.dispatchEvent(new Event("dc-push-ready"));
+    } catch (error) {
+      setNotificationMessage(error instanceof Error ? error.message : "Não foi possível ativar as notificações agora.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const sendBackgroundTest = async () => {
+    setTestBusy(true);
+    setNotificationMessage("");
+    try {
+      const result = await testPush();
+      if (result.sent > 0) {
+        setNotificationMessage("Notificação de teste enviada. Bloqueie a tela ou deixe o Dose Certa em segundo plano e confira se o aviso chega.");
+      } else if (result.devices === 0) {
+        setNotificationMessage("Nenhum aparelho está vinculado ainda. Ative as notificações neste perfil primeiro.");
+      } else {
+        setNotificationMessage("O envio foi tentado, mas o serviço não confirmou a entrega. Confira a conexão e tente novamente.");
+      }
+    } catch (error) {
+      setNotificationMessage(error instanceof Error ? error.message : "Não foi possível enviar o teste de notificação.");
+    } finally {
+      setTestBusy(false);
+    }
+  };
+
+  const testVibration = () => {
+    if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+      setVibrationMessage("Este navegador não oferece vibração acionável pela página. O padrão das notificações ainda depende do Android e do navegador.");
+      return;
+    }
+    const pattern = Array.from({ length: 20 }, () => [400, 100]).flat();
+    const accepted = navigator.vibrate(pattern);
+    setVibrationMessage(accepted
+      ? "Teste solicitado: 20 ciclos de 400 ms vibrando e 100 ms de pausa. O navegador pode limitar a duração."
+      : "O aparelho ou navegador não aceitou o teste de vibração.");
+  };
+
+  const startInstallation = async () => {
+    if (installFlow.step === "native") {
+      const result = await installFlow.install();
+      if (result === "unavailable") setShowInstallHelp(true);
+      return;
+    }
+    if (installFlow.step === "own-tab") installFlow.openOwnTab();
+    setShowInstallHelp(true);
+  };
+
+  const isIos = typeof navigator !== "undefined" && (/iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+  const isStandalone = typeof window !== "undefined" && (
+    window.matchMedia?.("(display-mode: standalone)").matches === true
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+  const notificationIsActive = permission === "granted" && pushRegistered;
+
   return (
     <div className="space-y-6">
       <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
       <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
       <PalettePicker />
+
+      <section className={cls(card, "space-y-4")}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl font-semibold text-foreground">Notificações e vibração</h2>
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">Gerencie os avisos deste aparelho e teste se o Dose Certa consegue chamar sua atenção.</p>
+          </div>
+          <span className={cls("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold", notificationIsActive ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : permission === "denied" ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground")}>
+            <span className={cls("h-2 w-2 rounded-full", notificationIsActive ? "bg-emerald-500" : permission === "denied" ? "bg-destructive" : "bg-muted-foreground")} />
+            {notificationIsActive ? "Ativas neste aparelho" : permission === "denied" ? "Permissão bloqueada" : permission === "unsupported" ? "Não compatível" : "Ainda não ativadas"}
+          </span>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-background/60 p-3.5">
+            <div className="flex items-center gap-2 text-foreground">
+              <BellRing className="h-5 w-5 text-primary" />
+              <p className="text-sm font-bold">Notificações</p>
+            </div>
+            <p className="mt-1.5 min-h-10 text-xs leading-relaxed text-muted-foreground">Permita os avisos e registre este celular para receber os lembretes.</p>
+            <button type="button" onClick={() => void activateNotifications()} disabled={pushBusy} className={cls(btnPrimary, "mt-3 w-full")}>
+              <BellRing className="h-4 w-4" />{pushBusy ? "Ativando..." : notificationIsActive ? "Atualizar vínculo" : "Ativar notificações"}
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-background/60 p-3.5">
+            <div className="flex items-center gap-2 text-foreground">
+              <Vibrate className="h-5 w-5 text-primary" />
+              <p className="text-sm font-bold">Vibração</p>
+            </div>
+            <p className="mt-1.5 min-h-10 text-xs leading-relaxed text-muted-foreground">Faça um teste com 20 pulsos para verificar a resposta do aparelho.</p>
+            <button type="button" onClick={testVibration} className={cls(btnOutline, "mt-3 w-full")}>
+              <Vibrate className="h-4 w-4" />Testar vibração
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-background/60 p-3.5 sm:col-span-2">
+            <div className="flex items-center gap-2 text-foreground">
+              <Bell className="h-5 w-5 text-primary" />
+              <p className="text-sm font-bold">Teste de notificação em segundo plano</p>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Envia um push real para este aparelho. Depois de tocar no botão, bloqueie a tela ou deixe o aplicativo em segundo plano para conferir a chegada.</p>
+            <button type="button" onClick={() => void sendBackgroundTest()} disabled={testBusy || !pushRegistered} className={cls(btnOutline, "mt-3 w-full sm:w-auto")}>
+              <BellRing className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar notificação de teste"}
+            </button>
+            {!pushRegistered && <p className="mt-2 text-xs font-semibold text-muted-foreground">Ative as notificações neste aparelho antes de enviar o teste.</p>}
+          </div>
+        </div>
+
+        {notificationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">{notificationMessage}</p>}
+        {vibrationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">{vibrationMessage}</p>}
+        <p className="text-xs leading-relaxed text-muted-foreground">A vibração depende das permissões e configurações do aparelho. O modo silencioso, a economia de bateria e as regras do navegador podem limitar os alertas.</p>
+      </section>
+
+      <section className={cls(card, "space-y-3")}>
+        <div>
+          <h2 className="font-display text-xl font-semibold text-foreground">Instalação do aplicativo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Adicione o Dose Certa à tela inicial ou ao computador para abrir como aplicativo.</p>
+        </div>
+        {isStandalone ? (
+          <p className="rounded-xl bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary">O Dose Certa já está instalado e aberto como aplicativo neste aparelho.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {installFlow.step === "native" && <button type="button" onClick={() => void startInstallation()} className={btnPrimary}><Download className="h-4 w-4" />Instalar agora</button>}
+            <button type="button" onClick={() => setShowInstallHelp((open) => !open)} className={btnOutline}><Download className="h-4 w-4" />{showInstallHelp ? "Ocultar instruções" : "Instalação manual"}</button>
+            {installFlow.step === "own-tab" && <button type="button" onClick={() => installFlow.openOwnTab()} className={btnOutline}>Abrir em nova aba</button>}
+          </div>
+        )}
+        {showInstallHelp && !isStandalone && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-4 text-sm leading-relaxed text-foreground">
+            {isIos ? (
+              <ol className="list-decimal space-y-1.5 pl-5">
+                <li>Abra esta página no Safari.</li>
+                <li>Toque em <b>Compartilhar</b>.</li>
+                <li>Escolha <b>Adicionar à Tela de Início</b> e confirme em <b>Adicionar</b>.</li>
+              </ol>
+            ) : isAndroid ? (
+              <ol className="list-decimal space-y-1.5 pl-5">
+                <li>Abra o menu do navegador (⋮).</li>
+                <li>Toque em <b>Instalar aplicativo</b> ou <b>Adicionar à tela inicial</b>.</li>
+                <li>Confirme a instalação e abra pelo novo ícone.</li>
+              </ol>
+            ) : (
+              <p>No Chrome ou Edge, use o ícone de instalação na barra de endereço ou abra o menu do navegador e escolha <b>Instalar Dose Certa</b>.</p>
+            )}
+          </div>
+        )}
+      </section>
+
       <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
         try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
         catch (error) { setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." }); } }}>
