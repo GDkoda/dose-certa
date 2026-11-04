@@ -26,16 +26,29 @@ export const removePushDevice = createServerFn({ method: "POST" })
 
 export const sendTestPush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data: devices, error } = await context.supabase.from("push_devices").select("token").eq("owner_id", context.userId);
-    if (error) throw new Error("Não foi possível ler seus aparelhos.");
-    if (!devices?.length) return { sent: 0, devices: 0 };
+  .inputValidator((input: unknown) => z.object({ token: z.string().min(20).max(4096) }).parse(input))
+  .handler(async ({ data, context }) => {
+    // Only send the test to the device that requested it, never to every phone on the account.
+    const { data: device, error } = await context.supabase.from("push_devices")
+      .select("token")
+      .eq("owner_id", context.userId)
+      .eq("token", data.token)
+      .maybeSingle();
+    if (error) throw new Error("Não foi possível localizar este aparelho.");
+    if (!device) return { sent: 0, devices: 0 };
     const { sendPush } = await import("@/lib/push-server");
-    await new Promise((r) => setTimeout(r, 3000));
-    let sent = 0;
-    for (const d of devices) {
-      const r = await sendPush(d.token, { title: "Teste de alarme • Dose Certa", body: "Se você está vendo isto com o app fechado, os avisos estão funcionando!", tag: `dc-test-${Date.now()}`, url: "/", owner: context.userId, doseIds: [], sig: "", test: true });
-      if (r.ok) sent++; else console.error("Test push failed", r.status, r.body.slice(0, 300));
-    }
-    return { sent, devices: devices.length };
+    // Give the user three seconds to lock the screen or switch away from the app.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const result = await sendPush(device.token, {
+      title: "Teste de alarme • Dose Certa",
+      body: "Se você está vendo isto com o app fechado, os avisos estão funcionando!",
+      tag: `dc-test-${Date.now()}`,
+      url: "/",
+      owner: context.userId,
+      doseIds: [],
+      sig: "",
+      test: true,
+    });
+    if (!result.ok) console.error("Test push failed", result.status, result.body.slice(0, 300));
+    return { sent: result.ok ? 1 : 0, devices: 1 };
   });
