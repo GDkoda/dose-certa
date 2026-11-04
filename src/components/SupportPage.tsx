@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   Activity, ArrowRight, BellRing, BookOpen, CheckCircle2, ChevronDown, CircleHelp,
   Clock3, FileImage, FileText, Headphones, LifeBuoy, MessageCircle, Paperclip,
@@ -67,7 +67,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
   const filteredFaq = faqItems.filter((item) => (faqCategory === "Todas" || item.category === faqCategory)
     && (item.question + " " + item.answer + " " + item.keywords).toLocaleLowerCase("pt-BR").includes(faqSearch.toLocaleLowerCase("pt-BR")));
 
-  const refreshDiagnostics = async () => {
+  const refreshDiagnostics = useCallback(async () => {
     if (typeof window === "undefined") return;
     setChecking(true);
     const online = navigator.onLine;
@@ -88,9 +88,9 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
       { label: "Aplicativo instalado", detail: standalone ? "Aberto como aplicativo" : "Aberto em uma aba do navegador", ok: standalone, icon: Smartphone },
     ]);
     setChecking(false);
-  };
+  }, []);
 
-  useEffect(() => { void refreshDiagnostics(); }, []);
+  useEffect(() => { void refreshDiagnostics(); }, [refreshDiagnostics]);
 
   const addAttachments = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
