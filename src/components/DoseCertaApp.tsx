@@ -1891,55 +1891,132 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
 }
 
 function Support({ me }: { me: User }) {
-  const tickets = useStore((s) => s.tickets); const users = useStore((s) => s.users);
-  const mine = me.role === "cuidador" ? tickets.filter((t) => t.userId === me.id) : tickets;
-  const [subject, setSubject] = useState(""); const [text, setText] = useState(""); const [open, setOpen] = useState<string | null>(null); const [reply, setReply] = useState("");
-  const faq: [string, string][] = [["Dúvida sobre interação medicamentosa", "Converse com o farmacêutico ou abra um chamado."], ["Posso tomar com café?", "Depende do medicamento; consulte a bula."], ["Efeitos colaterais", "Em caso de reação, procure atendimento médico."]];
+  const tickets = useStore((s) => s.tickets);
+  const users = useStore((s) => s.users);
+  const mine = me.role === "cuidador" ? tickets.filter((ticket) => ticket.userId === me.id) : tickets;
+  const [subject, setSubject] = useState("");
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
+  const [reply, setReply] = useState("");
+  const [faqSearch, setFaqSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "aberto" | "respondido" | "fechado">("todos");
+  const faq: [string, string][] = [
+    ["Como cadastrar um medicamento?", "Acesse Medicamentos, escolha Adicionar medicamento e preencha nome, dosagem, horários e quantidade disponível."],
+    ["O alarme não apareceu. O que fazer?", "Confira as permissões de notificação do navegador ou celular, mantenha o aplicativo instalado e abra a área de Perfil para verificar a configuração do dispositivo."],
+    ["Como acompanhar outro paciente?", "Na área Pacientes, selecione o cadastro desejado. Os medicamentos e o histórico exibidos passam a considerar esse paciente."],
+    ["Posso tirar dúvidas sobre um medicamento?", "A equipe de atendimento pode orientar sobre o uso do aplicativo. Para decisões clínicas, interações ou mudanças de tratamento, consulte um farmacêutico ou profissional de saúde."],
+    ["Como acompanho uma resposta?", "Abra o chamado na lista abaixo. Quando a equipe responder, a conversa e a situação serão atualizadas no mesmo lugar."],
+  ];
+  const filteredFaq = faq.filter(([question, answer]) => (question + " " + answer).toLocaleLowerCase("pt-BR").includes(faqSearch.toLocaleLowerCase("pt-BR")));
+  const visibleTickets = mine.filter((ticket) => statusFilter === "todos" || ticket.status === statusFilter);
+  const openCount = mine.filter((ticket) => ticket.status === "aberto").length;
+  const answeredCount = mine.filter((ticket) => ticket.status === "respondido").length;
+  const closedCount = mine.filter((ticket) => ticket.status === "fechado").length;
+
   return (
-    <div className="space-y-6">
-      <T k="sup-title" as="h1" className="font-display text-3xl text-foreground">Central de Atendimento</T>
-      <T k="sup-sub" as="p" className="text-muted-foreground">Estamos aqui para ajudar com o app e dúvidas sobre bulas e medicamentos.</T>
-      {me.role === "cuidador" && (
-        <form id="support-form" className={cls(card, "space-y-3")} onSubmit={(e) => { e.preventDefault(); if (!subject.trim() || !text.trim()) return;
-          setState((s) => ({ ...s, tickets: [{ id: uid(), userId: me.id, subject: subject.trim(), status: "aberto", messages: [{ from: me.login, text: text.trim(), at: new Date().toISOString() }] }, ...s.tickets] })); setSubject(""); setText(""); }}>
-          <h2 className="font-display text-lg text-foreground">Abrir chamado</h2>
-          <input className={input} placeholder="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          <textarea className={input} placeholder="Descreva sua dúvida" value={text} onChange={(e) => setText(e.target.value)} />
-          <button className={btnPrimary}>Enviar</button>
-        </form>)}
-      <div className={card}><h2 className="mb-2 font-display text-lg text-foreground">Perguntas frequentes</h2>
-        {faq.map(([q, a], i) => <details key={q} className="border-b border-border py-2"><summary className="cursor-pointer font-semibold text-foreground"><T k={`faq-q${i}`}>{q!}</T></summary><T k={`faq-a${i}`} as="p" className="mt-1 text-sm text-muted-foreground">{a!}</T></details>)}</div>
-      <div className="space-y-3">
-        {mine.length === 0 && me.role === "cuidador" && (
-          <EmptyState icon={<LifeBuoy className="h-6 w-6" />} title="Nenhum chamado por aqui" description="Quando surgir uma dúvida sobre o aplicativo, abra um chamado e acompanhe a resposta nesta área." actionLabel="Abrir primeiro chamado" onAction={() => {
-            document.getElementById("support-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            document.querySelector<HTMLInputElement>("#support-form input")?.focus();
-          }} />
-        )}
-        {mine.length === 0 && me.role !== "cuidador" && <p className="text-sm text-muted-foreground">Nenhum chamado recebido ainda.</p>}
-        {mine.map((t) => (
-          <div key={t.id} className={card}>
-            <div className="flex items-center gap-2">
-            <Button variant="ghost" className="h-auto min-w-0 flex-1 justify-between gap-2 whitespace-normal px-0 text-left hover:bg-transparent" onClick={() => setOpen(open === t.id ? null : t.id)}>
-              <span className="min-w-0 truncate font-semibold text-foreground">{t.subject} <span className="text-xs text-muted-foreground">· {users.find((u) => u.id === t.userId)?.login}</span></span>
-              <span className={cls("rounded-full px-3 py-1 text-xs font-bold", t.status === "aberto" ? "bg-warning/20 text-foreground" : "bg-primary/15 text-primary")}>{t.status}</span>
-            </Button>
-            <TicketManagement ticket={t} me={me} />
+    <div className="mx-auto max-w-5xl space-y-4">
+      <header className={cls(card, "relative overflow-hidden p-4 sm:p-5")}>
+        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Headphones className="h-5 w-5" /></div>
+            <div className="min-w-0">
+              <T k="sup-title" as="h1" className="font-display text-xl font-bold text-foreground sm:text-2xl">Central de Atendimento</T>
+              <T k="sup-sub" as="p" className="mt-0.5 text-xs text-muted-foreground sm:text-sm">Ajuda com o aplicativo e acompanhamento das suas solicitações.</T>
             </div>
-            {open === t.id && <div className="mt-3 space-y-2">
-              {t.messages.map((m, i) => <div key={i} className="rounded-xl bg-muted p-3 text-sm"><p className="text-xs font-bold text-muted-foreground">{m.from} · {fmtDate(m.at)}</p><p className="text-foreground">{m.text}</p></div>)}
-              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (!reply.trim()) return;
-                setState((s) => ({ ...s, tickets: s.tickets.map((x) => x.id === t.id ? { ...x, status: me.role === "cuidador" ? "aberto" : "respondido", messages: [...x.messages, { from: `${me.login} (${me.role})`, text: reply.trim(), at: new Date().toISOString() }] } : x) })); setReply(""); }}>
-                <input className={input} placeholder="Responder..." value={reply} onChange={(e) => setReply(e.target.value)} /><button className={btnPrimary}>Enviar</button>
-              </form>
-              {me.role !== "cuidador" && <button className="text-xs text-muted-foreground underline" onClick={() => setState((s) => ({ ...s, tickets: s.tickets.map((x) => x.id === t.id ? { ...x, status: "fechado" } : x) }))}>Fechar chamado</button>}
+          </div>
+          {me.role === "cuidador" && <button type="button" onClick={() => { document.getElementById("support-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); document.querySelector<HTMLInputElement>("#support-form input")?.focus(); }} className={cls(btnPrimary, "min-h-9 px-3 text-xs")}><Plus className="h-4 w-4" /> Novo chamado</button>}
+        </div>
+        <div className="relative mt-4 grid grid-cols-3 gap-2">
+          <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2"><p className="text-[10px] font-medium text-muted-foreground">Abertos</p><p className="text-lg font-bold tabular-nums text-foreground">{openCount}</p></div>
+          <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2"><p className="text-[10px] font-medium text-muted-foreground">Respondidos</p><p className="text-lg font-bold tabular-nums text-foreground">{answeredCount}</p></div>
+          <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2"><p className="text-[10px] font-medium text-muted-foreground">Encerrados</p><p className="text-lg font-bold tabular-nums text-foreground">{closedCount}</p></div>
+        </div>
+      </header>
+
+      {me.role === "cuidador" && (
+        <form id="support-form" className={cls(card, "space-y-3 p-3 sm:p-4")} onSubmit={(event) => {
+          event.preventDefault();
+          if (!subject.trim() || !text.trim()) return;
+          setState((state) => ({ ...state, tickets: [{ id: uid(), userId: me.id, subject: subject.trim(), status: "aberto", messages: [{ from: me.login, text: text.trim(), at: new Date().toISOString() }] }, ...state.tickets] }));
+          setSubject(""); setText("");
+        }}>
+          <div className="flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary"><LifeBuoy className="h-4 w-4" /></div>
+            <div><h2 className="text-sm font-bold text-foreground">Como podemos ajudar?</h2><p className="text-[11px] text-muted-foreground">Envie sua dúvida. Nossa equipe responderá por aqui.</p></div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <label className="space-y-1 text-xs font-semibold text-foreground">Assunto
+              <input required maxLength={100} className={cls(input, "w-full")} placeholder="Ex.: notificações, cadastro..." value={subject} onChange={(event) => setSubject(event.target.value)} />
+            </label>
+            <label className="space-y-1 text-xs font-semibold text-foreground">Mensagem
+              <textarea required maxLength={2000} rows={2} className={cls(input, "w-full resize-y")} placeholder="Conte brevemente o que aconteceu ou qual é sua dúvida..." value={text} onChange={(event) => setText(event.target.value)} />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] text-muted-foreground">Não envie senhas ou dados bancários neste campo.</p>
+            <button className={cls(btnPrimary, "min-h-9 px-4 text-xs")}><ArrowRight className="h-4 w-4" />Enviar solicitação</button>
+          </div>
+        </form>
+      )}
+
+      <section className={cls(card, "space-y-3 p-3 sm:p-4")}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><h2 className="text-sm font-bold text-foreground">Perguntas frequentes</h2><p className="text-[11px] text-muted-foreground">Respostas rápidas para as dúvidas mais comuns.</p></div>
+          <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">{filteredFaq.length} tópicos</span>
+        </div>
+        <input aria-label="Buscar nas perguntas frequentes" className={cls(input, "min-h-9 w-full text-xs")} placeholder="Buscar uma dúvida..." value={faqSearch} onChange={(event) => setFaqSearch(event.target.value)} />
+        <div className="divide-y divide-border">
+          {filteredFaq.map(([question, answer]) => <details key={question} className="group py-2 first:pt-0 last:pb-0">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-foreground [&::-webkit-details-marker]:hidden">{question}<span className="text-base font-normal text-primary transition group-open:rotate-45">+</span></summary>
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">{answer}</p>
+          </details>)}
+          {filteredFaq.length === 0 && <p className="py-3 text-xs text-muted-foreground">Nenhuma pergunta encontrada. Tente outro termo ou abra um chamado.</p>}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div><h2 className="text-sm font-bold text-foreground">{me.role === "cuidador" ? "Minhas solicitações" : "Fila de atendimento"}</h2><p className="text-[11px] text-muted-foreground">Consulte o andamento e continue uma conversa.</p></div>
+          <div className="flex flex-wrap gap-1 rounded-xl bg-muted p-1">
+            {(["todos", "aberto", "respondido", "fechado"] as const).map((status) => <button key={status} type="button" onClick={() => setStatusFilter(status)} className={cls("rounded-lg px-2.5 py-1.5 text-[10px] font-semibold capitalize transition", statusFilter === status ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{status === "todos" ? "Todos" : status === "fechado" ? "Encerrados" : status}</button>)}
+          </div>
+        </div>
+        {visibleTickets.length === 0 && me.role === "cuidador" && mine.length === 0 && (
+          <EmptyState icon={<ClipboardList className="h-6 w-6" />} title="Nenhuma solicitação ainda" description="Quando precisar de ajuda, envie uma mensagem. Você poderá acompanhar toda a conversa nesta página." actionLabel="Abrir primeiro chamado" onAction={() => { document.getElementById("support-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); document.querySelector<HTMLInputElement>("#support-form input")?.focus(); }} />
+        )}
+        {visibleTickets.length === 0 && (mine.length > 0 || me.role !== "cuidador") && <p className={cls(card, "p-4 text-center text-xs text-muted-foreground")}>Nenhuma solicitação nesta situação.</p>}
+        {visibleTickets.map((ticket) => (
+          <article key={ticket.id} className={cls(card, "space-y-2 p-3 sm:p-4")}>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" className="h-auto min-w-0 flex-1 justify-between gap-2 whitespace-normal px-0 text-left hover:bg-transparent" onClick={() => setOpen(open === ticket.id ? null : ticket.id)}>
+                <span className="min-w-0"><span className="block truncate text-xs font-bold text-foreground">{ticket.subject}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">{me.role !== "cuidador" ? users.find((user) => user.id === ticket.userId)?.login : "Solicitação com " + ticket.messages.length + " mensagem(ns)"}</span></span>
+                <span className={cls("shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold capitalize", ticket.status === "aberto" ? "bg-warning/20 text-foreground" : ticket.status === "respondido" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>{ticket.status === "fechado" ? "encerrado" : ticket.status}</span>
+              </Button>
+              <TicketManagement ticket={ticket} me={me} />
+            </div>
+            {open === ticket.id && <div className="space-y-2 border-t border-border pt-3">
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {ticket.messages.map((message, index) => <div key={index} className="max-w-[95%] rounded-xl bg-muted px-3 py-2 text-xs">
+                  <p className="mb-1 text-[10px] font-bold text-muted-foreground">{message.from} · {fmtDate(message.at)}</p><p className="whitespace-pre-wrap leading-relaxed text-foreground">{message.text}</p>
+                </div>)}
+              </div>
+              {ticket.status !== "fechado" && <form className="flex items-end gap-2" onSubmit={(event) => {
+                event.preventDefault(); if (!reply.trim()) return;
+                setState((state) => ({ ...state, tickets: state.tickets.map((item) => item.id === ticket.id ? { ...item, status: me.role === "cuidador" ? "aberto" : "respondido", messages: [...item.messages, { from: me.login + " (" + me.role + ")", text: reply.trim(), at: new Date().toISOString() }] } : item) }));
+                setReply("");
+              }}>
+                <textarea aria-label="Responder solicitação" rows={1} className={cls(input, "min-h-9 flex-1 resize-y text-xs")} placeholder="Escreva uma resposta..." value={reply} onChange={(event) => setReply(event.target.value)} />
+                <button className={cls(btnPrimary, "min-h-9 shrink-0 px-3 text-xs")}>Enviar</button>
+              </form>}
+              {me.role !== "cuidador" && ticket.status !== "fechado" && <button type="button" className="text-[10px] font-semibold text-muted-foreground underline underline-offset-2" onClick={() => setState((state) => ({ ...state, tickets: state.tickets.map((item) => item.id === ticket.id ? { ...item, status: "fechado" } : item) }))}>Encerrar solicitação</button>}
             </div>}
-          </div>))}
-      </div>
+          </article>
+        ))}
+      </section>
     </div>
   );
 }
-
 function Profile({ me }: { me: User }) {
   const [cur, setCur] = useState("");
   const [p1, setP1] = useState("");
