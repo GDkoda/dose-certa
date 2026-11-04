@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   Activity, ArrowRight, BellRing, BookOpen, CheckCircle2, ChevronDown, CircleHelp,
   Clock3, FileImage, FileText, Headphones, LifeBuoy, MessageCircle, Paperclip,
@@ -159,7 +159,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
           <div className="flex items-center justify-between gap-3"><div><h2 className="font-display text-lg font-bold text-foreground">Novo atendimento</h2><p className="text-xs text-muted-foreground">Descreva o que aconteceu. Nossa equipe responderá por aqui.</p></div><button type="button" onClick={() => setFormOpen(false)} className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Fechar formulário"><X className="h-4 w-4" /></button></div>
           <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
             <label className="space-y-1.5 text-xs font-bold text-foreground">Tipo de solicitação<select className={field} value={category} onChange={(event) => setCategory(event.target.value)}><option>Dúvida</option><option>Problema técnico</option><option>Sugestão</option><option>Outro assunto</option></select></label>
-            <label className="space-y-1.5 text-xs font-bold text-foreground">Assunto<input required maxLength={100} className={field} placeholder="Ex.: notificações não estão chegando" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
+            <label className="space-y-1.5 text-xs font-bold text-foreground">Assunto<input id="support-subject" required maxLength={100} className={field} placeholder="Ex.: notificações não estão chegando" value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
           </div>
           <label className="block space-y-1.5 text-xs font-bold text-foreground">Mensagem<textarea required maxLength={2000} rows={4} className={field + " min-h-24 resize-y"} placeholder="Conte o que aconteceu, em qual aparelho e quando começou..." value={message} onChange={(event) => setMessage(event.target.value)} /></label>
           <div className="flex flex-wrap items-center justify-between gap-3">
