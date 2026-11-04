@@ -142,9 +142,9 @@ self.addEventListener("fetch", (event) => {
       try {
         const response = await fetch(request);
         if (response && response.ok && response.type !== "opaque") {
-          await cache.put(request, response.clone());
+          await cache.put(request, response.clone()).catch(() => undefined);
           // The root route is the offline entry point for the single-shell app.
-          if (url.pathname === "/") await cache.put("/", response.clone());
+          if (url.pathname === "/") await cache.put("/", response.clone()).catch(() => undefined);
         }
         return response;
       } catch {
@@ -178,7 +178,7 @@ self.addEventListener("fetch", (event) => {
     try {
       const response = await fetch(request);
       if (response && response.ok && response.type !== "opaque") {
-        await cache.put(request, response.clone());
+        await cache.put(request, response.clone()).catch(() => undefined);
       }
       return response;
     } catch {
