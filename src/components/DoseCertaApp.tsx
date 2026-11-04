@@ -947,7 +947,7 @@ type MedicationEditorForm = {
 
 function MedicationEditor({ med, patients, onCancel, onSave }: {
   med: Med;
-  patients: { id: string; name: string }[];
+  patients: { id: string; name: string; ownerId: string }[];
   onCancel: () => void;
   onSave: (updated: Med) => void;
 }) {
@@ -999,8 +999,10 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
     const dose = strength === undefined
       ? med.dose
       : strength + " " + form.strengthUnit + " · " + quantity + " " + form.quantityUnit.toLowerCase();
+    const selectedPatient = patients.find((patient) => patient.id === form.patientId);
     const updated: Med = {
       ...med,
+      ownerId: selectedPatient?.ownerId ?? med.ownerId,
       patientId: form.patientId,
       name,
       dose,
@@ -1453,49 +1455,81 @@ function Meds({ me, activePatientId = "", go }: {
                   <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{summary}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{patients.find((p) => p.id === m.patientId)?.name}</p>
                 </div>
-                <button aria-label={"Excluir medicamento " + m.name} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id), doses: s.doses.filter((d) => d.medId !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button type="button" aria-label={"Editar medicamento " + m.name} title="Editar medicamento" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => setEditingMedicationId(m.id)}>
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button type="button" aria-label={"Excluir medicamento " + m.name} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
+                    if (confirm("Excluir " + m.name + " e seus registros de doses?")) {
+                      setState((state) => ({ ...state, meds: state.meds.filter((item) => item.id !== m.id), doses: state.doses.filter((dose) => dose.medId !== m.id) }));
+                    }
+                  }}><Trash2 className="h-4 w-4" /></button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {schedule.map((slot, index) => (
-                  <div key={slot.time + "-" + index} className="rounded-xl border border-border/70 bg-background/60 px-2.5 py-2">
-                    <p className="text-sm font-extrabold tabular-nums text-foreground">{slot.time}</p>
-                    <p className="truncate text-[10px] font-semibold text-muted-foreground">{DOSE_PERIODS.find((period) => period.value === slot.period)?.label ?? "Personalizado"}</p>
+              {editingMedicationId === m.id ? (
+                <MedicationEditor
+                  med={m}
+                  patients={patients.map((patient) => ({ id: patient.id, name: patient.name, ownerId: patient.ownerId }))}
+                  onCancel={() => setEditingMedicationId(null)}
+                  onSave={(updated) => {
+                    setState((state) => ({
+                      ...state,
+                      meds: state.meds.map((item) => item.id === updated.id ? updated : item),
+                      // Keep completed records; recreate future pending reminders from the edited schedule.
+                      doses: state.doses.filter((dose) => !(
+                        dose.medId === updated.id
+                        && dose.status === "pendente"
+                        && new Date(dose.scheduledAt).getTime() > Date.now()
+                      )),
+                    }));
+                    setEditingMedicationId(null);
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {schedule.map((slot, index) => (
+                      <div key={slot.time + "-" + index} className="rounded-xl border border-border/70 bg-background/60 px-2.5 py-2">
+                        <p className="text-sm font-extrabold tabular-nums text-foreground">{slot.time}</p>
+                        <p className="truncate text-[10px] font-semibold text-muted-foreground">{DOSE_PERIODS.find((period) => period.value === slot.period)?.label ?? "Personalizado"}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
-                <span className={cls(
-                  "rounded-full px-3 py-1 text-sm tabular-nums",
-                  level === "empty" || level === "low"
-                    ? "bg-destructive/15 font-extrabold text-destructive"
-                    : "bg-primary/15 font-semibold text-primary"
-                )}>
-                  Estoque: {m.stock} {m.quantityUnit ?? "un."}
-                </span>
-                <span className={cls("text-[11px] font-semibold", level === "low" || level === "empty" ? "font-extrabold text-destructive" : "text-muted-foreground")}>
-                  {level === "empty" ? "Estoque esgotado" : level === "low" ? (m.initialStock ? "10% ou menos restante" : "Estoque baixo") : "Estoque suficiente"}
-                </span>
-                <button
-                  className={cls(btnOutline, "ml-auto px-3 py-1.5 text-xs")}
-                  onClick={() => setState((s) => ({
-                    ...s,
-                    meds: s.meds.map((x) => x.id === m.id
-                      ? { ...x, stock: x.stock + 30, initialStock: (x.initialStock ?? x.stock) + 30 }
-                      : x),
-                  }))}
-                >+30</button>
-              </div>
-              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>{schedule.length} {schedule.length === 1 ? "dose" : "doses"} por dia</span>
-                <span className="text-right">Estoque estimado: {estimateStockDays(m) === null ? "—" : String(estimateStockDays(m)) + " dia(s)"}</span>
-              </div>
-              <label className="flex items-center justify-end gap-2 border-t border-border/70 pt-2 text-xs text-muted-foreground">
-                Tolerância
-                <input className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground" type="number" min="0" step="1" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} />
-                min
-              </label>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
+                    <span className={cls(
+                      "rounded-full px-3 py-1 text-sm tabular-nums",
+                      level === "empty" || level === "low"
+                        ? "bg-destructive/15 font-extrabold text-destructive"
+                        : "bg-primary/15 font-semibold text-primary"
+                    )}>
+                      Estoque: {m.stock} {m.quantityUnit ?? "un."}
+                    </span>
+                    <span className={cls("text-[11px] font-semibold", level === "low" || level === "empty" ? "font-extrabold text-destructive" : "text-muted-foreground")}>
+                      {level === "empty" ? "Estoque esgotado" : level === "low" ? (m.initialStock ? "10% ou menos restante" : "Estoque baixo") : "Estoque suficiente"}
+                    </span>
+                    <button
+                      className={cls(btnOutline, "ml-auto px-3 py-1.5 text-xs")}
+                      onClick={() => setState((state) => ({
+                        ...state,
+                        meds: state.meds.map((item) => item.id === m.id
+                          ? { ...item, stock: item.stock + 30, initialStock: (item.initialStock ?? item.stock) + 30 }
+                          : item),
+                      }))}
+                    >+30</button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>{schedule.length} {schedule.length === 1 ? "dose" : "doses"} por dia</span>
+                    <span className="text-right">Estoque estimado: {estimateStockDays(m) === null ? "—" : String(estimateStockDays(m)) + " dia(s)"}</span>
+                  </div>
+                  <label className="flex items-center justify-end gap-2 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+                    Tolerância
+                    <input className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground" type="number" min="0" step="1" value={m.tolerance} onChange={(e) => setState((state) => ({ ...state, meds: state.meds.map((item) => (item.id === m.id ? { ...item, tolerance: Number(e.target.value) } : item)) }))} />
+                    min
+                  </label>
+                </>
+              )}
             </article>
           );
         })}
