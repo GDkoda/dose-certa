@@ -27,11 +27,15 @@ export const Route = createFileRoute("/api/public/dose-action")({
 
       if (action === "taken") {
         const updatedDose = { ...dose, status: "tomado", takenAt: now.toISOString() };
-        const { error: doseError } = await db.from("app_records")
+        const { data: confirmedRows, error: doseError } = await db.from("app_records")
           .update({ payload: updatedDose })
           .eq("id", row.id)
-          .eq("owner_id", owner);
+          .eq("owner_id", owner)
+          .filter("payload->>status", "eq", "pendente")
+          .select("id");
         if (doseError) return new Response("Could not confirm dose", { status: 500 });
+        // Another tab or duplicate click may have confirmed this dose first.
+        if (!confirmedRows?.length) continue;
 
         const medId = typeof dose["medId"] === "string" ? dose["medId"] : "";
         if (medId) {
