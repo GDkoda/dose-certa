@@ -2,6 +2,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { accountEmail, formatAuthPassword } from './account-rules';
 import { connectCloudWriter, getState, replaceCloudState, type State, type User } from './store';
 import type { Json } from '@/integrations/supabase/types';
+import {
+  applyPendingChanges,
+  cacheServerSnapshot,
+  clearSyncedChanges,
+  persistLocalMutation,
+  publishOfflineStatus,
+  readOfflinePackage,
+  type OfflineChange,
+} from './offline-cache';
 
 const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets'] as const;
 let currentId: string | null = null;
@@ -12,42 +21,120 @@ let writeFailed = false;
 export async function flushCloudWrites() { await queue; if (writeFailed) throw new Error('Os registros não foram salvos. Confira a conexão e tente novamente.'); }
 export function onCloudError(handler: (message: string) => void) { errorHandler = handler; }
 
+async function loadRemoteState(id: string): Promise<State> {
+  const [profiles, roles, records] = await Promise.all([
+    supabase.from('profiles').select('*'),
+    supabase.from('user_roles').select('*'),
+    supabase.from('app_records').select('*'),
+  ]);
+  if (profiles.error || roles.error || records.error) throw new Error('Não foi possível conectar ao servidor.');
+  const users: User[] = profiles.data.map((profile) => ({
+    id: profile.id,
+    login: profile.username,
+    password: '',
+    role: roles.data.find((role) => role.user_id === profile.id)?.role ?? 'cuidador',
+    question: '',
+    answer: '',
+    mustChange: profile.must_change,
+  }));
+  const next: State = { users, patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: id };
+  for (const kind of kinds) {
+    const values = records.data
+      .filter((record) => record.kind === kind)
+      .map((record) => ({
+        ...(record.payload as object),
+        id: record.id,
+        ...(kind === 'tickets' ? { userId: record.owner_id } : { ownerId: record.owner_id }),
+      }));
+    Object.assign(next, { [kind]: values });
+  }
+  const config = records.data.find((record) => record.kind === 'config')?.payload as { texts?: Record<string, string>; images?: Record<string, string> } | undefined;
+  next.texts = config?.texts ?? {};
+  next.images = config?.images ?? {};
+  return next;
+}
+
+async function flushPendingChanges(userId: string): Promise<number> {
+  const cached = await readOfflinePackage(userId);
+  if (!cached?.pending.length) return 0;
+  const pending = cached.pending;
+  const upserts = pending.filter((change) => change.payload !== null);
+  const deletes = pending.filter((change) => change.payload === null);
+
+  if (upserts.length) {
+    const rows = upserts.map((change) => ({
+      id: change.id,
+      kind: change.kind,
+      owner_id: change.ownerId,
+      payload: change.payload as Json,
+    }));
+    const { error } = await supabase.from('app_records').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+    await clearSyncedChanges(userId, upserts);
+  }
+
+  if (deletes.length) {
+    for (const change of deletes) {
+      const { error } = await supabase.from('app_records')
+        .delete()
+        .eq('id', change.id)
+        .eq('owner_id', change.ownerId);
+      if (error) throw error;
+    }
+    await clearSyncedChanges(userId, deletes);
+  }
+
+  const remaining = await readOfflinePackage(userId);
+  return remaining?.pending.length ?? 0;
+}
+
 export async function refreshCloud() {
   if (refreshing) { await refreshing; return refreshCloud(); }
   const id = currentId;
   refreshing = (async () => {
-    if (!id) { replaceCloudState({ users: [], patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: null }); return; }
-    const [profiles, roles, records] = await Promise.all([
-      supabase.from('profiles').select('*'), supabase.from('user_roles').select('*'), supabase.from('app_records').select('*'),
-    ]);
-    if (profiles.error || roles.error || records.error) throw new Error('Não foi possível carregar seus dados. Tente novamente.');
-    if (currentId !== id) return;
-    const users: User[] = profiles.data.map((profile) => ({ id: profile.id, login: profile.username, password: '', role: roles.data.find((role) => role.user_id === profile.id)?.role ?? 'cuidador', question: '', answer: '', mustChange: profile.must_change }));
-    const next: State = { users, patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: id };
-    for (const kind of kinds) {
-      const values = records.data.filter((record) => record.kind === kind).map((record) => ({ ...(record.payload as object), id: record.id, ...(kind === 'tickets' ? { userId: record.owner_id } : { ownerId: record.owner_id }) }));
-      Object.assign(next, { [kind]: values });
+    if (!id) {
+      replaceCloudState({ users: [], patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: null });
+      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, 0, null);
+      return;
     }
-    const config = records.data.find((record) => record.kind === 'config')?.payload as { texts?: Record<string, string>; images?: Record<string, string> } | undefined;
-    next.texts = config?.texts ?? {}; next.images = config?.images ?? {};
-    replaceCloudState(next);
+
+    let remote: State | null = null;
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      try { remote = await loadRemoteState(id); } catch { remote = null; }
+    }
+
+    const cached = await readOfflinePackage(id).catch(() => null);
+    if (!remote && !cached) {
+      throw new Error('Não foi possível conectar e ainda não há uma cópia offline deste aparelho.');
+    }
+    if (currentId !== id) return;
+
+    const base = remote ?? cached!.snapshot;
+    const pending = cached?.pending ?? [];
+    const merged = applyPendingChanges(base, pending);
+    merged.sessionId = id;
+    replaceCloudState(merged);
+
+    if (remote) {
+      await cacheServerSnapshot(id, remote).catch(() => undefined);
+      if (pending.length && (typeof navigator === 'undefined' || navigator.onLine)) {
+        try {
+          const remaining = await flushPendingChanges(id);
+          if (remaining === 0) await cacheServerSnapshot(id, merged);
+        } catch {
+          // Keep the offline queue; the app remains usable and retries on reconnect.
+        }
+      }
+    }
+
+    const latest = await readOfflinePackage(id).catch(() => null);
+    publishOfflineStatus(
+      remote !== null && (typeof navigator === 'undefined' || navigator.onLine),
+      latest?.pending.length ?? pending.length,
+      latest?.lastSyncedAt ?? null,
+    );
   })();
   try { await refreshing; } finally { refreshing = undefined; }
-}
-
-async function saveChanges(before: State, after: State, actorId: string) {
-  const writes: { id: string; kind: string; owner_id: string; payload: Json }[] = [];
-  const deletes: string[] = [];
-  for (const kind of kinds) {
-    for (const record of after[kind]) {
-      const previous = before[kind].find((item) => item.id === record.id);
-      if (JSON.stringify(previous) !== JSON.stringify(record)) writes.push({ id: record.id, kind, owner_id: 'ownerId' in record ? record.ownerId : record.userId, payload: record as unknown as Json });
-    }
-    for (const record of before[kind]) if (!after[kind].some((item) => item.id === record.id)) deletes.push(record.id);
-  }
-  if (before.texts !== after.texts || before.images !== after.images) writes.push({ id: 'app-config', kind: 'config', owner_id: actorId, payload: { texts: after.texts, images: after.images } });
-  if (writes.length) { const { error } = await supabase.from('app_records').upsert(writes); if (error) throw error; }
-  if (deletes.length) { const { error } = await supabase.from('app_records').delete().in('id', deletes); if (error) throw error; }
 }
 
 export async function initializeCloud() {
@@ -56,7 +143,28 @@ export async function initializeCloud() {
   connectCloudWriter((before, after) => {
     const actorId = currentId;
     if (!actorId) return;
-    queue = queue.then(async () => { await saveChanges(before, after, actorId); writeFailed = false; }).catch(async () => { writeFailed = true; errorHandler('Não foi possível salvar a alteração. Confira sua conexão e permissões.'); await refreshCloud(); });
+    queue = queue.then(async () => {
+      const pendingCount = await persistLocalMutation(actorId, before, after);
+      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, pendingCount, null);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        writeFailed = false;
+        return;
+      }
+      try {
+        const remaining = await flushPendingChanges(actorId);
+        writeFailed = remaining > 0;
+        const cached = await readOfflinePackage(actorId);
+        publishOfflineStatus(true, remaining, cached?.lastSyncedAt ?? null);
+      } catch {
+        writeFailed = true;
+        const cached = await readOfflinePackage(actorId).catch(() => null);
+        publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, cached?.pending.length ?? pendingCount, cached?.lastSyncedAt ?? null);
+        errorHandler('Alteração guardada neste aparelho. A sincronização será retomada quando a conexão voltar.');
+      }
+    }).catch(() => {
+      writeFailed = true;
+      errorHandler('Não foi possível guardar esta alteração localmente. Libere espaço no aparelho e tente novamente.');
+    });
   });
   const { data } = await supabase.auth.getSession();
   currentId = data.session?.user.id ?? null;
@@ -66,11 +174,23 @@ export async function initializeCloud() {
     currentId = session?.user.id ?? null;
     setTimeout(() => { void refreshCloud().catch(() => errorHandler('Não foi possível atualizar a conta.')); }, 0);
   });
+  const syncOnReconnect = () => {
+    queue = queue.then(refreshCloud).catch(() => {
+      void readOfflinePackage(currentId ?? '').then((cached) => {
+        publishOfflineStatus(true, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null);
+      }).catch(() => undefined);
+    });
+  };
+  window.addEventListener('online', syncOnReconnect);
   const channel = supabase.channel('dose-certa-shared')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void queue.then(refreshCloud); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, () => { void queue.then(refreshCloud); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_records' }, () => { void queue.then(refreshCloud); }).subscribe();
-  return () => { auth.data.subscription.unsubscribe(); void supabase.removeChannel(channel); };
+  return () => {
+    window.removeEventListener('online', syncOnReconnect);
+    auth.data.subscription.unsubscribe();
+    void supabase.removeChannel(channel);
+  };
 }
 
 export async function cloudLogin(login: string, password: string) {
