@@ -782,3 +782,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     aspect-ratio: 1.32 / 1;
   }
 }
+
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .dc-patient-card-print .dc-patient-card,
+  .dc-patient-card-print .dc-patient-card * {
+    visibility: visible !important;
+  }
+  .dc-patient-card-print {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-width: 740px !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+  }
+  .dc-patient-card-print .dc-patient-card {
+    width: 100% !important;
+    min-height: 0 !important;
+    aspect-ratio: 1.62 / 1 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    box-shadow: none !important;
+  }
+}
