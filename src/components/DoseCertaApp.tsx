@@ -1403,7 +1403,7 @@ function Profile({ me }: { me: User }) {
   const [cur, setCur] = useState("");
   const [p1, setP1] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [pushRegistered, setPushRegistered] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -1577,7 +1577,7 @@ function Profile({ me }: { me: User }) {
               <Bell className="h-5 w-5 text-primary" />
               <p className="text-sm font-bold">Teste de notificação em segundo plano</p>
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Envia um push real para este aparelho. Depois de tocar no botão, bloqueie a tela ou deixe o aplicativo em segundo plano para conferir a chegada.</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Envia um push real para este aparelho após três segundos. Toque no botão e bloqueie a tela ou deixe o aplicativo em segundo plano para conferir a chegada.</p>
             <button type="button" onClick={() => void sendBackgroundTest()} disabled={testBusy || !pushRegistered} className={cls(btnOutline, "mt-3 w-full sm:w-auto")}>
               <BellRing className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar notificação de teste"}
             </button>
