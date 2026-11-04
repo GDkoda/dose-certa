@@ -5,23 +5,50 @@ const config = Object.fromEntries(new URL(self.location).searchParams);
 firebase.initializeApp(config);
 const messaging = firebase.messaging();
 
-// 20 ciclos: 400 ms vibrando + 100 ms de pausa (aprox. 10 segundos).
-// O Android/navegador pode ignorar ou limitar esse padrão em notificações.
-const backgroundVibrationPattern = Array.from({ length: 20 }, () => [400, 100]).flat();
+// Experimental background alert burst for mobile notification channels.
+// Android 8+ Chrome ignores NotificationOptions.vibrate. To test whether the
+// system notification channel can re-alert with its own sound/vibration, we
+// replace the SAME tagged notification 20 times, 500 ms apart.
+// This keeps one notification card and stops as soon as the user dismisses it.
+const BACKGROUND_ALERT_COUNT = 20;
+const BACKGROUND_ALERT_INTERVAL_MS = 500;
+const BACKGROUND_VIBRATION_PULSE = [400, 100];
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function showBackgroundAlarm(title, options) {
+  await self.registration.showNotification(title, options);
+
+  for (let pulse = 1; pulse < BACKGROUND_ALERT_COUNT; pulse += 1) {
+    await wait(BACKGROUND_ALERT_INTERVAL_MS);
+
+    // If the user tapped/dismissed the alarm, do not reopen it.
+    const visible = await self.registration.getNotifications({ tag: options.tag });
+    if (!visible.length) break;
+
+    await self.registration.showNotification(title, {
+      ...options,
+      // Repeated single pulses are more likely to respect per-notification limits.
+      vibrate: BACKGROUND_VIBRATION_PULSE,
+      timestamp: Date.now(),
+    });
+  }
+}
 
 // Persistent, high-priority medication alarm with action buttons.
 messaging.onBackgroundMessage((payload) => {
   const d = payload.data || {};
   const title = d.title || payload.notification?.title || "Hora do medicamento";
-  return self.registration.showNotification(title, {
+  const tag = d.tag || "dose-certa";
+  return showBackgroundAlarm(title, {
     body: d.body || "Abra o Dose Certa para registrar a dose.",
     icon: "/icon-512.png",
     badge: "/icon-192.png",
-    tag: d.tag || "dose-certa",
+    tag,
     renotify: true,
     requireInteraction: true,
     silent: false,
-    vibrate: backgroundVibrationPattern,
+    vibrate: BACKGROUND_VIBRATION_PULSE,
     actions: d.doseIds ? [
       { action: "taken", title: "Já tomei" },
       { action: "snooze", title: "Lembrar em 5 min" },
