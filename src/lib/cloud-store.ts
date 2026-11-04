@@ -12,7 +12,7 @@ import {
   readOfflinePackage,
 } from './offline-cache';
 
-const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets'] as const;
+const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets', 'routines', 'routineLogs', 'routineSettings'] as const;
 let currentId: string | null = null;
 let queue = Promise.resolve();
 let refreshing: Promise<void> | undefined;
@@ -51,7 +51,7 @@ async function loadRemoteState(id: string): Promise<State> {
     answer: '',
     mustChange: profile.must_change,
   }));
-  const next: State = { users, patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: id };
+  const next: State = { users, patients: [], meds: [], doses: [], alerts: [], tickets: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: id };
   for (const kind of kinds) {
     const values = records
       .filter((record) => record.kind === kind)
@@ -110,7 +110,7 @@ export async function refreshCloud() {
   const id = currentId;
   refreshing = (async () => {
     if (!id) {
-      replaceCloudState({ users: [], patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: null });
+      replaceCloudState({ users: [], patients: [], meds: [], doses: [], alerts: [], tickets: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null });
       publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, 0, null);
       return;
     }
