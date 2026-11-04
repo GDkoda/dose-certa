@@ -56,9 +56,21 @@ export interface Med {
 export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }
 export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean }
-export interface Ticket { id: string; userId: string; subject: string; status: "aberto" | "respondido" | "fechado"; messages: { from: string; text: string; at: string }[] }
+export type RoutineCategory = "hidratacao" | "alimentacao" | "higiene" | "terapia" | "descanso" | "escola" | "atividade" | "consulta" | "outro";
+export interface RoutineTask {
+  id: string; patientId: string; ownerId: string; title: string; category: RoutineCategory;
+  time: string; weekdays: number[]; description: string; pictogram: string; enabled: boolean;
+}
+export interface RoutineLog {
+  id: string; patientId: string; ownerId: string; taskId: string; date: string;
+  status: "concluido" | "parcial" | "nao_realizado"; offeredAmount?: number; acceptedAmount?: number;
+  unit?: string; notes?: string; completedAt: string;
+}
+export interface RoutineSettings { id: string; patientId: string; ownerId: string; dailyWaterGoalMl?: number }
+export interface TicketAttachment { name: string; type: string; dataUrl: string }
+export interface Ticket { id: string; userId: string; subject: string; category?: string; status: "aberto" | "respondido" | "fechado"; messages: { from: string; text: string; at: string; attachments?: TicketAttachment[] }[] }
 export interface State {
-  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[];
+  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[]; routines: RoutineTask[]; routineLogs: RoutineLog[]; routineSettings: RoutineSettings[];
   texts: Record<string, string>; images: Record<string, string>; sessionId: string | null;
 }
 
@@ -72,7 +84,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 export function initialState(): State {
   return {
     users: [],
-    patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: null,
+    patients: [], meds: [], doses: [], alerts: [], tickets: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null,
   };
 }
 
