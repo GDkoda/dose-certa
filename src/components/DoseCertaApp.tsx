@@ -2482,7 +2482,7 @@ function Shell({ me }: { me: User }) {
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "historico" && <HistoryPage me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "suporte" && <SupportPage me={me} onOpenProfile={() => setPage("perfil")} onOpenPatients={() => setPage("pacientes")} onOpenRoutine={() => setPage(activePatientId ? "rotina" : "pacientes")} />}
-          {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} />}
+          {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} onSelectPatient={selectPatient} />}
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
