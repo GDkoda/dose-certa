@@ -21,6 +21,16 @@ const DATABASE_NAME = "dose-certa-offline";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "accounts";
 
+/** Ask the browser to reduce the chance of evicting the offline cache. */
+export async function requestPersistentOfflineStorage(): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.storage?.persist) return false;
+  try {
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
