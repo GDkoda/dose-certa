@@ -212,7 +212,7 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
         </header>
 
         <div className="grid gap-4 p-3 sm:p-5 lg:grid-cols-[1.1fr_.9fr]">
-          <div className="min-w-0">
+          <div className="min-w-0 dc-patient-card-print">
             <div className={"dc-patient-card " + theme.className}>
               <CardMotif theme={theme.id} />
               <div className="relative z-10 flex h-full min-h-[285px] flex-col p-4 sm:min-h-[340px] sm:p-5">
