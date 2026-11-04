@@ -19,7 +19,22 @@ let refreshing: Promise<void> | undefined;
 let refreshQueued = false;
 let errorHandler: (message: string) => void = () => {};
 let writeFailed = false;
-export async function flushCloudWrites() { await queue; if (writeFailed) throw new Error('Os registros não foram salvos. Confira a conexão e tente novamente.'); }
+let lastSyncError: string | null = null;
+
+function cloudErrorDetails(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const value = error as { message?: unknown; code?: unknown; status?: unknown };
+    const message = typeof value.message === 'string' ? value.message : 'Falha desconhecida na comunicação com o servidor.';
+    const code = typeof value.code === 'string' ? value.code : typeof value.status === 'number' ? String(value.status) : '';
+    return (code ? `${message} (código ${code})` : message).slice(0, 240);
+  }
+  return (typeof error === 'string' ? error : 'Falha desconhecida na comunicação com o servidor.').slice(0, 240);
+}
+
+export async function flushCloudWrites() {
+  await queue;
+  if (writeFailed) throw new Error(lastSyncError ?? 'Os registros não foram sincronizados. Confira a conexão e tente novamente.');
+}
 export function onCloudError(handler: (message: string) => void) { errorHandler = handler; }
 
 async function fetchAllPages<T>(
@@ -110,24 +125,45 @@ export async function refreshCloud() {
   const id = currentId;
   refreshing = (async () => {
     if (!id) {
+      lastSyncError = null;
+      writeFailed = false;
       replaceCloudState({ users: [], patients: [], meds: [], doses: [], alerts: [], tickets: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null });
-      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, 0, null);
+      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, 0, null, null);
       return;
     }
 
     let remote: State | null = null;
-    if (typeof navigator === 'undefined' || navigator.onLine) {
-      try { remote = await loadRemoteState(id); } catch { remote = null; }
+    let remoteError: unknown = null;
+    const browserOnline = typeof navigator === 'undefined' || navigator.onLine;
+    if (browserOnline) {
+      try {
+        remote = await loadRemoteState(id);
+      } catch (error) {
+        remoteError = error;
+        console.error('[CloudSync] Não foi possível ler os dados do Supabase.', error);
+      }
+    } else {
+      remoteError = new Error('O aparelho está sem conexão com a internet.');
     }
 
-    const cached = await readOfflinePackage(id).catch(() => null);
+    let cached = null;
+    try {
+      cached = await readOfflinePackage(id);
+    } catch (error) {
+      console.error('[CloudSync] Não foi possível ler a cópia offline.', error);
+    }
     if (!remote && !cached) {
-      throw new Error('Não foi possível conectar e ainda não há uma cópia offline deste aparelho.');
+      const details = remoteError ? cloudErrorDetails(remoteError) : 'Não existe uma cópia offline neste aparelho.';
+      lastSyncError = details;
+      writeFailed = true;
+      publishOfflineStatus(false, 0, null, details);
+      throw new Error(`Não foi possível conectar ao servidor e carregar os dados: ${details}`);
     }
     if (currentId !== id) return;
 
     const base = remote ?? cached!.snapshot;
     let pending = cached?.pending ?? [];
+    let syncError = remoteError ? cloudErrorDetails(remoteError) : null;
     if (remote && pending.length) {
       const reconciled = reconcilePendingChanges(remote, pending);
       const resolved = pending.filter((change) => !reconciled.includes(change));
@@ -139,26 +175,39 @@ export async function refreshCloud() {
     replaceCloudState(merged);
 
     if (remote) {
-      await cacheServerSnapshot(id, remote).catch(() => undefined);
-      if (pending.length && (typeof navigator === 'undefined' || navigator.onLine)) {
+      await cacheServerSnapshot(id, remote).catch((error) => {
+        console.error('[CloudSync] Dados remotos carregados, mas a cópia offline não foi atualizada.', error);
+      });
+      if (pending.length && browserOnline) {
         try {
           const remaining = await flushPendingChanges(id);
           writeFailed = remaining > 0;
-          if (remaining === 0) await cacheServerSnapshot(id, merged);
-        } catch {
-          // Keep the offline queue; the app remains usable and retries on reconnect.
+          if (remaining === 0) {
+            await cacheServerSnapshot(id, merged);
+            syncError = null;
+          } else {
+            syncError = 'Ainda existem alterações aguardando envio.';
+          }
+        } catch (error) {
           writeFailed = true;
+          syncError = cloudErrorDetails(error);
+          console.error('[CloudSync] Falha ao enviar alterações pendentes.', error);
         }
       } else {
         writeFailed = false;
+        syncError = null;
       }
+    } else {
+      writeFailed = pending.length > 0;
     }
 
+    lastSyncError = syncError;
     const latest = await readOfflinePackage(id).catch(() => null);
     publishOfflineStatus(
-      remote !== null && (typeof navigator === 'undefined' || navigator.onLine),
+      remote !== null && browserOnline,
       latest?.pending.length ?? pending.length,
       latest?.lastSyncedAt ?? null,
+      syncError,
     );
   })();
   try {
@@ -167,7 +216,11 @@ export async function refreshCloud() {
     refreshing = undefined;
     if (refreshQueued) {
       refreshQueued = false;
-      void refreshCloud().catch(() => errorHandler('Não foi possível atualizar os dados compartilhados.'));
+      void refreshCloud().catch((error) => {
+        lastSyncError = cloudErrorDetails(error);
+        publishOfflineStatus(false, 0, null, lastSyncError);
+        errorHandler('Não foi possível atualizar os dados compartilhados. ' + lastSyncError);
+      });
     }
   }
 }
@@ -180,49 +233,90 @@ export async function initializeCloud() {
     if (!actorId) return;
     queue = queue.then(async () => {
       const pendingCount = await persistLocalMutation(actorId, before, after);
-      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, pendingCount, null);
+      publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, pendingCount, null, null);
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         writeFailed = false;
+        lastSyncError = null;
         return;
       }
       try {
         const remaining = await flushPendingChanges(actorId);
         writeFailed = remaining > 0;
+        lastSyncError = remaining > 0 ? 'Ainda existem alterações aguardando envio.' : null;
         const cached = await readOfflinePackage(actorId);
-        publishOfflineStatus(true, remaining, cached?.lastSyncedAt ?? null);
-      } catch {
+        publishOfflineStatus(true, remaining, cached?.lastSyncedAt ?? null, lastSyncError);
+      } catch (error) {
         writeFailed = true;
+        lastSyncError = cloudErrorDetails(error);
         const cached = await readOfflinePackage(actorId).catch(() => null);
-        publishOfflineStatus(false, cached?.pending.length ?? pendingCount, cached?.lastSyncedAt ?? null);
-        errorHandler('Alteração guardada neste aparelho. A sincronização será retomada quando a conexão voltar.');
+        publishOfflineStatus(false, cached?.pending.length ?? pendingCount, cached?.lastSyncedAt ?? null, lastSyncError);
+        console.error('[CloudSync] Falha ao salvar alterações no Supabase.', error);
+        errorHandler('Alteração guardada neste aparelho, mas não foi sincronizada: ' + lastSyncError);
       }
-    }).catch(() => {
+    }).catch((error) => {
       writeFailed = true;
-      errorHandler('Não foi possível guardar esta alteração localmente. Libere espaço no aparelho e tente novamente.');
+      lastSyncError = cloudErrorDetails(error);
+      errorHandler('Não foi possível guardar esta alteração localmente. ' + lastSyncError);
     });
   });
-  const { data } = await supabase.auth.getSession();
+
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error('Não foi possível recuperar a sessão do Supabase: ' + cloudErrorDetails(error));
   currentId = data.session?.user.id ?? null;
   await refreshCloud();
+
   const auth = supabase.auth.onAuthStateChange((event, session) => {
-    if (!['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED'].includes(event)) return;
+    if (!['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED', 'TOKEN_REFRESHED'].includes(event)) return;
     currentId = session?.user.id ?? null;
-    setTimeout(() => { void refreshCloud().catch(() => errorHandler('Não foi possível atualizar a conta.')); }, 0);
+    setTimeout(() => {
+      void refreshCloud().catch((error) => {
+        lastSyncError = cloudErrorDetails(error);
+        errorHandler('Não foi possível atualizar a conta. ' + lastSyncError);
+      });
+    }, 0);
   });
-  const syncOnReconnect = () => {
-    queue = queue.then(refreshCloud).catch(() => {
+
+  const syncNow = () => {
+    if (!currentId || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+    queue = queue.then(() => refreshCloud()).catch((error) => {
+      lastSyncError = cloudErrorDetails(error);
+      console.error('[CloudSync] Nova tentativa de sincronização falhou.', error);
       void readOfflinePackage(currentId ?? '').then((cached) => {
-        publishOfflineStatus(false, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null);
-      }).catch(() => undefined);
+        publishOfflineStatus(false, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null, lastSyncError);
+      }).catch(() => {
+        publishOfflineStatus(false, 0, null, lastSyncError);
+      });
     });
   };
+  const syncOnReconnect = () => syncNow();
+  const syncOnResume = () => {
+    if (document.visibilityState === 'visible') syncNow();
+  };
+
   window.addEventListener('online', syncOnReconnect);
+  window.addEventListener('focus', syncOnResume);
+  document.addEventListener('visibilitychange', syncOnResume);
+  // Realtime is the fast path; periodic refresh is the fallback if the browser
+  // or Supabase project does not deliver Realtime events to this session.
+  const syncInterval = window.setInterval(() => {
+    if (document.visibilityState === 'visible') syncNow();
+  }, 30_000);
+
   const channel = supabase.channel('dose-certa-shared')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void queue.then(refreshCloud); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, () => { void queue.then(refreshCloud); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_records' }, () => { void queue.then(refreshCloud); }).subscribe();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, syncNow)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roles' }, syncNow)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_records' }, syncNow)
+    .subscribe((status, error) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[CloudSync] Realtime indisponível; a atualização periódica continuará ativa.', error);
+      }
+    });
+
   return () => {
     window.removeEventListener('online', syncOnReconnect);
+    window.removeEventListener('focus', syncOnResume);
+    document.removeEventListener('visibilitychange', syncOnResume);
+    window.clearInterval(syncInterval);
     auth.data.subscription.unsubscribe();
     void supabase.removeChannel(channel);
   };
