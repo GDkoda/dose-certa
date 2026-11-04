@@ -928,7 +928,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 @media (max-width: 480px) {
   .dc-patient-card {
-    min-height: 220px;
+    min-height: 230px;
     aspect-ratio: 1.586 / 1;
     border-radius: .95rem;
   }
