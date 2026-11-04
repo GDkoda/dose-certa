@@ -181,8 +181,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
     if (!patient || !logTask) return;
     const offeredNumber = Number(offered);
     const acceptedNumber = Number(accepted);
-    if (!Number.isFinite(offeredNumber) || !Number.isFinite(acceptedNumber) || offeredNumber < 0 || acceptedNumber < 0 || acceptedNumber > offeredNumber) {
-      return setLogError("Confira as quantidades: o valor aceito não pode superar o oferecido.");
+    if (offered.trim() === "" || accepted.trim() === "" || !Number.isFinite(offeredNumber) || !Number.isFinite(acceptedNumber) || offeredNumber < 0 || acceptedNumber < 0 || acceptedNumber > offeredNumber) {
+      return setLogError("Informe quantidades válidas. O valor aceito não pode superar o oferecido.");
     }
     const status: RoutineLog["status"] = acceptedNumber === 0 ? "nao_realizado" : acceptedNumber < offeredNumber ? "parcial" : "concluido";
     const entry: RoutineLog = {
