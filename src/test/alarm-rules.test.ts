@@ -21,6 +21,11 @@ describe("alarm rules", () => {
     expect(additions[0]?.scheduledAt).toBe(localScheduledAt(day, "20:00"));
     expect(additions[0]?.id).toBe(`scheduled-m1-${localScheduledAt(day, "20:00")}`);
   });
+  it("does not generate reminders for archived medications", () => {
+    const day = new Date(2026, 9, 27, 12);
+    const archived = { ...med, archivedAt: "2026-10-26T10:00:00.000Z" };
+    expect(buildMissingDoses([archived], [], "u1", day)).toEqual([]);
+  });
   it("does not repeat a dose before its time or after it is confirmed", () => {
     const dueAt = Date.parse(dose.scheduledAt);
     expect(isDoseDue(dose, dueAt - 1)).toBe(false);

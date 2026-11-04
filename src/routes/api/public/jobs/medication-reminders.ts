@@ -5,14 +5,32 @@ import type { Dose } from "@/lib/store";
 import { z } from "zod";
 import { sendPush, signDoseAction } from "@/lib/push-server";
 
+async function fetchAllPages<T>(
+  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const result: T[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await loadPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    result.push(...page);
+    if (page.length < pageSize) return result;
+  }
+}
+
 export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
   server: { handlers: { POST: async ({ request }) => {
     const failure = await authenticateCronRequest(request);
     if (failure) return failure;
     if (!process.env["LOVABLE_API_KEY"] || !process.env["FIREBASE_MESSAGING_API_KEY"]) return new Response("Notification service unavailable", { status: 503 });
     const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-    const { data: devices, error } = await db.from("push_devices").select("*");
-    if (error) return new Response("Could not load devices", { status: 500 });
+    let devices: Awaited<ReturnType<typeof fetchAllPages>> = [];
+    try {
+      devices = await fetchAllPages((from, to) => db.from("push_devices").select("*").range(from, to));
+    } catch {
+      return new Response("Could not load devices", { status: 500 });
+    }
     const now = Date.now(); let sent = 0; let failed = 0;
     const medSchema = z.object({ patientId: z.string(), times: z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)), archivedAt: z.string().optional() });
     const doseSchema = z.object({ medId: z.string(), patientId: z.string(), scheduledAt: z.string().datetime(), status: z.enum(["pendente", "tomado", "nao_tomado"]), snoozeUntil: z.string().optional(), lastShown: z.string().optional() });
@@ -20,8 +38,13 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       const owned = (devices ?? []).filter((device) => device.owner_id === owner);
       const { data: roles } = await db.from("user_roles").select("role").eq("user_id", owner);
       if (!roles?.some((role) => role.role === "cuidador")) continue;
-      const { data: records, error: readError } = await db.from("app_records").select("*").eq("owner_id", owner).in("kind", ["meds", "doses"]);
-      if (readError) { failed++; continue; }
+      let records: Awaited<ReturnType<typeof fetchAllPages>> = [];
+      try {
+        records = await fetchAllPages((from, to) => db.from("app_records").select("*").eq("owner_id", owner).in("kind", ["meds", "doses"]).range(from, to));
+      } catch {
+        failed++;
+        continue;
+      }
       const doses: Dose[] = [];
       for (const record of records ?? []) {
         if (record.kind !== "doses") continue;
@@ -47,7 +70,13 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       }
       // Group pending doses of the same patient at the same time into one notification.
       const names = new Map<string, string>(); const medInfo = new Map<string, { name: string; dose: string; archived: boolean }>();
-      const { data: pats } = await db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients");
+      let pats: Awaited<ReturnType<typeof fetchAllPages>> = [];
+      try {
+        pats = await fetchAllPages((from, to) => db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients").range(from, to));
+      } catch {
+        failed++;
+        continue;
+      }
       for (const p of pats ?? []) names.set(p.id, String((p.payload as Record<string, unknown>)?.["name"] ?? "Paciente"));
       for (const r of records ?? []) if (r.kind === "meds") {
         const m = r.payload as Record<string, unknown>;

@@ -35,6 +35,20 @@ async function signDoseAction(owner: string, doseIds: string[]): Promise<string>
   return base64url(signature);
 }
 
+async function fetchAllPages<T>(
+  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await loadPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 function pemToBytes(pem: string): Uint8Array {
   return Uint8Array.from(atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "")), c => c.charCodeAt(0));
 }
@@ -76,33 +90,40 @@ Deno.serve(async (request) => {
   const now = Date.now();
   const isoNow = new Date(now).toISOString();
   const minDate = new Date(now - 12 * 60 * 60 * 1000).toISOString();
-  const [doseRows, medRows, patientRows, deviceRows] = await Promise.all([
-    supabase.from("app_records").select("id, owner_id, payload").eq("kind", "doses"),
-    supabase.from("app_records").select("id, owner_id, payload").eq("kind", "meds"),
-    supabase.from("app_records").select("id, payload").eq("kind", "patients"),
-    supabase.from("push_devices").select("owner_id, token, timezone"),
-  ]);
-  if (doseRows.error || medRows.error || patientRows.error || deviceRows.error) return json({ error: "Could not load reminder data" }, 500);
+  let doseRows: Record<string, unknown>[];
+  let medRows: Record<string, unknown>[];
+  let patientRows: Record<string, unknown>[];
+  let deviceRows: Record<string, unknown>[];
+  try {
+    [doseRows, medRows, patientRows, deviceRows] = await Promise.all([
+      fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "doses").range(from, to)),
+      fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "meds").range(from, to)),
+      fetchAllPages((from, to) => supabase.from("app_records").select("id, payload").eq("kind", "patients").range(from, to)),
+      fetchAllPages((from, to) => supabase.from("push_devices").select("owner_id, token, timezone").range(from, to)),
+    ]);
+  } catch {
+    return json({ error: "Could not load reminder data" }, 500);
+  }
 
   const meds = new Map<string, Med>();
-  for (const row of medRows.data ?? []) {
+  for (const row of medRows) {
     const payload = row.payload as Record<string, unknown>;
     meds.set(row.id, { ...payload, id: row.id, ownerId: row.owner_id } as Med);
   }
   const patients = new Map<string, Patient>();
-  for (const row of patientRows.data ?? []) {
+  for (const row of patientRows) {
     const payload = row.payload as Record<string, unknown>;
     patients.set(row.id, { id: row.id, name: String(payload.name ?? "Paciente") });
   }
   const devicesByOwner = new Map<string, Device[]>();
-  for (const device of (deviceRows.data ?? []) as Device[]) {
+  for (const device of deviceRows as unknown as Device[]) {
     const list = devicesByOwner.get(device.owner_id) ?? [];
     list.push(device); devicesByOwner.set(device.owner_id, list);
   }
 
   let sent = 0, skipped = 0, failed = 0;
   let accessToken: string | undefined;
-  for (const row of doseRows.data ?? []) {
+  for (const row of doseRows) {
     const dose = { ...(row.payload as Record<string, unknown>), id: row.id, ownerId: row.owner_id } as Dose;
     const scheduled = Date.parse(dose.scheduledAt);
     if (dose.status !== "pendente" || !Number.isFinite(scheduled) || scheduled > now || scheduled < Date.parse(minDate)) { skipped++; continue; }

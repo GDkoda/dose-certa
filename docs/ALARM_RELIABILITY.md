@@ -11,7 +11,8 @@ Branch de implementação: `teste.1`
 - O Service Worker fecha a notificação correspondente e avisa as janelas abertas após uma ação concluída. Ele não reexibe repetidamente a mesma notificação em pulsos de meio segundo.
 - O cache offline faz operações de leitura-modificação-gravação no IndexedDB dentro de uma transação. Na reconciliação, uma dose finalizada no servidor vence uma cópia offline antiga ainda marcada como pendente.
 - O agendador TanStack e a Edge Function usam a mesma chave idempotente por dose, janela de cinco minutos e dispositivo. Se ambos estiverem ativos, apenas um deve reivindicar cada entrega.
-- O carregamento do estado remoto percorre páginas de 500 registros, em vez de depender de uma única resposta limitada pelo servidor.
+- Medicamentos arquivados deixam de gerar doses locais e de acionar os dois emissores; doses finalizadas permanecem no histórico.
+- O carregamento do estado remoto, a rota de lembretes e a Edge Function percorrem páginas de 500 registros, em vez de depender de uma única resposta limitada pelo servidor.
 
 ## Migrations necessárias
 
