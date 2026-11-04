@@ -13,6 +13,8 @@ import { enablePush, registerAppServiceWorker } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { PatientIdentityCard } from "./PatientIdentityCard";
+import { RoutineCare } from "./RoutineCare";
+import { SupportPage } from "./SupportPage";
 import { DoseCertaMark } from "./DoseCertaMark";
 import { readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
 import { useInstallPrompt } from "@/lib/install-prompt";
@@ -712,7 +714,7 @@ function AlarmEngine({ me }: { me: User }) {
 }
 
 /* ---------------- pages ---------------- */
-type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | "perfil" | "admin";
+type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | "rotina" | "perfil" | "admin";
 
 function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) => void; activePatientId?: string }) {
   const doses = useStore((s) => s.doses.filter((d) => d.ownerId === me.id && (!activePatientId || d.patientId === activePatientId) && new Date(d.scheduledAt).toDateString() === new Date().toDateString()));
@@ -842,6 +844,7 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
   me: User;
   activePatientId?: string;
   onSelectPatient: (patientId: string) => void;
+  onOpenRoutine: (patientId: string) => void;
 }) {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
   const [f, setF] = useState({ name: "", age: "", birthDate: "", susCard: "", healthPlan: "", identityNumber: "", cpf: "", notes: "", photoDataUrl: "" });
@@ -1076,9 +1079,12 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
                     {p.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{p.notes}</p>}
                   </>
                 )}
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <button type="button" onClick={() => setViewingPatientCardId(p.id)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-sm font-bold text-primary transition hover:bg-primary/10">
                     <UserRound className="h-4 w-4" />Ver cartão
+                  </button>
+                  <button type="button" onClick={() => onOpenRoutine(p.id)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground transition hover:border-primary/30 hover:bg-primary/5">
+                    <CalendarDays className="h-4 w-4 text-primary" />Rotina
                   </button>
                   {me.role === "cuidador" ? (
                     <button type="button" onClick={() => onSelectPatient(isActive ? "" : p.id)} className={cls("flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition", isActive ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted")}>
@@ -2398,7 +2404,7 @@ function Shell({ me }: { me: User }) {
     { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
-  useEffect(() => { if (!items.some((item) => item.id === page)) setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
+  useEffect(() => { if (!items.some((item) => item.id === page) && page !== "rotina") setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
   const registerDevice = useServerFn(registerPushDevice);
   // Re-link this phone to the signed-in caregiver on every open, so tokens stay fresh and follow the account in use.
   useEffect(() => {
@@ -2472,10 +2478,11 @@ function Shell({ me }: { me: User }) {
         <main className="dc-main flex-1 px-4 pb-40 pt-6 md:px-8 md:pb-10">
           <DeviceSetupAssistant role={me.role} accountId={me.id} />
           {page === "inicio" && <Dashboard me={me} go={setPage} activePatientId={activePatientId} />}
-          {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} />}
+          {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} onOpenRoutine={(patientId) => { selectPatient(patientId); setPage("rotina"); }} />}
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "historico" && <HistoryPage me={me} activePatientId={activePatientId} go={setPage} />}
-          {page === "suporte" && <Support me={me} />}
+          {page === "suporte" && <SupportPage me={me} onOpenProfile={() => setPage("perfil")} onOpenPatients={() => setPage("pacientes")} onOpenRoutine={() => setPage(activePatientId ? "rotina" : "pacientes")} />}
+          {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} />}
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
