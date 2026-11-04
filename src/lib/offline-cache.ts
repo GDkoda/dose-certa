@@ -116,7 +116,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
         const previous = previousRecords.find((item) => item.id === id);
         if (previous && JSON.stringify(previous) === JSON.stringify(record)) continue;
         const key = kind + ":" + id;
-        const existing = pending.get(key);
         pending.set(key, {
           key,
           id,
@@ -130,7 +129,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
         const id = String(record.id);
         if (nextRecords.some((item) => item.id === id)) continue;
         const key = kind + ":" + id;
-        const existing = pending.get(key);
         pending.set(key, {
           key,
           id,
@@ -145,7 +143,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
     if (JSON.stringify(before.texts) !== JSON.stringify(after.texts)
       || JSON.stringify(before.images) !== JSON.stringify(after.images)) {
       const key = "config:app-config";
-      const existing = pending.get(key);
       pending.set(key, {
         key,
         id: "app-config",
