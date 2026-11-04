@@ -119,10 +119,14 @@ export async function refreshCloud() {
       if (pending.length && (typeof navigator === 'undefined' || navigator.onLine)) {
         try {
           const remaining = await flushPendingChanges(id);
+          writeFailed = remaining > 0;
           if (remaining === 0) await cacheServerSnapshot(id, merged);
         } catch {
           // Keep the offline queue; the app remains usable and retries on reconnect.
+          writeFailed = true;
         }
+      } else {
+        writeFailed = false;
       }
     }
 
