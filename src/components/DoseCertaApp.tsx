@@ -28,6 +28,9 @@ import {
 } from "@/lib/store";
 
 /* ---------------- helpers ---------------- */
+const STRENGTH_UNITS = ["mg", "g", "mcg", "mL", "mg/mL", "UI", "%", "gotas"];
+const PRESENTATIONS = ["Comprimido", "Cápsula", "Drágea", "Solução oral", "Suspensão", "Gotas", "Sachê", "Ampola", "Spray", "Creme", "Pomada", "Outro"];
+const QUANTITY_UNITS = ["Comprimido(s)", "Cápsula(s)", "Drágea(s)", "mL", "Gota(s)", "Sachê(s)", "Ampola(s)", "Jato(s)", "Aplicação(ões)", "Unidade(s)"];
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 const csvCell = (value: string) => {
