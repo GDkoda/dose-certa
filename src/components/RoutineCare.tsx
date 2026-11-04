@@ -29,7 +29,7 @@ const todayLabel = (value: string) => new Date(value + "T12:00:00").toLocaleDate
 
 type TimelineItem =
   | { key: string; kind: "medication"; title: string; time: string; description: string; status: string; }
-  | { key: string; kind: "task"; task: RoutineTask; time: string; log?: RoutineLog };
+  | { key: string; kind: "task"; title: string; task: RoutineTask; time: string; log?: RoutineLog };
 
 export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPatient }: {
   me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void; onSelectPatient: (patientId: string) => void;
@@ -97,6 +97,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
       items.push({
         key: task.id,
         kind: "task",
+        title: task.title,
         task,
         time: task.time,
         log: currentLogs.find((log) => log.taskId === task.id),
