@@ -13,7 +13,7 @@ import { enablePush, registerAppServiceWorker } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { PatientIdentityCard } from "./PatientIdentityCard";
-import { readOfflinePackage } from "@/lib/offline-cache";
+import { readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
@@ -2202,6 +2202,7 @@ export function DoseCertaApp() {
 
     // Prepare offline app shell even when the user has not enabled notifications.
     void registerAppServiceWorker().catch(() => undefined);
+    void requestPersistentOfflineStorage();
 
     let disposed = false; let cleanup: (() => void) | undefined;
     onCloudError(setCloudError);
