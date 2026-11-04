@@ -102,10 +102,17 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
       const next: TicketAttachment[] = [];
       for (const file of files) {
         if (!allowed.includes(file.type)) throw new Error("Use imagens JPG, PNG, WEBP ou documentos PDF.");
-        if (file.size > 1_500_000) throw new Error("Cada arquivo deve ter até 1,5 MB.");
+        if (file.size > 250_000) throw new Error("Cada arquivo deve ter até 250 KB para manter o chamado leve.");
         next.push({ name: file.name, type: file.type, dataUrl: await fileToDataUrl(file) });
       }
-      setAttachments((current) => [...current, ...next]);
+      setAttachments((current) => {
+        const combined = [...current, ...next];
+        if (combined.reduce((total, file) => total + file.dataUrl.length, 0) > 1_000_000) {
+          setAttachmentError("O tamanho total dos anexos ultrapassa o limite de 1 MB.");
+          return current;
+        }
+        return combined;
+      });
     } catch (error) {
       setAttachmentError(error instanceof Error ? error.message : "Não foi possível anexar o arquivo.");
     }
@@ -163,7 +170,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
           </div>
           <label className="block space-y-1.5 text-xs font-bold text-foreground">Mensagem<textarea required maxLength={2000} rows={4} className={field + " min-h-24 resize-y"} placeholder="Conte o que aconteceu, em qual aparelho e quando começou..." value={message} onChange={(event) => setMessage(event.target.value)} /></label>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1"><label className={quietButton + " min-h-9 cursor-pointer text-xs"}><Paperclip className="h-4 w-4" />Anexar imagem ou PDF<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => void addAttachments(event)} /></label><p className="text-[10px] text-muted-foreground">Até 3 arquivos · 1,5 MB cada. Não envie senhas ou documentos pessoais.</p></div>
+            <div className="space-y-1"><label className={quietButton + " min-h-9 cursor-pointer text-xs"}><Paperclip className="h-4 w-4" />Anexar imagem ou PDF<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => void addAttachments(event)} /></label><p className="text-[10px] text-muted-foreground">Até 3 arquivos · 250 KB cada · 1 MB no total. Não envie senhas ou documentos pessoais.</p></div>
             <button type="submit" className={primaryButton}><Send className="h-4 w-4" />Enviar chamado</button>
           </div>
           {attachments.length > 0 && <div className="flex flex-wrap gap-2">{attachments.map((file, index) => <span key={file.name + index} className="inline-flex max-w-full items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs text-foreground"><FileImage className="h-4 w-4 shrink-0 text-primary" /><span className="max-w-48 truncate">{file.name}</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, position) => position !== index))} aria-label={"Remover " + file.name}><X className="h-3.5 w-3.5" /></button></span>)}</div>}
