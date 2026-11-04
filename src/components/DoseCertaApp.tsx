@@ -501,6 +501,32 @@ function AlarmEngine({ me }: { me: User }) {
     const tick = () => {
       ensureTodayDoses(me.id);
       const s = getState(); const now = Date.now();
+      const currentTime = new Date(now);
+      const todayKey = [currentTime.getFullYear(), String(currentTime.getMonth() + 1).padStart(2, "0"), String(currentTime.getDate()).padStart(2, "0")].join("-");
+      const todayDay = currentTime.getDay();
+      const minuteOfDay = currentTime.getHours() * 60 + currentTime.getMinutes();
+      const routineReminders = s.routines.filter((task) => {
+        if (!task.enabled || task.ownerId !== me.id || !task.weekdays.includes(todayDay)) return false;
+        const [hours, minutes] = task.time.split(":").map(Number);
+        const scheduledMinute = (hours ?? 0) * 60 + (minutes ?? 0);
+        const sourceKey = "routine:" + task.id + ":" + todayKey;
+        const alreadyLogged = s.routineLogs.some((log) => log.taskId === task.id && log.date === todayKey);
+        return minuteOfDay >= scheduledMinute && minuteOfDay < scheduledMinute + 5
+          && !alreadyLogged && !s.alerts.some((alert) => alert.sourceKey === sourceKey);
+      });
+      if (routineReminders.length) {
+        const alerts = routineReminders.map((task) => ({
+          id: uid(), ownerId: me.id, at: new Date().toISOString(), read: false,
+          sourceKey: "routine:" + task.id + ":" + todayKey,
+          text: "Lembrete de rotina · " + (s.patients.find((patient) => patient.id === task.patientId)?.name ?? "Paciente") + " · " + task.pictogram + " " + task.title,
+        }));
+        setState((state) => ({ ...state, alerts: [...alerts, ...state.alerts] }));
+        if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          for (const alert of alerts) {
+            try { new Notification("Dose Certa • Rotina", { body: alert.text, tag: alert.sourceKey }); } catch { /* Notificações locais dependem do navegador. */ }
+          }
+        }
+      }
       // tolerance alerts
       const late = s.doses.filter((d) => d.ownerId === me.id && d.status === "pendente" && !d.lateAlerted && (() => { const m = s.meds.find((x) => x.id === d.medId); return m && now > new Date(d.scheduledAt).getTime() + m.tolerance * 60000; })());
       if (late.length) setState((st) => ({
