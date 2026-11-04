@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  Activity, ArrowRight, BellRing, BookOpen, CheckCircle2, ChevronDown, CircleHelp,
+  Activity, ArrowRight, BellRing, BookOpen, CalendarDays, CheckCircle2, ChevronDown, CircleHelp,
   Clock3, FileImage, FileText, Headphones, LifeBuoy, MessageCircle, Paperclip,
   Plus, Search, Send, Settings2, ShieldCheck, Smartphone, Wifi, X,
 } from "lucide-react";
@@ -220,7 +220,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
             <div className="mt-3 space-y-2">
               <button type="button" onClick={onOpenProfile} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300"><BellRing className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Ativar notificações</span><span className="block text-[10px] text-muted-foreground">Permissões e teste de alertas</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
               <button type="button" onClick={onOpenPatients} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300"><Smartphone className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Organizar pacientes</span><span className="block text-[10px] text-muted-foreground">Cadastro, cartão e seleção</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
-              <button type="button" onClick={onOpenRoutine} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"><CalendarIcon /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Montar rotina visual</span><span className="block text-[10px] text-muted-foreground">Alimentação, água e atividades</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
+              <button type="button" onClick={onOpenRoutine} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"><CalendarDays className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Montar rotina visual</span><span className="block text-[10px] text-muted-foreground">Alimentação, água e atividades</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
             </div>
           </section>
 
@@ -234,6 +234,3 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
   );
 }
 
-function CalendarIcon() {
-  return <span className="text-lg leading-none">▦</span>;
-}
