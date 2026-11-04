@@ -117,6 +117,16 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
   const pendingTimeline = timeline.filter((item) => item.kind === "medication" ? item.status === "pendente" : !item.log || item.log.status === "pendente");
   const nextItem = pendingTimeline[0];
   const afterItem = pendingTimeline[1];
+  const today = new Date();
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(today.getDate() - 6);
+  const recentStart = dateKey(sevenDaysAgo);
+  const recentEnd = dateKey(today);
+  const recentLogs = patientLogs.filter((log) => log.date >= recentStart && log.date <= recentEnd);
+  const recentWater = recentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "hidratacao").reduce((total, log) => total + (log.acceptedAmount ?? 0), 0);
+  const recentMeals = recentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "alimentacao").length;
+  const recentCompleted = recentLogs.filter((log) => log.status === "concluido" || log.status === "parcial").length;
+  const recentNotDone = recentLogs.filter((log) => log.status === "nao_realizado").length;
   const waterPercent = waterGoal > 0 ? Math.min(100, Math.round((waterAccepted / waterGoal) * 100)) : 0;
 
   const resetForm = () => {
@@ -330,7 +340,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
             <p className="mt-1 font-display text-2xl font-bold text-foreground">{completed}<span className="ml-1 text-sm font-medium text-muted-foreground">/ {timeline.length}</span></p>
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/75 p-3.5">
-            <p className="text-xs font-semibold text-muted-foreground">Água aceita hoje</p>
+            <p className="text-xs font-semibold text-muted-foreground">Água aceita no dia selecionado</p>
             <p className="mt-1 font-display text-2xl font-bold text-foreground">{waterAccepted}<span className="ml-1 text-sm font-medium text-muted-foreground">ml</span></p>
           </div>
           <div className="rounded-2xl border border-border/70 bg-background/75 p-3.5">
@@ -419,8 +429,18 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
 
           <section className="rounded-[1.7rem] border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-500/10 text-amber-700 dark:text-amber-300"><Utensils className="h-5 w-5" /></span><div><h2 className="font-display text-lg font-bold text-foreground">Alimentação</h2><p className="text-xs text-muted-foreground">Oferecido x aceito</p></div></div>
-            <div className="mt-4 space-y-2 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Registros de hoje</span><strong className="text-foreground">{mealsLogged}</strong></div><div className="flex items-center justify-between"><span className="text-muted-foreground">Refeições programadas</span><strong className="text-foreground">{currentTasks.filter((task) => task.category === "alimentacao").length}</strong></div></div>
+            <div className="mt-4 space-y-2 text-sm"><div className="flex items-center justify-between"><span className="text-muted-foreground">Registros no dia selecionado</span><strong className="text-foreground">{mealsLogged}</strong></div><div className="flex items-center justify-between"><span className="text-muted-foreground">Refeições programadas</span><strong className="text-foreground">{currentTasks.filter((task) => task.category === "alimentacao").length}</strong></div></div>
             <p className="mt-3 rounded-xl bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">Ao registrar uma refeição, informe quanto foi oferecido e quanto a pessoa aceitou. Recusas parciais também ficam no histórico.</p>
+          </section>
+
+          <section className="rounded-[1.7rem] border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-2"><div><h2 className="font-display text-lg font-bold text-foreground">Últimos 7 dias</h2><p className="text-[10px] text-muted-foreground">Resumo dos registros do paciente</p></div><CalendarDays className="h-4 w-4 text-primary" /></div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-semibold text-muted-foreground">Água aceita</p><p className="mt-1 text-lg font-bold tabular-nums text-foreground">{recentWater} ml</p></div>
+              <div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-semibold text-muted-foreground">Refeições</p><p className="mt-1 text-lg font-bold tabular-nums text-foreground">{recentMeals}</p></div>
+              <div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-semibold text-muted-foreground">Concluídas / parciais</p><p className="mt-1 text-lg font-bold tabular-nums text-foreground">{recentCompleted}</p></div>
+              <div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-semibold text-muted-foreground">Não realizadas</p><p className="mt-1 text-lg font-bold tabular-nums text-foreground">{recentNotDone}</p></div>
+            </div>
           </section>
 
           <section className="rounded-[1.7rem] border border-border bg-card p-5 shadow-sm">
