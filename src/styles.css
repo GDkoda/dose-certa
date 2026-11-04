@@ -712,77 +712,224 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 
-/* Patient information cards: eight personal themes with decorative botanical/geometric motifs. */
+/* Patient identity cards: premium metallic finishes with a restrained foil layer. */
 .dc-patient-card {
+  --dc-patient-foil-a: rgba(255,255,255,.5);
+  --dc-patient-foil-b: rgba(231,194,128,.42);
+  --dc-patient-foil-c: rgba(156,204,255,.28);
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-height: 300px;
-  aspect-ratio: 1.62 / 1;
-  border: 1px solid var(--dc-patient-border, color-mix(in srgb, currentColor 20%, transparent));
-  border-radius: 1.35rem;
-  color: var(--dc-patient-ink, #24332a);
-  background: var(--dc-patient-bg, #f1f5ed);
-  box-shadow: 0 18px 36px -24px color-mix(in srgb, var(--dc-patient-shadow, #283c32) 60%, transparent);
+  width: 100%;
+  min-height: 188px;
+  aspect-ratio: 1.586 / 1;
+  border: 1px solid var(--dc-patient-border, rgba(255,255,255,.45));
+  border-radius: 1.15rem;
+  color: #fff;
+  background: var(--dc-patient-bg, #172331);
+  box-shadow:
+    0 22px 44px -25px rgba(0,0,0,.78),
+    inset 0 1px 0 rgba(255,255,255,.52),
+    inset 0 -1px 0 rgba(0,0,0,.32);
+}
+.dc-patient-card::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: -42%;
+  pointer-events: none;
+  opacity: .58;
+  background:
+    linear-gradient(112deg,
+      transparent 10%,
+      var(--dc-patient-foil-a) 18%,
+      transparent 27%,
+      var(--dc-patient-foil-b) 41%,
+      transparent 49%,
+      var(--dc-patient-foil-c) 62%,
+      transparent 71%,
+      var(--dc-patient-foil-a) 82%,
+      transparent 90%);
+  transform: rotate(-13deg);
+  mix-blend-mode: screen;
+}
+.dc-patient-card::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 1px;
+  border-radius: calc(1.15rem - 1px);
+  pointer-events: none;
+  opacity: .27;
+  background-image:
+    repeating-linear-gradient(132deg, transparent 0 7px, rgba(255,255,255,.12) 7.5px 8px, transparent 8.5px 15px),
+    repeating-radial-gradient(ellipse at 50% 50%, transparent 0 17px, rgba(255,255,255,.16) 17.5px 18px, transparent 18.5px 29px),
+    linear-gradient(135deg, transparent 34%, rgba(255,255,255,.15) 49.8%, transparent 52%);
+  background-size: auto, 310px 210px, auto;
+  mix-blend-mode: screen;
+}
+.dc-patient-card-motif {
+  z-index: 1;
+  opacity: .19;
+  color: rgba(255,255,255,.95);
+  mix-blend-mode: screen;
+}
+.dc-patient-card-content {
+  z-index: 10;
+  text-shadow: 0 1px 5px rgba(0,0,0,.24);
+}
+.dc-patient-card-detail {
+  min-width: 0;
+  min-height: 29px;
+  padding: 4px 7px 5px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: .48rem;
+  background: linear-gradient(115deg, rgba(5,10,20,.49), rgba(5,10,20,.27));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 7px rgba(0,0,0,.08);
+  backdrop-filter: blur(5px);
+}
+.dc-card-photo {
+  border: 1px solid rgba(255,255,255,.72);
+  background: linear-gradient(145deg, rgba(255,255,255,.27), rgba(3,10,20,.42));
+  box-shadow: 0 0 0 2px rgba(255,255,255,.1), 0 5px 16px rgba(0,0,0,.22);
+}
+.dc-card-chip {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 21px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255,238,190,.86);
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.85), transparent 35%),
+    linear-gradient(145deg, #f4db9b, #9d7940 52%, #ead59a);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.8), 0 2px 5px rgba(0,0,0,.22);
+}
+.dc-card-chip::before,
+.dc-card-chip::after {
+  content: "";
+  position: absolute;
+  background: rgba(90,66,34,.58);
+}
+.dc-card-chip::before {
+  top: 0;
+  bottom: 0;
+  left: 33%;
+  width: 1px;
+  box-shadow: 9px 0 0 rgba(90,66,34,.58);
+}
+.dc-card-chip::after {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.dc-card-chip i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 33%;
+  width: 1px;
+  background: rgba(255,255,255,.55);
 }
 .dc-patient-card--rosas {
-  --dc-patient-ink: #fff1ef;
-  --dc-patient-shadow: #16070b;
-  --dc-patient-border: #ad3948;
-  background: radial-gradient(ellipse at 92% 7%, #a82035 0, transparent 42%), linear-gradient(135deg, #171116 0%, #35111b 48%, #7b1b2a 100%);
+  --dc-patient-border: #d98aa8;
+  --dc-patient-foil-a: rgba(255,183,214,.86);
+  --dc-patient-foil-b: rgba(216,93,133,.62);
+  --dc-patient-foil-c: rgba(173,145,255,.48);
+  background:
+    radial-gradient(ellipse at 88% 8%, rgba(215,74,123,.58), transparent 39%),
+    radial-gradient(ellipse at 8% 100%, rgba(104,24,63,.8), transparent 48%),
+    linear-gradient(125deg, #100d19 0%, #47152d 45%, #1a1424 72%, #70213e 100%);
 }
 .dc-patient-card--coracoes {
-  --dc-patient-ink: #6d2742;
-  --dc-patient-shadow: #9c5570;
-  --dc-patient-border: #e9a9c0;
-  background: linear-gradient(135deg, #fff1f5 0%, #f4c6d7 54%, #fbe3e8 100%);
+  --dc-patient-border: #e6a9c4;
+  --dc-patient-foil-a: rgba(255,221,236,.9);
+  --dc-patient-foil-b: rgba(234,133,172,.7);
+  --dc-patient-foil-c: rgba(245,185,145,.52);
+  background:
+    radial-gradient(ellipse at 85% 5%, rgba(205,103,151,.65), transparent 38%),
+    radial-gradient(ellipse at 0% 100%, rgba(103,30,75,.82), transparent 53%),
+    linear-gradient(132deg, #21101f 0%, #79314f 48%, #35172e 100%);
 }
 .dc-patient-card--praia {
-  --dc-patient-ink: #633b23;
-  --dc-patient-shadow: #c87537;
-  --dc-patient-border: #edb875;
-  background: radial-gradient(circle at 88% 12%, #ffe6a2 0 12%, transparent 12.5%), linear-gradient(155deg, #f9d9a1 0%, #f6b76b 48%, #ed985e 100%);
+  --dc-patient-border: #e4bd82;
+  --dc-patient-foil-a: rgba(255,232,181,.9);
+  --dc-patient-foil-b: rgba(74,216,202,.62);
+  --dc-patient-foil-c: rgba(236,155,108,.62);
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(212,161,93,.66), transparent 38%),
+    radial-gradient(ellipse at 4% 100%, rgba(11,132,142,.75), transparent 50%),
+    linear-gradient(125deg, #082431 0%, #086c76 48%, #9b5c3c 100%);
 }
 .dc-patient-card--girassol {
-  --dc-patient-ink: #574017;
-  --dc-patient-shadow: #b78a22;
-  --dc-patient-border: #e7c24b;
-  background: linear-gradient(135deg, #fff8cf 0%, #f6dc76 52%, #f2c34b 100%);
+  --dc-patient-border: #e5c16b;
+  --dc-patient-foil-a: rgba(255,235,158,.95);
+  --dc-patient-foil-b: rgba(213,158,58,.72);
+  --dc-patient-foil-c: rgba(255,246,205,.55);
+  background:
+    radial-gradient(ellipse at 89% 5%, rgba(212,158,49,.72), transparent 40%),
+    radial-gradient(ellipse at 0% 100%, rgba(121,74,21,.8), transparent 52%),
+    linear-gradient(130deg, #1a160e 0%, #73501b 48%, #2d2412 100%);
 }
 .dc-patient-card--folhas {
-  --dc-patient-ink: #254b38;
-  --dc-patient-shadow: #386c50;
-  --dc-patient-border: #b7d0bd;
-  background: linear-gradient(130deg, #fbfcf4 0%, #edf4e9 54%, #d9e9d9 100%);
+  --dc-patient-border: #9bcbb0;
+  --dc-patient-foil-a: rgba(196,246,215,.84);
+  --dc-patient-foil-b: rgba(76,187,145,.62);
+  --dc-patient-foil-c: rgba(222,217,158,.45);
+  background:
+    radial-gradient(ellipse at 92% 4%, rgba(58,148,107,.67), transparent 40%),
+    radial-gradient(ellipse at 0% 100%, rgba(16,92,70,.82), transparent 53%),
+    linear-gradient(130deg, #071b19 0%, #12523f 48%, #193e32 100%);
 }
 .dc-patient-card--ondas {
-  --dc-patient-ink: #effaff;
-  --dc-patient-shadow: #165b85;
-  --dc-patient-border: #8cc5df;
-  background: linear-gradient(145deg, #9ed6ec 0%, #337ea8 49%, #123f6b 100%);
+  --dc-patient-border: #8dd9f0;
+  --dc-patient-foil-a: rgba(196,243,255,.92);
+  --dc-patient-foil-b: rgba(49,174,225,.68);
+  --dc-patient-foil-c: rgba(172,190,255,.58);
+  background:
+    radial-gradient(ellipse at 90% 4%, rgba(50,154,203,.7), transparent 40%),
+    radial-gradient(ellipse at 0% 100%, rgba(11,71,119,.85), transparent 54%),
+    linear-gradient(128deg, #06152d 0%, #0c4c78 49%, #102748 100%);
 }
 .dc-patient-card--lavanda {
-  --dc-patient-ink: #514665;
-  --dc-patient-shadow: #9284aa;
-  --dc-patient-border: #d2c9e1;
-  background: linear-gradient(140deg, #faf8ff 0%, #eee9f6 58%, #dcd4e9 100%);
+  --dc-patient-border: #c4b0e7;
+  --dc-patient-foil-a: rgba(236,220,255,.94);
+  --dc-patient-foil-b: rgba(174,137,222,.68);
+  --dc-patient-foil-c: rgba(157,194,255,.55);
+  background:
+    radial-gradient(ellipse at 88% 4%, rgba(144,112,187,.76), transparent 40%),
+    radial-gradient(ellipse at 0% 100%, rgba(82,54,126,.85), transparent 53%),
+    linear-gradient(130deg, #171329 0%, #514071 48%, #28213d 100%);
 }
 .dc-patient-card--xadrez {
-  --dc-patient-ink: #171717;
-  --dc-patient-shadow: #3b3b3b;
-  --dc-patient-border: #b8b8b8;
-  background-color: #f8f8f8;
-  background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a), linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
-  background-position: 0 0, 18px 18px;
-  background-size: 36px 36px;
+  --dc-patient-border: #c4ccd6;
+  --dc-patient-foil-a: rgba(255,255,255,.92);
+  --dc-patient-foil-b: rgba(177,190,212,.72);
+  --dc-patient-foil-c: rgba(226,229,237,.58);
+  background:
+    radial-gradient(ellipse at 88% 5%, rgba(149,160,180,.58), transparent 40%),
+    radial-gradient(ellipse at 0% 100%, rgba(62,72,91,.78), transparent 53%),
+    linear-gradient(130deg, #11151d 0%, #454d5b 48%, #171c25 100%);
 }
 @media (max-width: 480px) {
   .dc-patient-card {
-    min-height: 285px;
-    aspect-ratio: 1.32 / 1;
+    min-height: 188px;
+    aspect-ratio: 1.586 / 1;
+    border-radius: .95rem;
+  }
+  .dc-patient-card::after {
+    border-radius: calc(.95rem - 1px);
+    opacity: .23;
+  }
+  .dc-patient-card-detail {
+    min-height: 26px;
+    padding: 3px 5px 4px;
   }
 }
-
 
 @media print {
   body * {
@@ -796,14 +943,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     position: fixed !important;
     inset: 0 auto auto 0 !important;
     width: 100% !important;
-    max-width: 740px !important;
+    max-width: 760px !important;
     padding: 0 !important;
     margin: 0 auto !important;
   }
   .dc-patient-card-print .dc-patient-card {
     width: 100% !important;
     min-height: 0 !important;
-    aspect-ratio: 1.62 / 1 !important;
+    aspect-ratio: 1.586 / 1 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     box-shadow: none !important;
