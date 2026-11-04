@@ -146,7 +146,7 @@ export async function refreshCloud() {
       remoteError = new Error('O aparelho está sem conexão com a internet.');
     }
 
-    let cached = null;
+    let cached: Awaited<ReturnType<typeof readOfflinePackage>> = null;
     try {
       cached = await readOfflinePackage(id);
     } catch (error) {
@@ -218,7 +218,11 @@ export async function refreshCloud() {
       refreshQueued = false;
       void refreshCloud().catch((error) => {
         lastSyncError = cloudErrorDetails(error);
-        publishOfflineStatus(false, 0, null, lastSyncError);
+        void readOfflinePackage(currentId ?? '').then((cached) => {
+          publishOfflineStatus(false, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null, lastSyncError);
+        }).catch(() => {
+          publishOfflineStatus(false, 0, null, lastSyncError);
+        });
         errorHandler('Não foi possível atualizar os dados compartilhados. ' + lastSyncError);
       });
     }
