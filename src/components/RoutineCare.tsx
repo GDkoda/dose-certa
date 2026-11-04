@@ -29,7 +29,7 @@ const todayLabel = (value: string) => new Date(value + "T12:00:00").toLocaleDate
 
 type TimelineItem =
   | { key: string; kind: "medication"; title: string; time: string; description: string; status: string; }
-  | { key: string; kind: "task"; title: string; task: RoutineTask; time: string; log?: RoutineLog };
+  | { key: string; kind: "task"; title: string; task: RoutineTask; time: string; log?: RoutineLog | undefined };
 
 export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPatient }: {
   me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void; onSelectPatient: (patientId: string) => void;
@@ -114,7 +114,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
     ? item.status === "tomado"
     : item.log?.status === "concluido" || item.log?.status === "parcial").length;
   const progress = timeline.length ? Math.round((completed / timeline.length) * 100) : 0;
-  const pendingTimeline = timeline.filter((item) => item.kind === "medication" ? item.status === "pendente" : !item.log || item.log.status === "pendente");
+  const pendingTimeline = timeline.filter((item) => item.kind === "medication" ? item.status === "pendente" : !item.log);
   const nextItem = pendingTimeline[0];
   const afterItem = pendingTimeline[1];
   const today = new Date();
@@ -397,8 +397,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
                     <div className={"grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl " + (done ? "bg-primary/10" : "bg-muted/75")}>{task?.pictogram ?? "💊"}</div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-foreground">{item.title}</p>
-                      <p className="truncate text-xs text-muted-foreground">{task ? (task.description || info?.label) : item.description}</p>
-                      {task && item.log && <p className="mt-1 text-[10px] font-semibold text-muted-foreground">{item.log.offeredAmount !== undefined ? "Oferecido: " + item.log.offeredAmount + " " + item.log.unit + " · Aceito: " + item.log.acceptedAmount + " " + item.log.unit : item.log.status === "nao_realizado" ? "Não realizado" : "Registrado"}</p>}
+                      <p className="truncate text-xs text-muted-foreground">{item.kind === "task" ? (item.task.description || info?.label) : item.description}</p>
+                      {item.kind === "task" && item.log && <p className="mt-1 text-[10px] font-semibold text-muted-foreground">{item.log.offeredAmount !== undefined ? "Oferecido: " + item.log.offeredAmount + " " + item.log.unit + " · Aceito: " + item.log.acceptedAmount + " " + item.log.unit : item.log.status === "nao_realizado" ? "Não realizado" : "Registrado"}</p>}
                     </div>
                     {item.kind === "medication" ? <span className={"shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold " + (done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{done ? "Tomado" : "Medicamento"}</span>
                       : <div className="flex shrink-0 items-center gap-1">
