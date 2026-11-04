@@ -6,6 +6,8 @@ type Dose = {
 };
 type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number; archivedAt?: string };
 type Patient = { id: string; name: string };
+type OwnedRecordRow = { id: string; owner_id: string; payload: unknown };
+type PatientRecordRow = { id: string; payload: unknown };
 type Device = { owner_id: string; token: string; timezone: string };
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret" };
@@ -90,10 +92,10 @@ Deno.serve(async (request) => {
   const now = Date.now();
   const isoNow = new Date(now).toISOString();
   const minDate = new Date(now - 12 * 60 * 60 * 1000).toISOString();
-  let doseRows: Record<string, unknown>[];
-  let medRows: Record<string, unknown>[];
-  let patientRows: Record<string, unknown>[];
-  let deviceRows: Record<string, unknown>[];
+  let doseRows: OwnedRecordRow[];
+  let medRows: OwnedRecordRow[];
+  let patientRows: PatientRecordRow[];
+  let deviceRows: Device[];
   try {
     [doseRows, medRows, patientRows, deviceRows] = await Promise.all([
       fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "doses").range(from, to)),
@@ -116,7 +118,7 @@ Deno.serve(async (request) => {
     patients.set(row.id, { id: row.id, name: String(payload.name ?? "Paciente") });
   }
   const devicesByOwner = new Map<string, Device[]>();
-  for (const device of deviceRows as unknown as Device[]) {
+  for (const device of deviceRows) {
     const list = devicesByOwner.get(device.owner_id) ?? [];
     list.push(device); devicesByOwner.set(device.owner_id, list);
   }

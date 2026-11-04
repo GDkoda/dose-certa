@@ -5,6 +5,10 @@ import type { Dose } from "@/lib/store";
 import { z } from "zod";
 import { sendPush, signDoseAction } from "@/lib/push-server";
 
+type PushDeviceRow = { owner_id: string; token: string; timezone?: string | null; updated_at?: string | null };
+type AppRecordRow = { id: string; owner_id: string; kind: string; payload: unknown };
+type PatientRecordRow = { id: string; payload: unknown };
+
 async function fetchAllPages<T>(
   loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
 ): Promise<T[]> {
@@ -25,9 +29,9 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
     if (failure) return failure;
     if (!process.env["LOVABLE_API_KEY"] || !process.env["FIREBASE_MESSAGING_API_KEY"]) return new Response("Notification service unavailable", { status: 503 });
     const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-    let devices: Awaited<ReturnType<typeof fetchAllPages>> = [];
+    let devices: PushDeviceRow[] = [];
     try {
-      devices = await fetchAllPages((from, to) => db.from("push_devices").select("*").range(from, to));
+      devices = await fetchAllPages<PushDeviceRow>((from, to) => db.from("push_devices").select("*").range(from, to));
     } catch {
       return new Response("Could not load devices", { status: 500 });
     }
@@ -38,9 +42,9 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       const owned = (devices ?? []).filter((device) => device.owner_id === owner);
       const { data: roles } = await db.from("user_roles").select("role").eq("user_id", owner);
       if (!roles?.some((role) => role.role === "cuidador")) continue;
-      let records: Awaited<ReturnType<typeof fetchAllPages>> = [];
+      let records: AppRecordRow[] = [];
       try {
-        records = await fetchAllPages((from, to) => db.from("app_records").select("*").eq("owner_id", owner).in("kind", ["meds", "doses"]).range(from, to));
+        records = await fetchAllPages<AppRecordRow>((from, to) => db.from("app_records").select("*").eq("owner_id", owner).in("kind", ["meds", "doses"]).range(from, to));
       } catch {
         failed++;
         continue;
@@ -70,9 +74,9 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       }
       // Group pending doses of the same patient at the same time into one notification.
       const names = new Map<string, string>(); const medInfo = new Map<string, { name: string; dose: string; archived: boolean }>();
-      let pats: Awaited<ReturnType<typeof fetchAllPages>> = [];
+      let pats: PatientRecordRow[] = [];
       try {
-        pats = await fetchAllPages((from, to) => db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients").range(from, to));
+        pats = await fetchAllPages<PatientRecordRow>((from, to) => db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients").range(from, to));
       } catch {
         failed++;
         continue;
