@@ -1749,7 +1749,6 @@ function Profile({ me }: { me: User }) {
         setNotificationMessage(messages[result.status]);
         return;
       }
-
       await registerDevice({
         data: {
           token: result.token,
@@ -1783,14 +1782,14 @@ function Profile({ me }: { me: User }) {
       }
       const result = await testPush({ data: { token } });
       if (result.sent > 0) {
-        setNotificationMessage("Notificação de teste enviada. Bloqueie a tela ou deixe o Dose Certa em segundo plano e confira se o aviso chega.");
+        setNotificationMessage("Notificação enviada. Bloqueie a tela ou deixe o Dose Certa em segundo plano para conferir a chegada.");
       } else if (result.devices === 0) {
-        setNotificationMessage("Nenhum aparelho está vinculado ainda. Ative as notificações neste perfil primeiro.");
+        setNotificationMessage("Nenhum aparelho está vinculado. Ative as notificações antes de testar.");
       } else {
-        setNotificationMessage("O envio foi tentado, mas o serviço não confirmou a entrega. Confira a conexão e tente novamente.");
+        setNotificationMessage("O serviço não confirmou o envio. Confira a conexão e tente novamente.");
       }
     } catch (error) {
-      setNotificationMessage(error instanceof Error ? error.message : "Não foi possível enviar o teste de notificação.");
+      setNotificationMessage(error instanceof Error ? error.message : "Não foi possível enviar o teste.");
     } finally {
       setTestBusy(false);
     }
@@ -1798,13 +1797,13 @@ function Profile({ me }: { me: User }) {
 
   const testVibration = () => {
     if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
-      setVibrationMessage("Este navegador não oferece vibração acionável pela página. O padrão das notificações ainda depende do Android e do navegador.");
+      setVibrationMessage("Este navegador não oferece vibração acionável pela página. A vibração de notificações em segundo plano depende do sistema.");
       return;
     }
     const pattern = Array.from({ length: 20 }, () => [400, 100]).flat();
     const accepted = navigator.vibrate(pattern);
     setVibrationMessage(accepted
-      ? "Teste solicitado: 20 ciclos de 400 ms vibrando e 100 ms de pausa. O navegador pode limitar a duração."
+      ? "Teste solicitado: 20 ciclos de 400 ms vibrando e 100 ms de pausa."
       : "O aparelho ou navegador não aceitou o teste de vibração.");
   };
 
@@ -1822,110 +1821,177 @@ function Profile({ me }: { me: User }) {
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
   const notificationIsActive = permission === "granted" && pushRegistered;
+  const roleLabel = me.role === "cuidador" ? "Cuidador(a)" : me.role === "mestre" ? "Mestre" : "Operador";
 
   return (
-    <div className="space-y-6">
-      <T k="prof-title" as="h1" className="font-display text-3xl text-foreground">Meu perfil</T>
-      <div className={card}><p className="text-foreground"><b>Login:</b> {me.login}</p><p className="text-foreground"><b>Perfil:</b> {me.role}</p></div>
-      <PalettePicker />
-
-      <section className={cls(card, "space-y-4")}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-foreground">Notificações e vibração</h2>
-            <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">Gerencie os avisos deste aparelho e teste se o Dose Certa consegue chamar sua atenção.</p>
-          </div>
-          <span className={cls("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold", notificationIsActive ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : permission === "denied" ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground")}>
-            <span className={cls("h-2 w-2 rounded-full", notificationIsActive ? "bg-emerald-500" : permission === "denied" ? "bg-destructive" : "bg-muted-foreground")} />
-            {notificationIsActive ? "Ativas neste aparelho" : permission === "denied" ? "Permissão bloqueada" : permission === "unsupported" ? "Não compatível" : "Ainda não ativadas"}
-          </span>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-background/60 p-3.5">
-            <div className="flex items-center gap-2 text-foreground">
-              <BellRing className="h-5 w-5 text-primary" />
-              <p className="text-sm font-bold">Notificações</p>
-            </div>
-            <p className="mt-1.5 min-h-10 text-xs leading-relaxed text-muted-foreground">Permita os avisos e registre este celular para receber os lembretes.</p>
-            <button type="button" onClick={() => void activateNotifications()} disabled={pushBusy} className={cls(btnPrimary, "mt-3 w-full")}>
-              <BellRing className="h-4 w-4" />{pushBusy ? "Ativando..." : notificationIsActive ? "Atualizar vínculo" : "Ativar notificações"}
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-background/60 p-3.5">
-            <div className="flex items-center gap-2 text-foreground">
-              <Vibrate className="h-5 w-5 text-primary" />
-              <p className="text-sm font-bold">Vibração</p>
-            </div>
-            <p className="mt-1.5 min-h-10 text-xs leading-relaxed text-muted-foreground">Faça um teste com 20 pulsos para verificar a resposta do aparelho.</p>
-            <button type="button" onClick={testVibration} className={cls(btnOutline, "mt-3 w-full")}>
-              <Vibrate className="h-4 w-4" />Testar vibração
-            </button>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-background/60 p-3.5 sm:col-span-2">
-            <div className="flex items-center gap-2 text-foreground">
-              <Bell className="h-5 w-5 text-primary" />
-              <p className="text-sm font-bold">Teste de notificação em segundo plano</p>
-            </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Envia um push real para este aparelho após três segundos. O teste tenta repetir o alerta por cerca de 10 segundos e pode repetir o som padrão do Android. Toque no botão e bloqueie a tela para conferir som e vibração.</p>
-            <button type="button" onClick={() => void sendBackgroundTest()} disabled={testBusy || !pushRegistered} className={cls(btnOutline, "mt-3 w-full sm:w-auto")}>
-              <BellRing className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar notificação de teste"}
-            </button>
-            {!pushRegistered && <p className="mt-2 text-xs font-semibold text-muted-foreground">Ative as notificações neste aparelho antes de enviar o teste.</p>}
-          </div>
-        </div>
-
-        {notificationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">{notificationMessage}</p>}
-        {vibrationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-sm leading-relaxed text-foreground">{vibrationMessage}</p>}
-        <p className="text-xs leading-relaxed text-muted-foreground">A vibração depende das permissões e configurações do aparelho. O modo silencioso, a economia de bateria e as regras do navegador podem limitar os alertas.</p>
-      </section>
-
-      <section className={cls(card, "space-y-3")}>
+    <div className="mx-auto w-full max-w-6xl space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-semibold text-foreground">Instalação do aplicativo</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Adicione o Dose Certa à tela inicial ou ao computador para abrir como aplicativo.</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Preferências e aparelho</p>
+          <T k="prof-title" as="h1" className="mt-1 font-display text-3xl text-foreground">Meu perfil</T>
+          <p className="mt-1 text-sm text-muted-foreground">Organize sua conta, aparência e configurações do Dose Certa.</p>
         </div>
-        {isStandalone ? (
-          <p className="rounded-xl bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary">O Dose Certa já está instalado e aberto como aplicativo neste aparelho.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {installFlow.step === "native" && <button type="button" onClick={() => void startInstallation()} className={btnPrimary}><Download className="h-4 w-4" />Instalar agora</button>}
-            <button type="button" onClick={() => setShowInstallHelp((open) => !open)} className={btnOutline}><Download className="h-4 w-4" />{showInstallHelp ? "Ocultar instruções" : "Instalação manual"}</button>
-            {installFlow.step === "own-tab" && <button type="button" onClick={() => installFlow.openOwnTab()} className={btnOutline}>Abrir em nova aba</button>}
-          </div>
-        )}
-        {showInstallHelp && !isStandalone && (
-          <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-4 text-sm leading-relaxed text-foreground">
-            {isIos ? (
-              <ol className="list-decimal space-y-1.5 pl-5">
-                <li>Abra esta página no Safari.</li>
-                <li>Toque em <b>Compartilhar</b>.</li>
-                <li>Escolha <b>Adicionar à Tela de Início</b> e confirme em <b>Adicionar</b>.</li>
-              </ol>
-            ) : isAndroid ? (
-              <ol className="list-decimal space-y-1.5 pl-5">
-                <li>Abra o menu do navegador (⋮).</li>
-                <li>Toque em <b>Instalar aplicativo</b> ou <b>Adicionar à tela inicial</b>.</li>
-                <li>Confirme a instalação e abra pelo novo ícone.</li>
-              </ol>
-            ) : (
-              <p>No Chrome ou Edge, use o ícone de instalação na barra de endereço ou abra o menu do navegador e escolha <b>Instalar Dose Certa</b>.</p>
-            )}
-          </div>
-        )}
-      </section>
+        <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground">{roleLabel}</span>
+      </header>
 
-      <form className={cls(card, "max-w-md space-y-3")} onSubmit={async (e) => { e.preventDefault();
-        try { await updateOwnPassword(cur, p1); setCur(""); setP1(""); setMsg({ ok: true, t: "Senha alterada!" }); }
-        catch (error) { setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." }); } }}>
-        <h2 className="font-display text-lg text-foreground">Alterar senha</h2>
-        <input className={input} type="password" placeholder="Senha atual" value={cur} onChange={(e) => setCur(e.target.value)} />
-        <input className={input} type="password" placeholder="Nova senha" value={p1} onChange={(e) => setP1(e.target.value)} />
-        {msg && <p className={cls("text-sm", msg.ok ? "text-primary" : "text-destructive")}>{msg.t}</p>}
-        <button className={btnPrimary}>Salvar</button>
-      </form>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(260px,.82fr)_minmax(0,1.18fr)]">
+        <div className="space-y-4">
+          <section className={cls(card, "space-y-3 !p-4 sm:!p-5")}>
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><UserRound className="h-6 w-6" /></span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Conta conectada</p>
+                <h2 className="truncate font-display text-xl font-semibold text-foreground">{me.login}</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+              <div className="rounded-xl bg-background/70 p-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Login</p>
+                <p className="mt-1 break-all text-sm font-bold text-foreground">{me.login}</p>
+              </div>
+              <div className="rounded-xl bg-background/70 p-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Acesso</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{roleLabel}</p>
+              </div>
+            </div>
+          </section>
+
+          <div className="space-y-2">
+            <div className="px-1">
+              <h2 className="text-sm font-extrabold text-foreground">Aparência do aplicativo</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">As cores e o modo visual ficam salvos neste aparelho.</p>
+            </div>
+            <PalettePicker />
+          </div>
+
+          <form className={cls(card, "space-y-3 !p-4 sm:!p-5")} onSubmit={async (event) => {
+            event.preventDefault();
+            try {
+              await updateOwnPassword(cur, p1);
+              setCur("");
+              setP1("");
+              setMsg({ ok: true, t: "Senha alterada com sucesso." });
+            } catch (error) {
+              setMsg({ ok: false, t: error instanceof Error ? error.message : "Não foi possível alterar." });
+            }
+          }}>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <h2 className="font-display text-lg font-semibold text-foreground">Segurança da conta</h2>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">Altere sua senha para manter o acesso protegido.</p>
+            <label className="block space-y-1 text-xs font-bold text-foreground">
+              Senha atual
+              <input className={input} type="password" autoComplete="current-password" placeholder="Digite a senha atual" value={cur} onChange={(event) => setCur(event.target.value)} />
+            </label>
+            <label className="block space-y-1 text-xs font-bold text-foreground">
+              Nova senha
+              <input className={input} type="password" autoComplete="new-password" placeholder="Digite a nova senha" value={p1} onChange={(event) => setP1(event.target.value)} />
+            </label>
+            {msg && <p role="status" className={cls("rounded-xl px-3 py-2 text-xs font-semibold", msg.ok ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive")}>{msg.t}</p>}
+            <button className={btnPrimary + " w-full"}>Salvar nova senha</button>
+          </form>
+        </div>
+
+        <div className="space-y-4">
+          <section className={cls(card, "space-y-4 !p-4 sm:!p-5")}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><BellRing className="h-5 w-5" /></span>
+                <div>
+                  <h2 className="font-display text-xl font-semibold text-foreground">Alertas deste aparelho</h2>
+                  <p className="mt-0.5 max-w-lg text-xs leading-relaxed text-muted-foreground">Ative notificações, teste a vibração e confira se o aviso chega com o aplicativo em segundo plano.</p>
+                </div>
+              </div>
+              <span className={cls("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-extrabold", notificationIsActive ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : permission === "denied" ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground")}>
+                <span className={cls("h-2 w-2 rounded-full", notificationIsActive ? "bg-emerald-500" : permission === "denied" ? "bg-destructive" : "bg-muted-foreground")} />
+                {notificationIsActive ? "Notificações ativas" : permission === "denied" ? "Permissão bloqueada" : permission === "unsupported" ? "Não compatível" : "Não ativadas"}
+              </span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-background/65 p-3.5">
+                <div className="flex items-center gap-2 text-foreground">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-extrabold">Permissão de notificação</p>
+                </div>
+                <p className="mt-1.5 min-h-9 text-xs leading-relaxed text-muted-foreground">Vincule este aparelho à sua conta para receber lembretes.</p>
+                <button type="button" onClick={() => void activateNotifications()} disabled={pushBusy} className={cls(btnPrimary, "mt-3 w-full px-3 text-xs")}>
+                  <BellRing className="h-4 w-4" />{pushBusy ? "Ativando..." : notificationIsActive ? "Atualizar aparelho" : "Ativar notificações"}
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background/65 p-3.5">
+                <div className="flex items-center gap-2 text-foreground">
+                  <Vibrate className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-extrabold">Teste de vibração</p>
+                </div>
+                <p className="mt-1.5 min-h-9 text-xs leading-relaxed text-muted-foreground">Solicita 20 pulsos de 400 ms, com 100 ms de pausa.</p>
+                <button type="button" onClick={testVibration} className={cls(btnOutline, "mt-3 w-full px-3 text-xs")}>
+                  <Vibrate className="h-4 w-4" />Testar vibração
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-primary/20 bg-primary/[0.045] p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <BellRing className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-extrabold text-foreground">Teste em segundo plano</p>
+                </div>
+                <span className="rounded-full bg-background/80 px-2.5 py-1 text-[10px] font-bold text-muted-foreground">Push real</span>
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Envia um aviso para este aparelho após três segundos. Bloqueie a tela para conferir se o sistema reproduz o alerta.</p>
+              <button type="button" onClick={() => void sendBackgroundTest()} disabled={testBusy || !pushRegistered} className={cls(btnOutline, "mt-3 w-full sm:w-auto")}>
+                <Bell className="h-4 w-4" />{testBusy ? "Enviando teste..." : "Enviar notificação de teste"}
+              </button>
+              {!pushRegistered && <p className="mt-2 text-[11px] font-semibold text-muted-foreground">Ative as notificações neste aparelho antes de testar.</p>}
+            </div>
+
+            {notificationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-xs leading-relaxed text-foreground">{notificationMessage}</p>}
+            {vibrationMessage && <p role="status" className="rounded-xl bg-muted px-3 py-2.5 text-xs leading-relaxed text-foreground">{vibrationMessage}</p>}
+            <p className="text-[11px] leading-relaxed text-muted-foreground">O sistema do aparelho, o modo silencioso e a economia de bateria podem limitar a vibração e o som.</p>
+          </section>
+
+          <section className={cls(card, "space-y-3 !p-4 sm:!p-5")}>
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Download className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <h2 className="font-display text-xl font-semibold text-foreground">Instalação do aplicativo</h2>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Adicione o Dose Certa à tela inicial ou ao computador para abrir como aplicativo.</p>
+              </div>
+            </div>
+            {isStandalone ? (
+              <p className="rounded-xl bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary">O Dose Certa já está instalado neste aparelho.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {installFlow.step === "native" && <button type="button" onClick={() => void startInstallation()} className={btnPrimary}><Download className="h-4 w-4" />Instalar agora</button>}
+                <button type="button" onClick={() => setShowInstallHelp((open) => !open)} className={btnOutline}><Download className="h-4 w-4" />{showInstallHelp ? "Ocultar instruções" : "Instalação manual"}</button>
+                {installFlow.step === "own-tab" && <button type="button" onClick={() => installFlow.openOwnTab()} className={btnOutline}>Abrir em nova aba</button>}
+              </div>
+            )}
+            {showInstallHelp && !isStandalone && (
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-3 text-xs leading-relaxed text-foreground">
+                {isIos ? (
+                  <ol className="list-decimal space-y-1.5 pl-5">
+                    <li>Abra esta página no Safari.</li>
+                    <li>Toque em <b>Compartilhar</b>.</li>
+                    <li>Escolha <b>Adicionar à Tela de Início</b> e confirme em <b>Adicionar</b>.</li>
+                  </ol>
+                ) : isAndroid ? (
+                  <ol className="list-decimal space-y-1.5 pl-5">
+                    <li>Abra o menu do navegador (⋮).</li>
+                    <li>Toque em <b>Instalar aplicativo</b> ou <b>Adicionar à tela inicial</b>.</li>
+                    <li>Confirme e abra pelo novo ícone.</li>
+                  </ol>
+                ) : (
+                  <p>No Chrome ou Edge, use o ícone de instalação na barra de endereço ou o menu do navegador e escolha <b>Instalar Dose Certa</b>.</p>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
