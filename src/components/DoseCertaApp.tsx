@@ -2034,7 +2034,8 @@ function Shell({ me }: { me: User }) {
   useEffect(() => {
     const syncOnlineState = () => setConnectionOnline(navigator.onLine);
     const syncPendingState = (event?: Event) => {
-      const detail = (event as CustomEvent<{ pending?: number }> | undefined)?.detail;
+      const detail = (event as CustomEvent<{ online?: boolean; pending?: number }> | undefined)?.detail;
+      if (typeof detail?.online === "boolean") setConnectionOnline(detail.online);
       if (typeof detail?.pending === "number") setPendingSync(detail.pending);
     };
     syncOnlineState();
