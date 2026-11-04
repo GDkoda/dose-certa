@@ -1,11 +1,10 @@
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
-
 const config = Object.fromEntries(new URL(self.location).searchParams);
 const hasFirebaseConfig = Boolean(config.apiKey && config.projectId && config.appId && config.messagingSenderId);
 let messaging = null;
 
 if (hasFirebaseConfig) {
+  importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
+  importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
   firebase.initializeApp(config);
   messaging = firebase.messaging();
 
