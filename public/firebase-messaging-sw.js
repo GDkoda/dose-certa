@@ -5,6 +5,10 @@ const config = Object.fromEntries(new URL(self.location).searchParams);
 firebase.initializeApp(config);
 const messaging = firebase.messaging();
 
+// 20 ciclos: 400 ms vibrando + 100 ms de pausa (aprox. 10 segundos).
+// O Android/navegador pode ignorar ou limitar esse padrão em notificações.
+const backgroundVibrationPattern = Array.from({ length: 20 }, () => [400, 100]).flat();
+
 // Persistent, high-priority medication alarm with action buttons.
 messaging.onBackgroundMessage((payload) => {
   const d = payload.data || {};
@@ -17,7 +21,7 @@ messaging.onBackgroundMessage((payload) => {
     renotify: true,
     requireInteraction: true,
     silent: false,
-    vibrate: [400, 200, 400, 200, 400, 200, 800],
+    vibrate: backgroundVibrationPattern,
     actions: d.doseIds ? [
       { action: "taken", title: "Já tomei" },
       { action: "snooze", title: "Lembrar em 5 min" },
