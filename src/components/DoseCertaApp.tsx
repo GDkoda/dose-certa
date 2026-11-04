@@ -12,6 +12,7 @@ import { registerPushDevice, sendTestPush } from "@/lib/push.functions";
 import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
+import { PatientIdentityCard } from "./PatientIdentityCard";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
@@ -714,6 +715,7 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
   const [f, setF] = useState({ name: "", age: "", notes: "" });
   const [err, setErr] = useState("");
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [viewingPatientCardId, setViewingPatientCardId] = useState<string | null>(null);
   const [editPatientForm, setEditPatientForm] = useState({ name: "", age: "", notes: "" });
   const [editPatientError, setEditPatientError] = useState("");
 
@@ -831,15 +833,34 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
                     {p.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{p.notes}</p>}
                   </>
                 )}
-                {me.role === "cuidador" && (
-                  <button type="button" onClick={() => onSelectPatient(isActive ? "" : p.id)} className={cls("mt-4 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition", isActive ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted")}>
-                    {isActive ? <><CheckCircle2 className="h-4 w-4" />Paciente selecionado</> : "Selecionar paciente"}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setViewingPatientCardId(p.id)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2 text-sm font-bold text-primary transition hover:bg-primary/10">
+                    <UserRound className="h-4 w-4" />Ver cartão
                   </button>
-                )}
+                  {me.role === "cuidador" ? (
+                    <button type="button" onClick={() => onSelectPatient(isActive ? "" : p.id)} className={cls("flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition", isActive ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted")}>
+                      {isActive ? <><CheckCircle2 className="h-4 w-4" />Selecionado</> : "Selecionar"}
+                    </button>
+                  ) : (
+                    <span className="flex min-h-10 items-center justify-center rounded-xl bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">Cadastro de paciente</span>
+                  )}
+                </div>
               </article>
             );
           })}
         </div>
+      )}
+      {viewingPatientCardId && patients.find((patient) => patient.id === viewingPatientCardId) && (
+        <PatientIdentityCard
+          patient={patients.find((patient) => patient.id === viewingPatientCardId)!}
+          onClose={() => setViewingPatientCardId(null)}
+          onSave={(updated) => {
+            setState((state) => ({
+              ...state,
+              patients: state.patients.map((patient) => patient.id === updated.id ? updated : patient),
+            }));
+          }}
+        />
       )}
     </div>
   );
