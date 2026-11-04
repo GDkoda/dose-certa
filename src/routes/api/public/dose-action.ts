@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/public/dose-action")({
 
         const { owner, doseIds, sig, action } = parsed.data;
         try {
-          if (!(await verifyDoseAction(owner, doseIds, sig))) return new Response("Forbidden", { status: 403);
+          if (!(await verifyDoseAction(owner, doseIds, sig))) return new Response("Forbidden", { status: 403 });
         } catch {
           return new Response("Notification actions are not configured", { status: 503 });
         }

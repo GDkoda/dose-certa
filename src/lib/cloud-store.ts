@@ -8,6 +8,7 @@ import {
   clearSyncedChanges,
   persistLocalMutation,
   publishOfflineStatus,
+  reconcilePendingChanges,
   readOfflinePackage,
 } from './offline-cache';
 
@@ -20,25 +21,38 @@ let writeFailed = false;
 export async function flushCloudWrites() { await queue; if (writeFailed) throw new Error('Os registros não foram salvos. Confira a conexão e tente novamente.'); }
 export function onCloudError(handler: (message: string) => void) { errorHandler = handler; }
 
+async function fetchAllPages<T>(
+  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await loadPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 async function loadRemoteState(id: string): Promise<State> {
   const [profiles, roles, records] = await Promise.all([
-    supabase.from('profiles').select('*'),
-    supabase.from('user_roles').select('*'),
-    supabase.from('app_records').select('*'),
+    fetchAllPages((from, to) => supabase.from('profiles').select('*').range(from, to)),
+    fetchAllPages((from, to) => supabase.from('user_roles').select('*').range(from, to)),
+    fetchAllPages((from, to) => supabase.from('app_records').select('*').range(from, to)),
   ]);
-  if (profiles.error || roles.error || records.error) throw new Error('Não foi possível conectar ao servidor.');
-  const users: User[] = profiles.data.map((profile) => ({
+  const users: User[] = profiles.map((profile) => ({
     id: profile.id,
     login: profile.username,
     password: '',
-    role: roles.data.find((role) => role.user_id === profile.id)?.role ?? 'cuidador',
+    role: roles.find((role) => role.user_id === profile.id)?.role ?? 'cuidador',
     question: '',
     answer: '',
     mustChange: profile.must_change,
   }));
   const next: State = { users, patients: [], meds: [], doses: [], alerts: [], tickets: [], texts: {}, images: {}, sessionId: id };
   for (const kind of kinds) {
-    const values = records.data
+    const values = records
       .filter((record) => record.kind === kind)
       .map((record) => ({
         ...(record.payload as object),
@@ -47,7 +61,7 @@ async function loadRemoteState(id: string): Promise<State> {
       }));
     Object.assign(next, { [kind]: values });
   }
-  const config = records.data.find((record) => record.kind === 'config')?.payload as { texts?: Record<string, string>; images?: Record<string, string> } | undefined;
+  const config = records.find((record) => record.kind === 'config')?.payload as { texts?: Record<string, string>; images?: Record<string, string> } | undefined;
   next.texts = config?.texts ?? {};
   next.images = config?.images ?? {};
   return next;
@@ -109,7 +123,13 @@ export async function refreshCloud() {
     if (currentId !== id) return;
 
     const base = remote ?? cached!.snapshot;
-    const pending = cached?.pending ?? [];
+    let pending = cached?.pending ?? [];
+    if (remote && pending.length) {
+      const reconciled = reconcilePendingChanges(remote, pending);
+      const resolved = pending.filter((change) => !reconciled.includes(change));
+      if (resolved.length) await clearSyncedChanges(id, resolved);
+      pending = reconciled;
+    }
     const merged = applyPendingChanges(base, pending);
     merged.sessionId = id;
     replaceCloudState(merged);

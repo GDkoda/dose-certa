@@ -69,13 +69,34 @@ function readPackage(database: IDBDatabase, userId: string): Promise<OfflinePack
   });
 }
 
-function writePackage(database: IDBDatabase, value: OfflinePackage): Promise<void> {
+function updatePackage(
+  database: IDBDatabase,
+  userId: string,
+  update: (current: OfflinePackage | null) => OfflinePackage,
+): Promise<OfflinePackage> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(value);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("Falha ao salvar os dados offline."));
-    transaction.onabort = () => reject(transaction.error ?? new Error("O salvamento offline foi cancelado."));
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(userId);
+    let result: OfflinePackage | null = null;
+    let updateError: unknown;
+
+    request.onsuccess = () => {
+      try {
+        result = update((request.result as OfflinePackage | undefined) ?? null);
+        store.put(result);
+      } catch (error) {
+        updateError = error;
+        transaction.abort();
+      }
+    };
+    request.onerror = () => transaction.abort();
+    transaction.oncomplete = () => {
+      if (result) resolve(result);
+      else reject(new Error("O pacote offline não foi atualizado."));
+    };
+    transaction.onerror = () => reject(updateError ?? transaction.error ?? new Error("Falha ao atualizar os dados offline."));
+    transaction.onabort = () => reject(updateError ?? transaction.error ?? new Error("A atualização offline foi cancelada."));
   });
 }
 
@@ -91,13 +112,12 @@ export async function readOfflinePackage(userId: string): Promise<OfflinePackage
 export async function cacheServerSnapshot(userId: string, snapshot: State): Promise<void> {
   const database = await openDatabase();
   try {
-    const current = await readPackage(database, userId);
-    await writePackage(database, {
+    await updatePackage(database, userId, (current) => ({
       userId,
       snapshot: clone(snapshot),
       pending: current?.pending ?? [],
       lastSyncedAt: new Date().toISOString(),
-    });
+    }));
   } finally {
     database.close();
   }
@@ -110,62 +130,69 @@ function ownerFor(kind: string, record: Record<string, unknown>, fallback: strin
 export async function persistLocalMutation(userId: string, before: State, after: State): Promise<number> {
   const database = await openDatabase();
   try {
-    const cached = await readPackage(database, userId);
-    const pending = new Map((cached?.pending ?? []).map((change) => [change.key, change]));
-    const kinds = ["patients", "meds", "doses", "alerts", "tickets"] as const;
+    let pendingSize = 0;
+    await updatePackage(database, userId, (cached) => {
+      const pending = new Map((cached?.pending ?? []).map((change) => [change.key, change]));
+      const kinds = ["patients", "meds", "doses", "alerts", "tickets"] as const;
 
-    for (const kind of kinds) {
-      const previousRecords = before[kind] as unknown as Record<string, unknown>[];
-      const nextRecords = after[kind] as unknown as Record<string, unknown>[];
-      for (const record of nextRecords) {
-        const id = String(record.id);
-        const previous = previousRecords.find((item) => item.id === id);
-        if (previous && JSON.stringify(previous) === JSON.stringify(record)) continue;
-        const key = kind + ":" + id;
+      for (const kind of kinds) {
+        const previousRecords = before[kind] as unknown as Record<string, unknown>[];
+        const nextRecords = after[kind] as unknown as Record<string, unknown>[];
+        const previousById = new Map(previousRecords.map((record) => [String(record.id), record]));
+        const nextIds = new Set(nextRecords.map((record) => String(record.id)));
+
+        for (const record of nextRecords) {
+          const id = String(record.id);
+          const previous = previousById.get(id);
+          if (previous && JSON.stringify(previous) === JSON.stringify(record)) continue;
+          const key = kind + ":" + id;
+          pending.set(key, {
+            key,
+            id,
+            kind,
+            ownerId: ownerFor(kind, record, userId),
+            payload: clone(record),
+            changedAt: nextChangeRevision(),
+          });
+        }
+
+        for (const record of previousRecords) {
+          const id = String(record.id);
+          if (nextIds.has(id)) continue;
+          const key = kind + ":" + id;
+          pending.set(key, {
+            key,
+            id,
+            kind,
+            ownerId: ownerFor(kind, record, userId),
+            payload: null,
+            changedAt: nextChangeRevision(),
+          });
+        }
+      }
+
+      if (JSON.stringify(before.texts) !== JSON.stringify(after.texts)
+        || JSON.stringify(before.images) !== JSON.stringify(after.images)) {
+        const key = "config:app-config";
         pending.set(key, {
           key,
-          id,
-          kind,
-          ownerId: ownerFor(kind, record, userId),
-          payload: clone(record),
+          id: "app-config",
+          kind: "config",
+          ownerId: userId,
+          payload: clone({ texts: after.texts, images: after.images }),
           changedAt: nextChangeRevision(),
         });
       }
-      for (const record of previousRecords) {
-        const id = String(record.id);
-        if (nextRecords.some((item) => item.id === id)) continue;
-        const key = kind + ":" + id;
-        pending.set(key, {
-          key,
-          id,
-          kind,
-          ownerId: ownerFor(kind, record, userId),
-          payload: null,
-          changedAt: nextChangeRevision(),
-        });
-      }
-    }
 
-    if (JSON.stringify(before.texts) !== JSON.stringify(after.texts)
-      || JSON.stringify(before.images) !== JSON.stringify(after.images)) {
-      const key = "config:app-config";
-      pending.set(key, {
-        key,
-        id: "app-config",
-        kind: "config",
-        ownerId: userId,
-        payload: clone({ texts: after.texts, images: after.images }),
-        changedAt: nextChangeRevision(),
-      });
-    }
-
-    await writePackage(database, {
-      userId,
-      snapshot: clone(after),
-      pending: [...pending.values()],
-      lastSyncedAt: cached?.lastSyncedAt ?? null,
+      pendingSize = pending.size;
+      return {
+        userId,
+        snapshot: clone(after),
+        pending: [...pending.values()],
+        lastSyncedAt: cached?.lastSyncedAt ?? null,
+      };
     });
-    return pending.size;
+    return pendingSize;
   } finally {
     database.close();
   }
@@ -174,19 +201,33 @@ export async function persistLocalMutation(userId: string, before: State, after:
 export async function clearSyncedChanges(userId: string, synced: OfflineChange[]): Promise<number> {
   const database = await openDatabase();
   try {
-    const cached = await readPackage(database, userId);
-    if (!cached) return 0;
-    const completed = new Map(synced.map((change) => [change.key, change.changedAt]));
-    const pending = cached.pending.filter((change) => completed.get(change.key) !== change.changedAt);
-    await writePackage(database, {
-      ...cached,
-      pending,
-      lastSyncedAt: pending.length === 0 ? new Date().toISOString() : cached.lastSyncedAt,
+    let remaining = 0;
+    await updatePackage(database, userId, (cached) => {
+      if (!cached) return { userId, snapshot: {} as State, pending: [], lastSyncedAt: null };
+      const completed = new Map(synced.map((change) => [change.key, change.changedAt]));
+      const pending = cached.pending.filter((change) => completed.get(change.key) !== change.changedAt);
+      remaining = pending.length;
+      return {
+        ...cached,
+        pending,
+        lastSyncedAt: pending.length === 0 ? new Date().toISOString() : cached.lastSyncedAt,
+      };
     });
-    return pending.length;
+    return remaining;
   } finally {
     database.close();
   }
+}
+
+/**
+ * A finalized server dose is authoritative over a stale offline "pending" copy.
+ * This is needed when a notification action confirms a dose while a tab is suspended.
+ */
+export function reconcilePendingChanges(remote: State, changes: OfflineChange[]): OfflineChange[] {
+  const finalizedRemoteDoses = new Set(
+    remote.doses.filter((dose) => dose.status !== "pendente").map((dose) => dose.id),
+  );
+  return changes.filter((change) => !(change.kind === "doses" && finalizedRemoteDoses.has(change.id)));
 }
 
 export function applyPendingChanges(remote: State, changes: OfflineChange[]): State {
