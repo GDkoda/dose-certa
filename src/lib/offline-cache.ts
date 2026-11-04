@@ -133,7 +133,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
     let pendingSize = 0;
     await updatePackage(database, userId, (cached) => {
       const pending = new Map((cached?.pending ?? []).map((change) => [change.key, change]));
-      const kinds = ["patients", "meds", "doses", "alerts", "tickets"] as const;
+      const kinds = ["patients", "meds", "doses", "alerts", "tickets", "routines", "routineLogs", "routineSettings"] as const;
 
       for (const kind of kinds) {
         const previousRecords = before[kind] as unknown as Record<string, unknown>[];
@@ -233,6 +233,9 @@ export function reconcilePendingChanges(remote: State, changes: OfflineChange[])
 
 export function applyPendingChanges(remote: State, changes: OfflineChange[]): State {
   const merged = clone(remote);
+  for (const key of ["patients", "meds", "doses", "alerts", "tickets", "routines", "routineLogs", "routineSettings"] as const) {
+    if (!Array.isArray(merged[key])) merged[key] = [];
+  }
   for (const change of changes) {
     if (change.kind === "config") {
       const config = change.payload as { texts?: Record<string, string>; images?: Record<string, string> } | null;
@@ -243,8 +246,8 @@ export function applyPendingChanges(remote: State, changes: OfflineChange[]): St
       continue;
     }
 
-    if (!["patients", "meds", "doses", "alerts", "tickets"].includes(change.kind)) continue;
-    const kind = change.kind as "patients" | "meds" | "doses" | "alerts" | "tickets";
+    if (!["patients", "meds", "doses", "alerts", "tickets", "routines", "routineLogs", "routineSettings"].includes(change.kind)) continue;
+    const kind = change.kind as "patients" | "meds" | "doses" | "alerts" | "tickets" | "routines" | "routineLogs" | "routineSettings";
     const list = merged[kind] as unknown as Record<string, unknown>[];
     const index = list.findIndex((record) => record["id"] === change.id);
     if (change.payload === null) {
