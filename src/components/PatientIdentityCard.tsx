@@ -350,7 +350,7 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
           )}
         </div>
         <footer className="border-t border-border bg-muted/40 px-4 py-2.5 text-[10px] leading-relaxed text-muted-foreground sm:px-5">
-          Este cartão é um resumo informativo preenchido pelo cuidador. Não substitui documentos oficiais ou avaliação profissional. Como pode conter CPF e dados de saúde, use somente informações necessárias e evite abrir o cartão em aparelhos compartilhados.
+          Este cartão é um resumo informativo preenchido pelo cuidador. Não substitui documentos oficiais ou avaliação profissional. Como pode conter CPF e dados de saúde, use somente informações necessárias. A cópia offline fica no armazenamento deste navegador; evite aparelhos compartilhados e proteja sua sessão.
         </footer>
       </section>
     </div>,
