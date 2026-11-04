@@ -16,7 +16,7 @@ import { PatientIdentityCard } from "./PatientIdentityCard";
 import { RoutineCare } from "./RoutineCare";
 import { SupportPage } from "./SupportPage";
 import { DoseCertaMark } from "./DoseCertaMark";
-import { readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
+import { getOfflineStatus, readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { confirmDoseTaken } from "@/lib/dose.functions";
@@ -2383,29 +2383,45 @@ function UrgentAlertToast({ me }: { me: User }) {
 /* ---------------- shell ---------------- */
 function Shell({ me }: { me: User }) {
   const removeDevice = useServerFn(removePushDevice);
-  const [connectionOnline, setConnectionOnline] = useState(true);
-  const [pendingSync, setPendingSync] = useState(0);
+  const initialSyncStatus = getOfflineStatus();
+  const [cloudConnected, setCloudConnected] = useState(initialSyncStatus.online);
+  const [browserOnline, setBrowserOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [pendingSync, setPendingSync] = useState(initialSyncStatus.pending);
+  const [syncError, setSyncError] = useState(initialSyncStatus.error ?? "");
+  const [syncBusy, setSyncBusy] = useState(false);
   const [page, setPage] = useState<Page>(me.role === "mestre" ? "admin" : "inicio");
   const patientOptions = useStore((s) => s.patients.filter((p) => p.ownerId === me.id));
   const patientIdsKey = patientOptions.map((p) => p.id).join("|");
   useEffect(() => {
-    const syncOnlineState = () => setConnectionOnline(navigator.onLine);
+    const syncBrowserState = () => setBrowserOnline(navigator.onLine);
     const syncPendingState = (event?: Event) => {
-      const detail = (event as CustomEvent<{ online?: boolean; pending?: number }> | undefined)?.detail;
-      if (typeof detail?.online === "boolean") setConnectionOnline(detail.online);
+      const detail = (event as CustomEvent<{ online?: boolean; pending?: number; error?: string | null }> | undefined)?.detail;
+      if (typeof detail?.online === "boolean") setCloudConnected(detail.online);
       if (typeof detail?.pending === "number") setPendingSync(detail.pending);
+      if (typeof detail?.error === "string") setSyncError(detail.error);
+      else if (detail?.error === null) setSyncError("");
     };
-    syncOnlineState();
+    const initial = getOfflineStatus();
+    setCloudConnected(initial.online);
+    setPendingSync(initial.pending);
+    setSyncError(initial.error ?? "");
+    syncBrowserState();
     void readOfflinePackage(me.id).then((cached) => setPendingSync(cached?.pending.length ?? 0)).catch(() => undefined);
-    window.addEventListener("online", syncOnlineState);
-    window.addEventListener("offline", syncOnlineState);
+    window.addEventListener("online", syncBrowserState);
+    window.addEventListener("offline", syncBrowserState);
     window.addEventListener("dc-offline-status", syncPendingState);
     return () => {
-      window.removeEventListener("online", syncOnlineState);
-      window.removeEventListener("offline", syncOnlineState);
+      window.removeEventListener("online", syncBrowserState);
+      window.removeEventListener("offline", syncBrowserState);
       window.removeEventListener("dc-offline-status", syncPendingState);
     };
   }, [me.id]);
+  const retryCloudSync = () => {
+    setSyncBusy(true);
+    void refreshCloud()
+      .catch((error) => setSyncError(error instanceof Error ? error.message : "Não foi possível sincronizar agora."))
+      .finally(() => setSyncBusy(false));
+  };
   const [activePatientId, setActivePatientId] = useState("");
   useEffect(() => {
     const saved = localStorage.getItem(`dc-patient-${me.id}`);
@@ -2468,17 +2484,30 @@ function Shell({ me }: { me: User }) {
           <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
-        {(!connectionOnline || pendingSync > 0) && (
-          <div role="status" className="no-print border-b border-border/70 bg-muted/70 px-4 py-2.5 md:px-8">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-2.5">
-              {connectionOnline ? <CloudUpload className="h-4 w-4 shrink-0 text-primary" /> : <CloudOff className="h-4 w-4 shrink-0 text-amber-600" />}
-              <p className="min-w-0 text-xs font-semibold leading-relaxed text-foreground">
-                {!connectionOnline
-                  ? "Sem internet. Os dados salvos neste aparelho continuam disponíveis e serão sincronizados quando a conexão voltar."
-                  : pendingSync > 0
-                    ? pendingSync + (pendingSync === 1 ? " alteração aguardando sincronização." : " alterações aguardando sincronização.")
-                    : "Conexão restabelecida."}
-              </p>
+        {(!browserOnline || !cloudConnected || pendingSync > 0 || !!syncError) && (
+          <div role="status" aria-live="polite" className="no-print border-b border-border/70 bg-muted/70 px-4 py-2.5 md:px-8">
+            <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-2.5">
+              {browserOnline && cloudConnected && !syncError
+                ? <CloudUpload className="h-4 w-4 shrink-0 text-primary" />
+                : <CloudOff className="h-4 w-4 shrink-0 text-amber-600" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold leading-relaxed text-foreground">
+                  {!browserOnline
+                    ? "Sem internet. As alterações ficam guardadas neste aparelho e serão enviadas quando a conexão voltar."
+                    : syncError
+                      ? "Falha na sincronização: " + syncError
+                      : !cloudConnected
+                        ? "O aparelho está conectado à internet, mas não confirmou a conexão com a nuvem. Os dados locais continuam disponíveis."
+                        : pendingSync > 0
+                          ? pendingSync + (pendingSync === 1 ? " alteração aguardando sincronização." : " alterações aguardando sincronização.")
+                          : "Conexão restabelecida."}
+                </p>
+              </div>
+              {browserOnline && (!cloudConnected || pendingSync > 0 || !!syncError) && (
+                <button type="button" onClick={retryCloudSync} disabled={syncBusy} className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">
+                  {syncBusy ? "Conectando…" : "Tentar sincronizar"}
+                </button>
+              )}
             </div>
           </div>
         )}
