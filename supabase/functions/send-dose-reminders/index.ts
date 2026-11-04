@@ -6,6 +6,8 @@ type Dose = {
 };
 type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number; archivedAt?: string };
 type Patient = { id: string; name: string };
+type RoutineTask = { id: string; ownerId: string; patientId: string; title: string; time: string; weekdays: number[]; description?: string; pictogram?: string; enabled: boolean };
+type RoutineLog = { id: string; ownerId: string; patientId: string; taskId: string; date: string; status: string };
 type OwnedRecordRow = { id: string; owner_id: string; payload: unknown };
 type PatientRecordRow = { id: string; payload: unknown };
 type Device = { owner_id: string; token: string; timezone: string };
@@ -35,6 +37,23 @@ async function signDoseAction(owner: string, doseIds: string[]): Promise<string>
     new TextEncoder().encode(`${owner}|${doseIds.join(",")}`),
   ));
   return base64url(signature);
+}
+
+function localScheduleParts(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  if (weekday < 0) return null;
+  return { date: get("year") + "-" + get("month") + "-" + get("day"), weekday, time: get("hour") + ":" + get("minute") };
 }
 
 async function fetchAllPages<T>(
@@ -95,12 +114,16 @@ Deno.serve(async (request) => {
   let doseRows: OwnedRecordRow[];
   let medRows: OwnedRecordRow[];
   let patientRows: PatientRecordRow[];
+  let routineRows: OwnedRecordRow[];
+  let routineLogRows: OwnedRecordRow[];
   let deviceRows: Device[];
   try {
-    [doseRows, medRows, patientRows, deviceRows] = await Promise.all([
+    [doseRows, medRows, patientRows, routineRows, routineLogRows, deviceRows] = await Promise.all([
       fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "doses").range(from, to)),
       fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "meds").range(from, to)),
       fetchAllPages((from, to) => supabase.from("app_records").select("id, payload").eq("kind", "patients").range(from, to)),
+      fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "routines").range(from, to)),
+      fetchAllPages((from, to) => supabase.from("app_records").select("id, owner_id, payload").eq("kind", "routineLogs").range(from, to)),
       fetchAllPages((from, to) => supabase.from("push_devices").select("owner_id, token, timezone").range(from, to)),
     ]);
   } catch {
@@ -185,5 +208,84 @@ Deno.serve(async (request) => {
       }
     }
   }
+
+  // Routine reminders are evaluated in each registered device's local timezone.
+  // A five-minute delivery window tolerates small cron delays; the database claim
+  // guarantees at most one push per task, local date and device.
+  const routines: RoutineTask[] = routineRows.map((row) => ({
+    ...(row.payload as Record<string, unknown>),
+    id: row.id,
+    ownerId: row.owner_id,
+  }) as RoutineTask);
+  const completedRoutineSlots = new Set<string>();
+  for (const row of routineLogRows) {
+    const log = { ...(row.payload as Record<string, unknown>), id: row.id, ownerId: row.owner_id } as RoutineLog;
+    completedRoutineSlots.add(log.ownerId + "|" + log.taskId + "|" + log.date);
+  }
+
+  for (const task of routines) {
+    if (!task.enabled || !task.title || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(task.time) || !Array.isArray(task.weekdays)) {
+      skipped++;
+      continue;
+    }
+    const devices = devicesByOwner.get(task.ownerId) ?? [];
+    if (!devices.length) { skipped++; continue; }
+    const patient = patients.get(task.patientId)?.name ?? "Paciente";
+    for (const device of devices) {
+      const local = (() => {
+        try { return localScheduleParts(new Date(now), device.timezone); } catch { return null; }
+      })();
+      if (!local || !task.weekdays.includes(local.weekday)) { skipped++; continue; }
+      const [hours, minutes] = task.time.split(":").map(Number);
+      const scheduledMinute = (hours ?? 0) * 60 + (minutes ?? 0);
+      const currentMinute = Number(local.time.slice(0, 2)) * 60 + Number(local.time.slice(3, 5));
+      if (currentMinute < scheduledMinute || currentMinute >= scheduledMinute + 5) { skipped++; continue; }
+      if (completedRoutineSlots.has(task.ownerId + "|" + task.id + "|" + local.date)) { skipped++; continue; }
+
+      const deliveryKey = `routine:${task.id}:${local.date}:${device.token.slice(-12)}`;
+      const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", {
+        p_key: deliveryKey,
+        p_token: device.token,
+        p_dose: `routine:${task.id}:${local.date}`,
+      });
+      if (claimError) { failed++; continue; }
+      if (!claimed) { skipped++; continue; }
+
+      try {
+        accessToken ??= await googleAccessToken(serviceAccount);
+        const description = task.description?.trim();
+        const pictogram = task.pictogram?.trim();
+        const body = `Está na hora de ${pictogram ? pictogram + " " : ""}${task.title}.${description ? " " + description : ""} Abra o Dose Certa para registrar.`;
+        const response = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
+          method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: {
+              token: device.token,
+              data: {
+                title: `Dose Certa • Rotina de ${patient}`,
+                body,
+                tag: `dc-routine-${task.id}-${local.date}`,
+                doseIds: "",
+                owner: task.ownerId,
+                sig: "",
+                url: "/",
+              },
+              android: { priority: "high" },
+              webpush: { headers: { Urgency: "high" }, fcmOptions: { link: "/" } },
+            },
+          }),
+        });
+        if (!response.ok) {
+          const detail = await response.text();
+          if (response.status === 404 || (response.status === 400 && /UNREGISTERED|registration-token-not-registered/.test(detail))) await supabase.from("push_devices").delete().eq("token", device.token);
+          failed++;
+          continue;
+        }
+        const { error: markError } = await supabase.from("push_deliveries").update({ sent_at: isoNow }).eq("delivery_key", deliveryKey).eq("device_token", device.token);
+        if (markError) failed++; else sent++;
+      } catch { failed++; }
+    }
+  }
+
   return json({ ok: failed === 0, checkedAt: isoNow, sent, skipped, failed });
 });
