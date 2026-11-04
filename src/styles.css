@@ -710,3 +710,75 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     background-size: 66px 66px, 66px 66px, 22px 22px;
   }
 }
+
+
+/* Patient information cards: eight personal themes with decorative botanical/geometric motifs. */
+.dc-patient-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 300px;
+  aspect-ratio: 1.62 / 1;
+  border: 1px solid var(--dc-patient-border, color-mix(in srgb, currentColor 20%, transparent));
+  border-radius: 1.35rem;
+  color: var(--dc-patient-ink, #24332a);
+  background: var(--dc-patient-bg, #f1f5ed);
+  box-shadow: 0 18px 36px -24px color-mix(in srgb, var(--dc-patient-shadow, #283c32) 60%, transparent);
+}
+.dc-patient-card--rosas {
+  --dc-patient-ink: #fff1ef;
+  --dc-patient-shadow: #16070b;
+  --dc-patient-border: #ad3948;
+  background: radial-gradient(ellipse at 92% 7%, #a82035 0, transparent 42%), linear-gradient(135deg, #171116 0%, #35111b 48%, #7b1b2a 100%);
+}
+.dc-patient-card--coracoes {
+  --dc-patient-ink: #6d2742;
+  --dc-patient-shadow: #9c5570;
+  --dc-patient-border: #e9a9c0;
+  background: linear-gradient(135deg, #fff1f5 0%, #f4c6d7 54%, #fbe3e8 100%);
+}
+.dc-patient-card--praia {
+  --dc-patient-ink: #633b23;
+  --dc-patient-shadow: #c87537;
+  --dc-patient-border: #edb875;
+  background: radial-gradient(circle at 88% 12%, #ffe6a2 0 12%, transparent 12.5%), linear-gradient(155deg, #f9d9a1 0%, #f6b76b 48%, #ed985e 100%);
+}
+.dc-patient-card--girassol {
+  --dc-patient-ink: #574017;
+  --dc-patient-shadow: #b78a22;
+  --dc-patient-border: #e7c24b;
+  background: linear-gradient(135deg, #fff8cf 0%, #f6dc76 52%, #f2c34b 100%);
+}
+.dc-patient-card--folhas {
+  --dc-patient-ink: #254b38;
+  --dc-patient-shadow: #386c50;
+  --dc-patient-border: #b7d0bd;
+  background: linear-gradient(130deg, #fbfcf4 0%, #edf4e9 54%, #d9e9d9 100%);
+}
+.dc-patient-card--ondas {
+  --dc-patient-ink: #effaff;
+  --dc-patient-shadow: #165b85;
+  --dc-patient-border: #8cc5df;
+  background: linear-gradient(145deg, #9ed6ec 0%, #337ea8 49%, #123f6b 100%);
+}
+.dc-patient-card--lavanda {
+  --dc-patient-ink: #514665;
+  --dc-patient-shadow: #9284aa;
+  --dc-patient-border: #d2c9e1;
+  background: linear-gradient(140deg, #faf8ff 0%, #eee9f6 58%, #dcd4e9 100%);
+}
+.dc-patient-card--xadrez {
+  --dc-patient-ink: #171717;
+  --dc-patient-shadow: #3b3b3b;
+  --dc-patient-border: #b8b8b8;
+  background-color: #f8f8f8;
+  background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a), linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
+  background-position: 0 0, 18px 18px;
+  background-size: 36px 36px;
+}
+@media (max-width: 480px) {
+  .dc-patient-card {
+    min-height: 285px;
+    aspect-ratio: 1.32 / 1;
+  }
+}
