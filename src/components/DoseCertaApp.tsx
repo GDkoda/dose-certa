@@ -1403,13 +1403,9 @@ function Profile({ me }: { me: User }) {
   const [cur, setCur] = useState("");
   const [p1, setP1] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() =>
-    typeof Notification === "undefined" ? "unsupported" : Notification.permission
-  );
-  const [pushRegistered, setPushRegistered] = useState(() => {
-    try { return typeof window !== "undefined" && localStorage.getItem("dc-push-ready-" + me.id) === "1"; }
-    catch { return false; }
-  });
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [pushRegistered, setPushRegistered] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
@@ -1422,15 +1418,26 @@ function Profile({ me }: { me: User }) {
   useEffect(() => {
     const syncDeviceState = () => {
       setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
-      try { setPushRegistered(localStorage.getItem("dc-push-ready-" + me.id) === "1"); }
-      catch { setPushRegistered(false); }
+      try {
+        const ready = localStorage.getItem("dc-push-ready-" + me.id) === "1";
+        setPushRegistered(ready && Boolean(sessionStorage.getItem("dc-push-token")));
+      } catch { setPushRegistered(false); }
+    };
+    const syncInstalledState = () => {
+      const standalone = window.matchMedia?.("(display-mode: standalone)").matches === true
+        || window.matchMedia?.("(display-mode: fullscreen)").matches === true
+        || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      setIsStandalone(standalone);
     };
     syncDeviceState();
+    syncInstalledState();
     window.addEventListener("dc-push-ready", syncDeviceState);
     window.addEventListener("focus", syncDeviceState);
+    window.addEventListener("appinstalled", syncInstalledState);
     return () => {
       window.removeEventListener("dc-push-ready", syncDeviceState);
       window.removeEventListener("focus", syncDeviceState);
+      window.removeEventListener("appinstalled", syncInstalledState);
     };
   }, [me.id]);
 
@@ -1476,7 +1483,13 @@ function Profile({ me }: { me: User }) {
     setTestBusy(true);
     setNotificationMessage("");
     try {
-      const result = await testPush();
+      const token = sessionStorage.getItem("dc-push-token");
+      if (!token) {
+        setPushRegistered(false);
+        setNotificationMessage("Este aparelho precisa ser vinculado novamente. Toque em Ativar notificações antes de testar.");
+        return;
+      }
+      const result = await testPush({ data: { token } });
       if (result.sent > 0) {
         setNotificationMessage("Notificação de teste enviada. Bloqueie a tela ou deixe o Dose Certa em segundo plano e confira se o aviso chega.");
       } else if (result.devices === 0) {
@@ -1516,10 +1529,6 @@ function Profile({ me }: { me: User }) {
   const isIos = typeof navigator !== "undefined" && (/iPhone|iPad|iPod/i.test(navigator.userAgent)
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-  const isStandalone = typeof window !== "undefined" && (
-    window.matchMedia?.("(display-mode: standalone)").matches === true
-    || (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
   const notificationIsActive = permission === "granted" && pushRegistered;
 
   return (
