@@ -105,14 +105,12 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
         if (file.size > 250_000) throw new Error("Cada arquivo deve ter até 250 KB para manter o chamado leve.");
         next.push({ name: file.name, type: file.type, dataUrl: await fileToDataUrl(file) });
       }
-      setAttachments((current) => {
-        const combined = [...current, ...next];
-        if (combined.reduce((total, file) => total + file.dataUrl.length, 0) > 1_000_000) {
-          setAttachmentError("O tamanho total dos anexos ultrapassa o limite de 1 MB.");
-          return current;
-        }
-        return combined;
-      });
+      const combined = [...attachments, ...next];
+      if (combined.reduce((total, file) => total + file.dataUrl.length, 0) > 1_000_000) {
+        setAttachmentError("O tamanho total dos anexos ultrapassa o limite de 1 MB.");
+        return;
+      }
+      setAttachments(combined);
     } catch (error) {
       setAttachmentError(error instanceof Error ? error.message : "Não foi possível anexar o arquivo.");
     }
