@@ -112,7 +112,10 @@ export function startLovableBadgeHider(): () => void {
       if (record.type === "characterData" && record.target.parentElement) {
         scanSubtree(record.target.parentElement);
       }
-      for (const addedNode of record.addedNodes) scanSubtree(addedNode);
+      for (const addedNode of record.addedNodes) {
+        if (addedNode instanceof Element) scanSubtree(addedNode);
+        else if (record.target instanceof Element) scanSubtree(record.target);
+      }
     }
   });
 
