@@ -157,7 +157,7 @@ export async function initializeCloud() {
       } catch {
         writeFailed = true;
         const cached = await readOfflinePackage(actorId).catch(() => null);
-        publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, cached?.pending.length ?? pendingCount, cached?.lastSyncedAt ?? null);
+        publishOfflineStatus(false, cached?.pending.length ?? pendingCount, cached?.lastSyncedAt ?? null);
         errorHandler('Alteração guardada neste aparelho. A sincronização será retomada quando a conexão voltar.');
       }
     }).catch(() => {
@@ -176,7 +176,7 @@ export async function initializeCloud() {
   const syncOnReconnect = () => {
     queue = queue.then(refreshCloud).catch(() => {
       void readOfflinePackage(currentId ?? '').then((cached) => {
-        publishOfflineStatus(true, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null);
+        publishOfflineStatus(false, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null);
       }).catch(() => undefined);
     });
   };
