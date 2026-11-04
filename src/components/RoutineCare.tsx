@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  ArrowLeft, CalendarDays, Check, CheckCircle2, Clock3, Droplets,
+  ArrowLeft, CalendarDays, Check, CheckCircle2, CircleMinus, Clock3, Droplets,
   Heart, ListChecks, Pencil, Plus, Sparkles, Utensils, X,
 } from "lucide-react";
 import {
@@ -24,7 +24,7 @@ const categories: { id: RoutineCategory; label: string; emoji: string }[] = [
 ];
 const days = [{ label: "D", value: 0 }, { label: "S", value: 1 }, { label: "T", value: 2 }, { label: "Q", value: 3 }, { label: "Q", value: 4 }, { label: "S", value: 5 }, { label: "S", value: 6 }];
 const dateKey = (date: Date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
-const categoryInfo = (category: RoutineCategory) => categories.find((item) => item.id === category) ?? categories[categories.length - 1];
+const categoryInfo = (category: RoutineCategory) => categories.find((item) => item.id === category) ?? { id: "outro" as RoutineCategory, label: "Outro", emoji: "✨" };
 const todayLabel = (value: string) => new Date(value + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 
 type TimelineItem =
@@ -392,7 +392,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
                     {item.kind === "medication" ? <span className={"shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold " + (done ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>{done ? "Tomado" : "Medicamento"}</span>
                       : <div className="flex shrink-0 items-center gap-1">
                         <button type="button" title={item.log ? "Editar registro" : "Registrar atividade"} aria-label={item.log ? "Editar registro de " + task?.title : "Registrar " + task?.title} onClick={() => task && (task.category === "hidratacao" || task.category === "alimentacao" ? openLog(task) : markTask(task, "concluido"))} className={"grid h-9 w-9 place-items-center rounded-xl transition " + (done ? "bg-primary/10 text-primary hover:bg-primary/15" : "bg-muted text-foreground hover:bg-primary/10 hover:text-primary")}>{done ? <CheckCircle2 className="h-4 w-4" /> : <Check className="h-4 w-4" />}</button>
-                        <button type="button" title="Editar atividade" aria-label={"Editar " + task?.title} onClick={() => task && beginEdit(task)} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                        <button type="button" title="Marcar como não realizada" aria-label={"Marcar " + task?.title + " como não realizada"} onClick={() => task && markTask(task, "nao_realizado")} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-amber-500/10 hover:text-amber-700"><CircleMinus className="h-4 w-4" /></button>
+                        <button type="button" title="Editar atividade" aria-label={"Editar " + task?.title} onClick={() => task && beginEdit(task)} className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
                         <button type="button" title="Remover atividade" aria-label={"Remover " + task?.title} onClick={() => task && window.confirm("Remover esta atividade da rotina? Os registros anteriores serão preservados.") && setState((state) => ({ ...state, routines: state.routines.filter((entry) => entry.id !== task.id) }))} className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><X className="h-4 w-4" /></button>
                       </div>}
                   </article>
