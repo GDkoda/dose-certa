@@ -800,6 +800,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .dc-card-brand {
   margin: 0;
+  font-family: var(--font-sans);
   color: rgba(255,255,255,.76);
   font-size: clamp(7px, .9vw, 10px);
   font-weight: 900;
@@ -814,7 +815,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dc-card-name {
   margin: clamp(4px, .7vw, 8px) 0 0;
   color: #fff;
-  font-family: inherit;
+  font-family: var(--font-display);
   font-size: clamp(16px, 2.25vw, 28px);
   font-weight: 850;
   line-height: 1.08;
@@ -851,6 +852,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .dc-card-meta {
   display: inline-flex;
+  font-family: var(--font-sans);
   min-width: 0;
   flex-direction: column;
   gap: 2px;
@@ -919,6 +921,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .dc-patient-card-detail {
   min-width: 0;
+  font-family: var(--font-sans);
   min-height: 0;
   padding: clamp(3px, .55vw, 5px) clamp(5px, .75vw, 8px);
   overflow: hidden;
@@ -946,6 +949,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .dc-card-footer {
   grid-column: 1 / -1;
+  font-family: var(--font-sans);
   grid-row: 3;
   display: flex;
   min-width: 0;
