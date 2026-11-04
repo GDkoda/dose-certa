@@ -201,9 +201,10 @@ export async function persistLocalMutation(userId: string, before: State, after:
 export async function clearSyncedChanges(userId: string, synced: OfflineChange[]): Promise<number> {
   const database = await openDatabase();
   try {
+    if (!(await readPackage(database, userId))) return 0;
     let remaining = 0;
     await updatePackage(database, userId, (cached) => {
-      if (!cached) return { userId, snapshot: {} as State, pending: [], lastSyncedAt: null };
+      if (!cached) throw new Error("O pacote offline foi removido durante a sincronização.");
       const completed = new Map(synced.map((change) => [change.key, change.changedAt]));
       const pending = cached.pending.filter((change) => completed.get(change.key) !== change.changedAt);
       remaining = pending.length;

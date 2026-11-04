@@ -25,3 +25,12 @@ describe("additional push schedule edge cases", () => {
     expect(pushSlot(dose, Date.parse("2026-10-25T10:04:59Z"))).toBe(0);
   });
 });
+
+describe("shared reminder idempotency keys", () => {
+  it("uses the dose, five-minute slot and device token suffix as the stable delivery identity", () => {
+    const deliveryKey = (doseId: string, slot: number, token: string) => `${doseId}:${slot}:${token.slice(-12)}`;
+    expect(deliveryKey("dose-1", 3, "token-123456789012")).toBe("dose-1:3:123456789012");
+    expect(deliveryKey("dose-1", 3, "token-123456789012")).toBe(deliveryKey("dose-1", 3, "token-123456789012"));
+    expect(deliveryKey("dose-1", 4, "token-123456789012")).not.toBe(deliveryKey("dose-1", 3, "token-123456789012"));
+  });
+});

@@ -17,6 +17,24 @@ function base64url(input: Uint8Array | string): string {
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
+async function signDoseAction(owner: string, doseIds: string[]): Promise<string> {
+  const secret = Deno.env.get("DOSE_ACTION_SIGNING_SECRET") || Deno.env.get("LOVABLE_API_KEY");
+  if (!secret) throw new Error("DOSE_ACTION_SIGNING_SECRET is not configured");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`dose-action:${secret}`),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${owner}|${doseIds.join(",")}`),
+  ));
+  return base64url(signature);
+}
+
 function pemToBytes(pem: string): Uint8Array {
   return Uint8Array.from(atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "")), c => c.charCodeAt(0));
 }
@@ -104,14 +122,34 @@ Deno.serve(async (request) => {
         ...(late ? [{ key: `late:${dose.id}:${device.token.slice(-12)}`, title: `Dose pendente • ${patient}`, body: `A dose de ${med.name} continua pendente após o período de tolerância. Confira o Dose Certa; o registro não confirma se o medicamento foi tomado.` }] : []),
       ];
       for (const item of messages) {
-        const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", { p_dose: dose.id, p_key: item.key, p_token: device.token });
+        const { data: claimed, error: claimError } = await supabase.rpc("claim_push_delivery", {
+          p_key: item.key,
+          p_token: device.token,
+          p_dose: dose.id,
+        });
         if (claimError) { failed++; continue; }
         if (!claimed) { skipped++; continue; }
         try {
           accessToken ??= await googleAccessToken(serviceAccount);
+          const sig = await signDoseAction(dose.ownerId, [dose.id]);
           const response = await fetch(`https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`, {
             method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: { token: device.token, data: { title: item.title, body: item.body, doseId: dose.id, url: "/" }, android: { priority: "high" }, webpush: { headers: { Urgency: "high" }, fcmOptions: { link: "/" } } } }),
+            body: JSON.stringify({
+              message: {
+                token: device.token,
+                data: {
+                  title: item.title,
+                  body: item.body,
+                  tag: `dc-${dose.id}`,
+                  doseIds: dose.id,
+                  owner: dose.ownerId,
+                  sig,
+                  url: "/",
+                },
+                android: { priority: "high" },
+                webpush: { headers: { Urgency: "high" }, fcmOptions: { link: "/" } },
+              },
+            }),
           });
           if (!response.ok) {
             const detail = await response.text();

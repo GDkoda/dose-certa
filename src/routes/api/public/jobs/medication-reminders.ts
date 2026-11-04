@@ -29,7 +29,8 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
         if (parsed.success) doses.push({ medId: parsed.data.medId, patientId: parsed.data.patientId, scheduledAt: parsed.data.scheduledAt, status: parsed.data.status, ...(parsed.data.snoozeUntil ? { snoozeUntil: parsed.data.snoozeUntil } : {}), ...(parsed.data.lastShown ? { lastShown: parsed.data.lastShown } : {}), id: record.id, ownerId: owner });
       }
       // Generate daily doses even when the caregiver never opens the page.
-      const timezone = owned[0]?.timezone ?? "UTC";
+      const timezone = [...owned]
+        .sort((a, b) => Date.parse(String(b.updated_at ?? "")) - Date.parse(String(a.updated_at ?? "")))[0]?.timezone ?? "UTC";
       const dayParts = Object.fromEntries(new Intl.DateTimeFormat("en", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now)).map((part) => [part.type, part.value]));
       const day = `${dayParts['year']}-${dayParts['month']}-${dayParts['day']}`;
       for (const record of records ?? []) {
@@ -52,9 +53,6 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       const groups = new Map<string, { patientId: string; scheduledAt: string; slot: number; doses: Dose[] }>();
       for (const dose of doses) {
         const slot = pushSlot(dose, now); if (slot === null) continue;
-        const { data: latest } = await db.from("app_records").select("payload").eq("id", dose.id).maybeSingle();
-        const current = doseSchema.safeParse(latest?.payload);
-        if (!current.success || pushSlot(current.data, now) === null) continue;
         const gk = `${dose.patientId}|${dose.scheduledAt}`;
         const g = groups.get(gk) ?? { patientId: dose.patientId, scheduledAt: dose.scheduledAt, slot, doses: [] };
         g.slot = Math.max(g.slot, slot); g.doses.push(dose); groups.set(gk, g);
@@ -62,24 +60,67 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       for (const g of groups.values()) {
         const hhmm = new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(g.scheduledAt));
         const patient = names.get(g.patientId) ?? "Paciente";
-        const lines = g.doses.map((d) => { const m = medInfo.get(d.medId); return m ? `${m.name}${m.dose ? ` — ${m.dose}` : ""}` : "Medicamento"; });
-        const title = g.doses.length > 1 ? `${patient}: ${g.doses.length} medicamentos às ${hhmm}` : `${patient}: hora do remédio (${hhmm})`;
-        const doseIds = g.doses.map((d) => d.id);
-        const sig = await signDoseAction(owner, doseIds);
         const groupId = `${g.patientId}-${g.scheduledAt}`;
         for (const device of owned) {
-          const deliveryKey = `${groupId}:${device.token}:${g.slot}`;
-          const { data: claimed, error: claimError } = await db.rpc("claim_push_delivery", { p_key: deliveryKey, p_token: device.token, p_dose: doseIds[0]! });
-          if (claimError || !claimed) continue;
+          const claimedDoses: Dose[] = [];
+          const deliveryKeys: string[] = [];
+
+          // The per-dose key is shared with the Edge Function sender. Whichever
+          // scheduler claims first owns this dose/device/five-minute slot.
+          for (const dose of g.doses) {
+            const deliveryKey = `${dose.id}:${g.slot}:${device.token.slice(-12)}`;
+            const { data: claimed, error: claimError } = await db.rpc("claim_push_delivery", {
+              p_key: deliveryKey,
+              p_token: device.token,
+              p_dose: dose.id,
+            });
+            if (claimError) {
+              console.error("Could not claim medication push", claimError.message);
+              failed++;
+              continue;
+            }
+            if (!claimed) continue;
+            claimedDoses.push(dose);
+            deliveryKeys.push(deliveryKey);
+          }
+
+          if (!claimedDoses.length) continue;
+          const doseIds = claimedDoses.map((dose) => dose.id);
+          const sig = await signDoseAction(owner, doseIds);
+          const lines = claimedDoses.map((dose) => {
+            const med = medInfo.get(dose.medId);
+            return med ? `${med.name}${med.dose ? ` — ${med.dose}` : ""}` : "Medicamento";
+          });
+          const title = claimedDoses.length > 1
+            ? `${patient}: ${claimedDoses.length} medicamentos às ${hhmm}`
+            : `${patient}: hora do remédio (${hhmm})`;
+
           try {
-            const r = await sendPush(device.token, { title, body: lines.join("\n"), tag: `dc-${groupId}`, url: new URL("/", request.url).href, owner, doseIds, sig });
+            const r = await sendPush(device.token, {
+              title,
+              body: lines.join("\n"),
+              tag: `dc-${groupId}`,
+              url: new URL("/", request.url).href,
+              owner,
+              doseIds,
+              sig,
+            });
             if (!r.ok) {
               console.error("Medication push failed", r.status, r.body.slice(0, 300));
-              if (r.status === 404 || (r.status === 400 && r.body.includes("INVALID_ARGUMENT") && r.body.includes("token"))) await db.from("push_devices").delete().eq("token", device.token);
-              failed++; continue;
+              if (r.status === 404 || (r.status === 400 && r.body.includes("INVALID_ARGUMENT") && r.body.includes("token"))) {
+                await db.from("push_devices").delete().eq("token", device.token);
+              }
+              failed++;
+              continue;
             }
-            await db.from("push_deliveries").update({ sent_at: new Date().toISOString() }).eq("delivery_key", deliveryKey); sent++;
-          } catch { failed++; }
+            await db.from("push_deliveries")
+              .update({ sent_at: new Date().toISOString() })
+              .in("delivery_key", deliveryKeys)
+              .eq("device_token", device.token);
+            sent++;
+          } catch {
+            failed++;
+          }
         }
       }
     }
