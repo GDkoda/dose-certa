@@ -146,15 +146,7 @@ export type Database = {
     }
     Functions: {
       claim_push_delivery: {
-        Args: { p_key: string; p_token: string; p_dose: string }
-        Returns: boolean
-      }
-      confirm_doses_and_deduct_stock: {
-        Args: { p_owner: string; p_dose_ids: string[]; p_taken_at?: string }
-        Returns: { dose_id: string }[]
-      }
-      password_change_completed: {
-        Args: { _user_id: string }
+        Args: { p_dose: string; p_key: string; p_token: string }
         Returns: boolean
       }
       has_role: {
