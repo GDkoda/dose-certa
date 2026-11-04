@@ -265,9 +265,33 @@ export function applyPendingChanges(remote: State, changes: OfflineChange[]): St
   return merged;
 }
 
-export function publishOfflineStatus(online: boolean, pending: number, lastSyncedAt: string | null) {
+export type OfflineStatus = {
+  online: boolean;
+  pending: number;
+  lastSyncedAt: string | null;
+  error: string | null;
+};
+
+let latestOfflineStatus: OfflineStatus = {
+  online: false,
+  pending: 0,
+  lastSyncedAt: null,
+  error: null,
+};
+
+export function getOfflineStatus(): OfflineStatus {
+  return { ...latestOfflineStatus };
+}
+
+export function publishOfflineStatus(
+  online: boolean,
+  pending: number,
+  lastSyncedAt: string | null,
+  error: string | null = null,
+) {
+  latestOfflineStatus = { online, pending, lastSyncedAt, error };
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("dc-offline-status", {
-    detail: { online, pending, lastSyncedAt },
+    detail: latestOfflineStatus,
   }));
 }
