@@ -9,7 +9,6 @@ import {
   persistLocalMutation,
   publishOfflineStatus,
   readOfflinePackage,
-  type OfflineChange,
 } from './offline-cache';
 
 const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets'] as const;
