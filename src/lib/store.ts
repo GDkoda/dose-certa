@@ -3,7 +3,30 @@ import { useSyncExternalStore } from "react";
 export type Role = "cuidador" | "operador" | "mestre";
 export interface User { id: string; login: string; password: string; role: Role; question: string; answer: string; mustChange?: boolean }
 export interface Patient { id: string; ownerId: string; name: string; age: number; notes: string }
-export interface Med { id: string; patientId: string; ownerId: string; name: string; dose: string; times: string[]; stock: number; tolerance: number }
+export type DosePeriod =
+  | "manhã" | "tarde" | "noite" | "madrugada"
+  | "antes-almoco" | "depois-almoco" | "antes-jantar" | "depois-jantar"
+  | "personalizado";
+export interface DoseSchedule { time: string; period: DosePeriod }
+export interface Med {
+  id: string;
+  patientId: string;
+  ownerId: string;
+  name: string;
+  /** Human-readable summary retained for old records and push notifications. */
+  dose: string;
+  times: string[];
+  stock: number;
+  tolerance: number;
+  /** Optional structured fields; absent on medication records created by older app versions. */
+  schedule?: DoseSchedule[];
+  strengthValue?: number;
+  strengthUnit?: string;
+  presentation?: string;
+  quantityPerDose?: number;
+  quantityUnit?: string;
+  initialStock?: number;
+}
 export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }
 export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean }
