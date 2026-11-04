@@ -88,3 +88,104 @@ self.addEventListener("notificationclick", (event) => {
   }
   event.waitUntil(openApp(data.url));
 });
+
+
+// ---- Offline application shell ----
+// Cache only same-origin app navigation and static assets. API requests,
+// auth endpoints and Supabase data are deliberately never cached here.
+const OFFLINE_CACHE_PREFIX = "dose-certa-shell-";
+const OFFLINE_CACHE_NAME = OFFLINE_CACHE_PREFIX + "v1";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(OFFLINE_CACHE_NAME);
+    try {
+      await cache.add(new Request("/", { cache: "reload" }));
+    } catch (error) {
+      // The service worker may install in a constrained preview. Runtime
+      // caching can still fill the shell cache on the next successful visit.
+      console.warn("Dose Certa offline shell precache skipped", error);
+    }
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names
+      .filter((name) => name.startsWith(OFFLINE_CACHE_PREFIX) && name !== OFFLINE_CACHE_NAME)
+      .map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
+});
+
+function isCacheableAppRequest(request, url) {
+  if (request.method !== "GET" || url.origin !== self.location.origin) return false;
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/_serverFn") ||
+    url.pathname.startsWith("/auth/") ||
+    url.pathname.startsWith("/rest/") ||
+    url.pathname.startsWith("/storage/") ||
+    url.pathname.startsWith("/firebase-messaging-sw.js") ||
+    url.pathname.includes("supabase")
+  ) return false;
+  return true;
+}
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (!isCacheableAppRequest(request, url)) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith((async () => {
+      const cache = await caches.open(OFFLINE_CACHE_NAME);
+      try {
+        const response = await fetch(request);
+        if (response && response.ok && response.type !== "opaque") {
+          await cache.put(request, response.clone());
+          // The root route is the offline entry point for the single-shell app.
+          if (url.pathname === "/") await cache.put("/", response.clone());
+        }
+        return response;
+      } catch {
+        return (await cache.match(request))
+          || (await cache.match("/"))
+          || new Response(
+            "O Dose Certa ainda não foi carregado neste aparelho. Conecte-se à internet e abra o aplicativo uma vez para preparar o acesso offline.",
+            { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+          );
+      }
+    })());
+    return;
+  }
+
+  const isStaticAsset = ["script", "style", "image", "font", "worker"].includes(request.destination)
+    || url.pathname.startsWith("/assets/")
+    || /\\.(?:js|css|png|jpe?g|webp|svg|woff2?|ttf|ico)$/i.test(url.pathname);
+  if (!isStaticAsset) return;
+
+  event.respondWith((async () => {
+    const cache = await caches.open(OFFLINE_CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) {
+      // Refresh cache in the background while serving a known-good resource.
+      void fetch(request).then((response) => {
+        if (response && response.ok && response.type !== "opaque") return cache.put(request, response);
+        return undefined;
+      }).catch(() => undefined);
+      return cached;
+    }
+    try {
+      const response = await fetch(request);
+      if (response && response.ok && response.type !== "opaque") {
+        await cache.put(request, response.clone());
+      }
+      return response;
+    } catch {
+      return new Response("", { status: 504, statusText: "Offline resource unavailable" });
+    }
+  })());
+});
