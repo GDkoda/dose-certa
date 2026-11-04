@@ -18,8 +18,19 @@ CREATE TABLE public.app_records (id text PRIMARY KEY, kind text NOT NULL CHECK (
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.app_records TO authenticated;
 GRANT ALL ON public.app_records TO service_role;
 ALTER TABLE public.app_records ENABLE ROW LEVEL SECURITY;
-CREATE POLICY records_read ON public.app_records FOR SELECT TO authenticated USING (owner_id = auth.uid() OR public.has_role(auth.uid(),'mestre') OR (public.has_role(auth.uid(),'operador') AND kind = 'tickets') OR kind = 'config');
-CREATE POLICY records_insert ON public.app_records FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config'));
-CREATE POLICY records_update ON public.app_records FOR UPDATE TO authenticated USING (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador'))) WITH CHECK (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador')));
-CREATE POLICY records_delete ON public.app_records FOR DELETE TO authenticated USING (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config'));
+CREATE OR REPLACE FUNCTION public.password_change_completed(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT COALESCE((SELECT NOT must_change FROM public.profiles WHERE id = _user_id), false)
+$;
+REVOKE ALL ON FUNCTION public.password_change_completed(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.password_change_completed(uuid) TO authenticated, service_role;
+CREATE POLICY records_read ON public.app_records FOR SELECT TO authenticated USING (public.password_change_completed(auth.uid()) AND (owner_id = auth.uid() OR public.has_role(auth.uid(),'mestre') OR (public.has_role(auth.uid(),'operador') AND kind = 'tickets') OR kind = 'config'));
+CREATE POLICY records_insert ON public.app_records FOR INSERT TO authenticated WITH CHECK (public.password_change_completed(auth.uid()) AND (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config')));
+CREATE POLICY records_update ON public.app_records FOR UPDATE TO authenticated USING (public.password_change_completed(auth.uid()) AND (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador')))) WITH CHECK (public.password_change_completed(auth.uid()) AND (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config') OR (kind = 'tickets' AND public.has_role(auth.uid(),'operador'))));
+CREATE POLICY records_delete ON public.app_records FOR DELETE TO authenticated USING (public.password_change_completed(auth.uid()) AND (public.has_role(auth.uid(),'mestre') OR (owner_id = auth.uid() AND kind <> 'config')));
 ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles, public.user_roles, public.app_records;

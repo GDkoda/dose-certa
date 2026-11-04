@@ -588,8 +588,8 @@ function AlarmEngine({ me }: { me: User }) {
       setActionBusy(true);
       try {
         await confirmDose({ data: { doseId: d.id } });
-        await refreshCloud();
         closeActive();
+        await refreshCloud().catch(() => undefined);
       } catch (error) {
         setActionError(error instanceof Error ? error.message : "Não foi possível registrar a dose.");
       } finally {

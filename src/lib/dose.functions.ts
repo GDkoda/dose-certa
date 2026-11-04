@@ -9,6 +9,13 @@ export const confirmDoseTaken = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => confirmDoseSchema.parse(data))
   .handler(async ({ context, data }) => {
+    const { data: profile, error: profileError } = await context.supabase
+      .from("profiles")
+      .select("must_change")
+      .eq("id", context.userId)
+      .single();
+    if (profileError || profile?.must_change) throw new Error("Altere sua senha antes de continuar.");
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: confirmed, error } = await supabaseAdmin.rpc("confirm_doses_and_deduct_stock", {
       p_owner: context.userId,

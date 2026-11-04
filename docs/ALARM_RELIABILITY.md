@@ -1,94 +1,71 @@
 # Dose Certa — confiabilidade dos alarmes
 
-Branch de implementação: `Alpha2`
+Branch de implementação: `teste.1`
 
-## Implementado no repositório
+## Implementado no código
 
-- O motor local usa regras puras para gerar doses diárias e selecionar a próxima dose pendente.
-- A criação das doses evita duplicatas para o mesmo medicamento e instante programado.
-- A seleção do alerta respeita status, horário previsto, adiamento, intervalo de repetição e limite de 12 horas.
-- Há testes unitários para horários, geração de doses, repetição e prioridade.
-- O service worker mostra notificações de dados recebidas pelo Firebase Messaging em segundo plano e trata cliques para abrir o app.
-- A interface esclarece que registrar o aparelho não garante que o serviço de envio esteja operacional.
-- A Edge Function `send-dose-reminders` consulta doses e dispositivos, limita lembretes a 12 horas após o horário previsto, usa mensagens FCM data-only e tenta remover tokens inválidos.
-- A migration `202610270001_push_delivery_claim.sql` define o controle de idempotência por dose, intervalo e dispositivo.
+- As doses diárias geradas no navegador usam IDs determinísticos, compatíveis com a geração do agendador do servidor quando ambos usam o mesmo instante UTC.
+- O motor local mantém um único alarme ativo até que ele seja resolvido; a próxima dose não substitui o aviso aberto a cada ciclo de verificação.
+- Ao retornar para a aba ou receber uma mensagem do Service Worker, o app atualiza o estado remoto. Uma dose que já esteja finalizada no servidor encerra o alarme local.
+- As ações “Já tomei” na notificação e no app usam a função transacional `confirm_doses_and_deduct_stock`: mudança de status e desconto de estoque ocorrem juntos, e uma repetição da ação não desconta novamente.
+- O Service Worker fecha a notificação correspondente e avisa as janelas abertas após uma ação concluída. Ele não reexibe repetidamente a mesma notificação em pulsos de meio segundo.
+- O cache offline faz operações de leitura-modificação-gravação no IndexedDB dentro de uma transação. Na reconciliação, uma dose finalizada no servidor vence uma cópia offline antiga ainda marcada como pendente.
+- O agendador TanStack e a Edge Function usam a mesma chave idempotente por dose, janela de cinco minutos e dispositivo. Se ambos estiverem ativos, apenas um deve reivindicar cada entrega.
+- O carregamento do estado remoto percorre páginas de 500 registros, em vez de depender de uma única resposta limitada pelo servidor.
 
-## Configuração obrigatória antes de ativar
+## Migrations necessárias
 
-A implementação está versionada, mas o envio real **não estará ativo** até que o projeto Supabase e o Firebase sejam configurados. Não há como confirmar credenciais, executar migrations no projeto remoto ou agendar a função a partir deste repositório.
+Aplique todas as migrations novas antes de testar:
 
-1. Aplique a migration no projeto Supabase ligado ao app.
-2. Configure os secrets da Edge Function:
-   - `DOSE_REMINDER_CRON_SECRET`: segredo aleatório forte, usado para autorizar somente o agendador.
-   - `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON da conta de serviço do Firebase com acesso ao Firebase Cloud Messaging. Não coloque esse JSON no frontend nem no Git.
-   - `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`: disponibilizados no ambiente Supabase para Edge Functions; confirme a configuração do projeto.
-3. Faça deploy da função `send-dose-reminders`.
-4. Configure Supabase Cron para chamar a função a cada minuto, enviando o header `x-cron-secret` com o mesmo valor guardado em `DOSE_REMINDER_CRON_SECRET`. Guarde a credencial do agendador em Supabase Vault ou em outro mecanismo de secrets do lado servidor; não a grave em SQL versionado.
-5. Verifique logs da Edge Function e do Cron antes de testar com uma dose de teste e um dispositivo real.
+- `202611040001_atomic_dose_confirmation.sql`: alinha a assinatura da função de idempotência e cria a confirmação transacional da dose com desconto de estoque.
+- `202611040002_limit_operator_health_data.sql`: limita a leitura do operador aos chamados e exige que a troca obrigatória de senha esteja concluída antes de acessar registros.
 
-Exemplo de deploy (com Supabase CLI já autenticado e projeto vinculado):
+O arquivo equivalente para o fluxo Drizzle está em `drizzle/migrations`.
 
-```sh
-supabase db push
-supabase secrets set DOSE_REMINDER_CRON_SECRET='<segredo-forte>'
-supabase secrets set FIREBASE_SERVICE_ACCOUNT_JSON='<JSON-da-conta-de-servico>'
-supabase functions deploy send-dose-reminders
-```
+## Configuração obrigatória
 
-A forma de armazenar e referenciar o segredo no Supabase Cron depende da configuração do projeto. Não crie uma chamada agendada pública sem autenticação.
+O código versionado não confirma que as credenciais, migrations ou agendadores estejam ativos no projeto remoto.
+
+1. Aplique as migrations no projeto Supabase.
+2. Configure `DOSE_ACTION_SIGNING_SECRET` com o mesmo segredo forte no ambiente servidor do app e nas Edge Functions. O app mantém compatibilidade com `LOVABLE_API_KEY` como fallback, mas um segredo dedicado compartilhado é preferível.
+3. Para o envio pela Edge Function, configure também `DOSE_REMINDER_CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`.
+4. Para o envio pela rota TanStack, configure `LOVABLE_API_KEY`, `FIREBASE_MESSAGING_API_KEY` e a autenticação de Cron esperada por `authenticateCronRequest`.
+5. Confirme qual agendador está configurado no projeto. A chave idempotente comum evita dois envios para a mesma dose/dispositivo/janela; quando os emissores competirem, um grupo de doses pode aparecer dividido em notificações separadas.
+6. Faça deploy da Edge Function depois das alterações. Não basta aplicar apenas as migrations.
 
 ## Como funciona o envio
 
-- A função busca registros `app_records` do tipo `doses` e `meds`, mais dispositivos em `push_devices`.
-- Só processa doses `pendente` cujo horário chegou e que não tenham mais de 12 horas.
-- Respeita `snoozeUntil`; usa uma janela de cinco minutos para gerar a chave idempotente de entrega.
-- Envia mensagem FCM data-only para o service worker, que monta a notificação localmente.
-- Registra tentativa e envio em `push_deliveries`. Uma tentativa sem sucesso pode ser reivindicada novamente após dois minutos.
-- Tokens que o FCM reporta como não registrados são removidos.
+- O agendador identifica doses pendentes até 12 horas após o horário previsto e respeita `snoozeUntil`.
+- A chave de entrega é `doseId:slot:tokenFinal`, onde `slot` é a janela de cinco minutos. A claim é protegida por uma função SQL no banco.
+- O payload FCM é data-only. O Service Worker constrói a notificação e envia a ação assinada para `/api/public/dose-action`.
+- A confirmação da notificação valida o HMAC antes de executar a operação privilegiada no banco.
+- A função SQL bloqueia as linhas de dose e medicamento, confirma apenas doses ainda pendentes e subtrai o estoque de maneira atômica.
+- Tentativas malsucedidas ficam registradas em `push_deliveries` e podem ser reivindicadas novamente após a janela de recuperação.
 
-## Limitações e pontos a validar
+## Limitações que ainda exigem validação em ambiente real
 
-- O processo consulta todos os registros de doses e medicamentos; para grandes volumes, adicionar paginação e filtros no banco.
-- A chave idempotente evita duplicação de processamento por intervalo, mas falhas entre o FCM aceitar a mensagem e o banco registrar `sent_at` ainda podem causar um reenvio após a janela de recuperação.
-- O envio usa horário UTC da dose armazenada; confirmar que os horários são persistidos como instantes UTC corretos. O campo de fuso dos dispositivos está disponível para futuras regras de agenda local.
-- O estado do aplicativo pode mudar depois que a função consulta a dose. A função revalida no ciclo de execução, mas para cargas maiores deve buscar/validar cada dose imediatamente antes do envio.
-- A função não consegue garantir que o sistema operacional mostre cada notificação; permissões, conectividade, economia de bateria e políticas do dispositivo podem interferir.
-- Tokens FCM e nomes de medicamentos são dados sensíveis. Limite acesso aos logs e retenção, e nunca registre tokens completos ou payloads de saúde em logs.
-- O projeto precisa validar RLS e permissões das tabelas `app_records`, `push_devices` e `push_deliveries` antes de produção.
-
-## Escopo de produto
-
-O vínculo entre familiares e cuidadores foi descartado por decisão do produto e não faz parte do escopo desta etapa. Os alertas permanecem limitados aos dispositivos registrados na mesma conta proprietária.
-
-A duração do estoque é apenas uma estimativa: o modelo atual não registra unidades por dose nem volume de líquidos, então o cálculo assume uma unidade por horário cadastrado. Não deve ser interpretada como prescrição ou recomendação de dose.
-
-## Relatórios e adesão
-
-O histórico separa doses tomadas, não tomadas e pendentes. A porcentagem de adesão considera somente doses finalizadas (tomadas ou não tomadas); doses pendentes ficam fora do denominador para não distorcer o resultado. O relatório é informativo e não substitui orientação clínica.
+- Os fusos horários são definidos pelos dispositivos registrados; em contas com aparelhos em fusos diferentes, o agendador usa o dispositivo atualizado mais recentemente. Uma configuração de fuso no nível da conta seria mais consistente em viagens ou uso multi-região.
+- A disponibilidade da notificação depende das permissões e das políticas do Android, iOS, navegador, economia de bateria e conectividade. O código não consegue garantir que o sistema operacional exiba ou toque cada alerta.
+- O agendador carrega os registros de medicamentos e doses da conta em cada execução. Contas muito grandes podem precisar de paginação adicional nesse caminho.
+- Um erro entre o FCM aceitar uma mensagem e o banco gravar `sent_at` pode gerar reenvio depois da janela de recuperação; a ação do usuário, por sua vez, continua idempotente.
+- O projeto remoto, Cron, Edge Function, Firebase e migrations aplicadas precisam ser verificados separadamente. A versão do código não prova que a configuração de produção esteja ativa.
 
 ## Matriz mínima de validação manual
 
-- Chrome desktop: app aberto, aba em segundo plano, aba fechada, permissão permitida e negada.
-- Android/Chrome: tela bloqueada, economia de bateria, rede alternada, app PWA e navegador fechado.
-- iPhone/Safari: Safari normal e web app instalado na Tela de Início; registrar a versão do iOS e o estado das permissões.
-- Retorno após ficar offline: verificar reconciliação das doses sem duplicar nem reabrir doses confirmadas.
-- Sincronização multiaparelho: confirmar dose num dispositivo e verificar que os demais não continuam notificando após sincronização.
+- Chrome desktop: app aberto, aba em segundo plano, aba fechada e permissões permitidas/negadas.
+- Android/Chrome: tela bloqueada, economia de bateria, rede alternada, PWA instalado e navegador.
+- iPhone/Safari: Safari e web app na Tela de Início; registrar versão do iOS e permissões.
+- Confirmar “Já tomei” na notificação com o app aberto: som e vibração devem parar sem abrir o app.
+- Confirmar “Já tomei” com o app fechado: ao abrir novamente, a dose deve aparecer tomada.
+- Confirmar estoque: uma dose confirmada por notificação e também por clique repetido deve descontar exatamente uma vez.
+- Sincronização multiaparelho: confirmar num aparelho e validar que os demais não mantêm o alarme ativo após sincronização.
+- Testar adiamento de cinco minutos, dose não tomada, modo offline, reconexão e transição de horário de verão.
 
 ## Critérios de aceite
 
-- Nenhuma dose duplicada ao atualizar/reabrir a página ou após sincronização.
-- Doses confirmadas não voltam a pendente.
-- Adiar cinco minutos atualiza a próxima janela de alerta.
-- Notificações server-side são enviadas com a página fechada, dentro das limitações documentadas de cada plataforma.
+- Nenhuma dose confirmada volta a pendente após sincronização.
+- O alarme local encerra quando a confirmação chega de outra aba, aparelho ou notificação.
+- O estoque é descontado uma única vez por dose confirmada.
+- O adiamento bloqueia o alerta até o novo horário.
 - Falhas de envio ficam observáveis e o app não promete entrega garantida.
-- Testes automatizados, build e lint passam; cenários reais em Android e iOS são documentados.
-
-## Comandos de verificação
-
-```sh
-npm run test
-npm run lint
-npm run build
-```
-
-Os comandos precisam ser executados num ambiente com dependências e variáveis configuradas. A existência dos testes não significa que tenham sido executados nesta alteração.
+- Testes automatizados, build e lint passam; Android e iOS reais são testados manualmente.

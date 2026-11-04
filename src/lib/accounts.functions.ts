@@ -72,6 +72,8 @@ export const manageAccount = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => manageAccountSchema.parse(data))
   .handler(async ({ context, data }) => {
+    const { data: profile, error: profileError } = await context.supabase.from('profiles').select('must_change').eq('id', context.userId).single();
+    if (profileError || profile?.must_change) throw new Error('Altere sua senha antes de continuar.');
     const { data: allowed, error: roleError } = await context.supabase.rpc('has_role', { _user_id: context.userId, _role: 'mestre' });
     if (roleError || !allowed) throw new Error('Somente o Mestre pode gerenciar contas.');
     if (data.action !== 'create') {
