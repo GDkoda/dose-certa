@@ -713,6 +713,33 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
   const [f, setF] = useState({ name: "", age: "", notes: "" });
   const [err, setErr] = useState("");
+  const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+  const [editPatientForm, setEditPatientForm] = useState({ name: "", age: "", notes: "" });
+  const [editPatientError, setEditPatientError] = useState("");
+
+  const beginPatientEdit = (patient: { id: string; name: string; age: number; notes: string }) => {
+    setEditingPatientId(patient.id);
+    setEditPatientForm({ name: patient.name, age: String(patient.age), notes: patient.notes ?? "" });
+    setEditPatientError("");
+  };
+
+  const savePatientEdit = (event: React.FormEvent, patientId: string) => {
+    event.preventDefault();
+    const name = editPatientForm.name.trim();
+    const age = Number(editPatientForm.age);
+    if (!name) return setEditPatientError("Informe o nome do paciente.");
+    if (editPatientForm.age.trim() === "" || !Number.isFinite(age) || age < 0) {
+      return setEditPatientError("Informe uma idade válida, igual ou maior que zero.");
+    }
+    setState((state) => ({
+      ...state,
+      patients: state.patients.map((patient) => patient.id === patientId
+        ? { ...patient, name, age, notes: editPatientForm.notes.trim() }
+        : patient),
+    }));
+    setEditingPatientId(null);
+    setEditPatientError("");
+  };
 
   const focusPatientForm = () => {
     document.getElementById("patient-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -740,7 +767,7 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
         <form id="patient-form" className={cls(card, "grid gap-3 sm:grid-cols-[1fr_120px]")} onSubmit={(e) => {
           e.preventDefault();
           setErr("");
-          if (!f.name.trim() || !Number(f.age)) return setErr("Informe nome e idade.");
+          if (!f.name.trim() || f.age.trim() === "" || !Number.isFinite(Number(f.age)) || Number(f.age) < 0) return setErr("Informe nome e idade válida.");
           if (!canAddPatient(getState(), me.id)) return setErr(`Limite de ${MAX_PATIENTS} pacientes.`);
           const patientId = uid();
           setState((s) => ({ ...s, patients: [...s.patients, { id: patientId, ownerId: me.id, name: f.name.trim(), age: Number(f.age), notes: f.notes.trim() }] }));
@@ -766,14 +793,44 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
                     <p className="break-words font-display text-lg font-semibold text-foreground">{p.name}</p>
                     <p className="text-sm text-muted-foreground">{p.age} anos</p>
                   </div>
-                  <button aria-label={`Excluir paciente ${p.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
-                    if (confirm(`Excluir ${p.name} e seus medicamentos?`)) {
-                      setState((s) => ({ ...s, patients: s.patients.filter((x) => x.id !== p.id), meds: s.meds.filter((m) => m.patientId !== p.id), doses: s.doses.filter((d) => d.patientId !== p.id) }));
-                      if (activePatientId === p.id) onSelectPatient("");
-                    }
-                  }}><Trash2 className="h-4 w-4" /></button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button type="button" aria-label={`Editar paciente ${p.name}`} title="Editar paciente" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => beginPatientEdit(p)}>
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button type="button" aria-label={`Excluir paciente ${p.name}`} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
+                      if (confirm(`Excluir ${p.name} e seus medicamentos?`)) {
+                        setState((s) => ({ ...s, patients: s.patients.filter((x) => x.id !== p.id), meds: s.meds.filter((m) => m.patientId !== p.id), doses: s.doses.filter((d) => d.patientId !== p.id) }));
+                        if (activePatientId === p.id) onSelectPatient("");
+                      }
+                    }}><Trash2 className="h-4 w-4" /></button>
+                  </div>
                 </div>
-                {p.notes && <p className="mt-2 text-sm text-muted-foreground">{p.notes}</p>}
+                {editingPatientId === p.id ? (
+                  <form className="mt-3 space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.04] p-3" onSubmit={(event) => savePatientEdit(event, p.id)}>
+                    <p className="text-sm font-bold text-foreground">Editar dados do paciente</p>
+                    <label className="block space-y-1 text-xs font-semibold text-foreground">
+                      Nome
+                      <input autoFocus className={input} value={editPatientForm.name} onChange={(event) => setEditPatientForm((current) => ({ ...current, name: event.target.value }))} />
+                    </label>
+                    <label className="block space-y-1 text-xs font-semibold text-foreground">
+                      Idade
+                      <input className={input} type="number" min="0" step="1" value={editPatientForm.age} onChange={(event) => setEditPatientForm((current) => ({ ...current, age: event.target.value }))} />
+                    </label>
+                    <label className="block space-y-1 text-xs font-semibold text-foreground">
+                      Observações
+                      <textarea className={input} rows={3} value={editPatientForm.notes} onChange={(event) => setEditPatientForm((current) => ({ ...current, notes: event.target.value }))} />
+                    </label>
+                    {editPatientError && <p role="alert" className="text-xs font-semibold text-destructive">{editPatientError}</p>}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="submit" className={cls(btnPrimary, "flex-1")}><CheckCircle2 className="h-4 w-4" />Salvar alterações</button>
+                      <button type="button" className={btnOutline} onClick={() => { setEditingPatientId(null); setEditPatientError(""); }}>Cancelar</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    {p.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{p.notes}</p>}
+                  </>
+                )}
                 {me.role === "cuidador" && (
                   <button type="button" onClick={() => onSelectPatient(isActive ? "" : p.id)} className={cls("mt-4 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition", isActive ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted")}>
                     {isActive ? <><CheckCircle2 className="h-4 w-4" />Paciente selecionado</> : "Selecionar paciente"}
