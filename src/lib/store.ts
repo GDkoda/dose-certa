@@ -50,6 +50,8 @@ export interface Med {
   quantityPerDose?: number;
   quantityUnit?: string;
   initialStock?: number;
+  /** Archived medications remain available to historical dose records. */
+  archivedAt?: string;
 }
 export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }

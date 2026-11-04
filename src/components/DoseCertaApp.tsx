@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  AlarmClock, Archive, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   CloudOff, CloudUpload, Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -340,11 +340,13 @@ function PaletteQuickAccess() {
 }
 
 /* ---------------- sound ---------------- */
+let alarmAudioContext: AudioContext | null = null;
 function beep() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioContextClass();
-    void ctx.resume();
+    if (!alarmAudioContext || alarmAudioContext.state === "closed") alarmAudioContext = new AudioContextClass();
+    const ctx = alarmAudioContext;
+    if (ctx.state === "suspended") void ctx.resume();
     [0, 0.24, 0.68, 0.92].forEach((t, index) => {
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -359,7 +361,6 @@ function beep() {
       oscillator.start(ctx.currentTime + t);
       oscillator.stop(ctx.currentTime + t + 0.21);
     });
-    window.setTimeout(() => { void ctx.close().catch(() => undefined); }, 1800);
   } catch { /* áudio indisponível ou bloqueado pelo navegador */ }
 }
 
@@ -705,7 +706,7 @@ type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | 
 
 function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) => void; activePatientId?: string }) {
   const doses = useStore((s) => s.doses.filter((d) => d.ownerId === me.id && (!activePatientId || d.patientId === activePatientId) && new Date(d.scheduledAt).toDateString() === new Date().toDateString()));
-  const meds = useStore((s) => s.meds); const patients = useStore((s) => s.patients);
+  const meds = useStore((s) => s.meds.filter((med) => !med.archivedAt)); const patients = useStore((s) => s.patients);
   const taken = doses.filter((d) => d.status === "tomado").length;
   const pend = doses.filter((d) => d.status === "pendente").length;
   const miss = doses.filter((d) => d.status === "nao_tomado").length;
@@ -1066,6 +1067,9 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
     tolerance: String(med.tolerance ?? 0),
   }));
   const [error, setError] = useState("");
+  const [confirmedUnitChange, setConfirmedUnitChange] = useState(false);
+  const originalQuantityUnit = med.quantityUnit ?? (med.presentation ? defaultQuantityUnit(med.presentation) : "Unidade(s)");
+  const quantityUnitChanged = form.quantityUnit !== originalQuantityUnit;
 
   const updateSchedule = (index: number, patch: Partial<DoseSchedule>) => {
     setForm((current) => ({
@@ -1089,6 +1093,7 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
     if (strengthText !== "" && (!Number.isFinite(strength) || (strength ?? 0) <= 0)) return setError("A concentração precisa ser maior que zero ou ficar em branco para manter o cadastro antigo.");
     if (!Number.isFinite(quantity) || quantity <= 0) return setError("Informe uma quantidade por dose maior que zero.");
     if (!Number.isFinite(stock) || stock < 0) return setError("Informe o estoque atual, igual ou maior que zero.");
+    if (quantityUnitChanged && !confirmedUnitChange) return setError("Confirme que recalculou o estoque na nova unidade antes de salvar.");
     if (!form.schedule.length || form.schedule.length > 6
       || times.some((time) => !/^([01]\\d|2[0-3]):([0-5]\\d)$/.test(time))
       || new Set(times).size !== times.length) {
@@ -1141,7 +1146,10 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
         </label>
         <label className="block space-y-1 text-xs font-semibold text-foreground">
           Apresentação
-          <select className={input} value={form.presentation} onChange={(event) => setForm((current) => ({ ...current, presentation: event.target.value, quantityUnit: defaultQuantityUnit(event.target.value) }))}>
+          <select className={input} value={form.presentation} onChange={(event) => {
+            setConfirmedUnitChange(false);
+            setForm((current) => ({ ...current, presentation: event.target.value, quantityUnit: defaultQuantityUnit(event.target.value) }));
+          }}>
             {PRESENTATIONS.map((presentation) => <option key={presentation} value={presentation}>{presentation}</option>)}
           </select>
         </label>
@@ -1149,7 +1157,10 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
           Quantidade por dose
           <div className="grid grid-cols-[minmax(0,1fr)_9rem] gap-2">
             <input className={input} type="number" min="0.01" step="0.01" inputMode="decimal" value={form.quantityPerDose} onChange={(event) => setForm((current) => ({ ...current, quantityPerDose: event.target.value }))} />
-            <select aria-label="Unidade por dose" className={input} value={form.quantityUnit} onChange={(event) => setForm((current) => ({ ...current, quantityUnit: event.target.value }))}>
+            <select aria-label="Unidade por dose" className={input} value={form.quantityUnit} onChange={(event) => {
+              setConfirmedUnitChange(false);
+              setForm((current) => ({ ...current, quantityUnit: event.target.value }));
+            }}>
               {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
             </select>
           </div>
@@ -1170,6 +1181,12 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
         </label>
       </div>
 
+      {quantityUnitChanged && (
+        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs leading-relaxed text-foreground">
+          <input type="checkbox" className="mt-0.5" checked={confirmedUnitChange} onChange={(event) => setConfirmedUnitChange(event.target.checked)} />
+          <span>Recalculei o estoque atual de <strong>{originalQuantityUnit}</strong> para <strong>{form.quantityUnit}</strong>. O número informado acima representa a nova unidade.</span>
+        </label>
+      )}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-bold text-foreground">Horários e períodos</p>
@@ -1212,7 +1229,7 @@ function Meds({ me, activePatientId = "", go }: {
   go: (page: Page) => void;
 }) {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
-  const allMeds = useStore((s) => s.meds.filter((m) => me.role === "mestre" || m.ownerId === me.id));
+  const allMeds = useStore((s) => s.meds.filter((m) => (me.role === "mestre" || m.ownerId === me.id) && !m.archivedAt));
   const meds = allMeds.filter((m) => !activePatientId || m.patientId === activePatientId);
   const [step, setStep] = useState(1);
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
@@ -1559,11 +1576,15 @@ function Meds({ me, activePatientId = "", go }: {
                   <button type="button" aria-label={"Editar medicamento " + m.name} title="Editar medicamento" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => setEditingMedicationId(m.id)}>
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button type="button" aria-label={"Excluir medicamento " + m.name} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
-                    if (confirm("Excluir " + m.name + " e seus registros de doses?")) {
-                      setState((state) => ({ ...state, meds: state.meds.filter((item) => item.id !== m.id), doses: state.doses.filter((dose) => dose.medId !== m.id) }));
+                  <button type="button" aria-label={"Arquivar medicamento " + m.name} title="Arquivar medicamento" className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => {
+                    if (confirm("Arquivar " + m.name + "? O histórico de doses finalizadas será preservado e os lembretes pendentes serão removidos.")) {
+                      setState((state) => ({
+                        ...state,
+                        meds: state.meds.map((item) => item.id === m.id ? { ...item, archivedAt: new Date().toISOString() } : item),
+                        doses: state.doses.filter((dose) => dose.medId !== m.id || dose.status !== "pendente"),
+                      }));
                     }
-                  }}><Trash2 className="h-4 w-4" /></button>
+                  }}><Archive className="h-4 w-4" /></button>
                 </div>
               </div>
 

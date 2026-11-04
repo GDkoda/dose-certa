@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
     const { data: devices, error } = await db.from("push_devices").select("*");
     if (error) return new Response("Could not load devices", { status: 500 });
     const now = Date.now(); let sent = 0; let failed = 0;
-    const medSchema = z.object({ patientId: z.string(), times: z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)) });
+    const medSchema = z.object({ patientId: z.string(), times: z.array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)), archivedAt: z.string().optional() });
     const doseSchema = z.object({ medId: z.string(), patientId: z.string(), scheduledAt: z.string().datetime(), status: z.enum(["pendente", "tomado", "nao_tomado"]), snoozeUntil: z.string().optional(), lastShown: z.string().optional() });
     for (const owner of new Set((devices ?? []).map((device) => device.owner_id))) {
       const owned = (devices ?? []).filter((device) => device.owner_id === owner);
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
       const day = `${dayParts['year']}-${dayParts['month']}-${dayParts['day']}`;
       for (const record of records ?? []) {
         if (record.kind !== "meds") continue;
-        const parsed = medSchema.safeParse(record.payload); if (!parsed.success) continue;
+        const parsed = medSchema.safeParse(record.payload); if (!parsed.success || parsed.data.archivedAt) continue;
         for (const time of parsed.data.times) {
           const scheduledAt = scheduledInTimezone(day, time, timezone);
           if (doses.some((dose) => dose.medId === record.id && dose.scheduledAt === scheduledAt)) continue;
@@ -46,12 +46,16 @@ export const Route = createFileRoute("/api/public/jobs/medication-reminders")({
         }
       }
       // Group pending doses of the same patient at the same time into one notification.
-      const names = new Map<string, string>(); const medInfo = new Map<string, { name: string; dose: string }>();
+      const names = new Map<string, string>(); const medInfo = new Map<string, { name: string; dose: string; archived: boolean }>();
       const { data: pats } = await db.from("app_records").select("id,payload").eq("owner_id", owner).eq("kind", "patients");
       for (const p of pats ?? []) names.set(p.id, String((p.payload as Record<string, unknown>)?.["name"] ?? "Paciente"));
-      for (const r of records ?? []) if (r.kind === "meds") { const m = r.payload as Record<string, unknown>; medInfo.set(r.id, { name: String(m?.["name"] ?? "Medicamento"), dose: String(m?.["dose"] ?? "") }); }
+      for (const r of records ?? []) if (r.kind === "meds") {
+        const m = r.payload as Record<string, unknown>;
+        medInfo.set(r.id, { name: String(m?.["name"] ?? "Medicamento"), dose: String(m?.["dose"] ?? ""), archived: Boolean(m?.["archivedAt"]) });
+      }
       const groups = new Map<string, { patientId: string; scheduledAt: string; slot: number; doses: Dose[] }>();
       for (const dose of doses) {
+        if (medInfo.get(dose.medId)?.archived) continue;
         const slot = pushSlot(dose, now); if (slot === null) continue;
         const gk = `${dose.patientId}|${dose.scheduledAt}`;
         const g = groups.get(gk) ?? { patientId: dose.patientId, scheduledAt: dose.scheduledAt, slot, doses: [] };

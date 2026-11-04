@@ -24,7 +24,7 @@ export function buildMissingDoses(
   const existingKeys = new Set(existing.map((dose) => `${dose.medId}|${dose.scheduledAt}`));
   const additions: Dose[] = [];
   for (const med of meds) {
-    if (med.ownerId !== ownerId) continue;
+    if (med.ownerId !== ownerId || med.archivedAt) continue;
     for (const time of med.times) {
       let scheduledAt: string;
       try { scheduledAt = localScheduledAt(start, time); } catch { continue; }

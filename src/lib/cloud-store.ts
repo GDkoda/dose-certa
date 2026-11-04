@@ -16,6 +16,7 @@ const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets'] as const;
 let currentId: string | null = null;
 let queue = Promise.resolve();
 let refreshing: Promise<void> | undefined;
+let refreshQueued = false;
 let errorHandler: (message: string) => void = () => {};
 let writeFailed = false;
 export async function flushCloudWrites() { await queue; if (writeFailed) throw new Error('Os registros não foram salvos. Confira a conexão e tente novamente.'); }
@@ -102,7 +103,10 @@ async function flushPendingChanges(userId: string): Promise<number> {
 }
 
 export async function refreshCloud() {
-  if (refreshing) { await refreshing; return refreshCloud(); }
+  if (refreshing) {
+    refreshQueued = true;
+    return refreshing;
+  }
   const id = currentId;
   refreshing = (async () => {
     if (!id) {
@@ -157,7 +161,15 @@ export async function refreshCloud() {
       latest?.lastSyncedAt ?? null,
     );
   })();
-  try { await refreshing; } finally { refreshing = undefined; }
+  try {
+    await refreshing;
+  } finally {
+    refreshing = undefined;
+    if (refreshQueued) {
+      refreshQueued = false;
+      void refreshCloud().catch(() => errorHandler('Não foi possível atualizar os dados compartilhados.'));
+    }
+  }
 }
 
 export async function initializeCloud() {

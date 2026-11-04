@@ -4,7 +4,7 @@ type Dose = {
   id: string; ownerId: string; patientId: string; medId: string;
   scheduledAt: string; status: string; snoozeUntil?: string; lastShown?: string;
 };
-type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number };
+type Med = { id: string; ownerId: string; patientId: string; name: string; dose: string; tolerance?: number; archivedAt?: string };
 type Patient = { id: string; name: string };
 type Device = { owner_id: string; token: string; timezone: string };
 
@@ -109,7 +109,7 @@ Deno.serve(async (request) => {
     if (dose.snoozeUntil && Date.parse(dose.snoozeUntil) > now) { skipped++; continue; }
     if (dose.lastShown && now - Date.parse(dose.lastShown) < 5 * 60_000) { skipped++; continue; }
     const med = meds.get(dose.medId);
-    if (!med || med.ownerId !== dose.ownerId) { skipped++; continue; }
+    if (!med || med.archivedAt || med.ownerId !== dose.ownerId) { skipped++; continue; }
     const patient = patients.get(dose.patientId)?.name ?? "Paciente";
     const devices = devicesByOwner.get(dose.ownerId) ?? [];
     if (!devices.length) { skipped++; continue; }
