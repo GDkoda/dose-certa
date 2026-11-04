@@ -517,7 +517,7 @@ function AlarmEngine({ me }: { me: User }) {
       if (routineReminders.length) {
         const alerts = routineReminders.map((task) => ({
           id: uid(), ownerId: me.id, at: new Date().toISOString(), read: false,
-          sourceKey: "routine:" + task.id + ":" + todayKey,
+          sourceKey: "dc-routine-" + task.id + "-" + todayKey,
           text: "Lembrete de rotina · " + (s.patients.find((patient) => patient.id === task.patientId)?.name ?? "Paciente") + " · " + task.pictogram + " " + task.title,
         }));
         setState((state) => ({ ...state, alerts: [...alerts, ...state.alerts] }));
