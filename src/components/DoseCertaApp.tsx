@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
@@ -19,7 +19,7 @@ import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
 import { summarizeDoseStatuses } from "@/lib/report-rules";
 import {
   canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
-  type Dose, type Role, type User,
+  type Dose, type DosePeriod, type DoseSchedule, type Role, type User,
 } from "@/lib/store";
 
 /* ---------------- helpers ---------------- */
@@ -541,7 +541,10 @@ function AlarmEngine({ me }: { me: User }) {
   const act = (kind: "tomado" | "snooze" | "nao") => {
     setState((s) => {
       let st = { ...s, doses: s.doses.map((x) => x.id !== d.id ? x : kind === "tomado" ? { ...x, status: "tomado" as const, takenAt: new Date().toISOString() } : kind === "nao" ? { ...x, status: "nao_tomado" as const } : { ...x, snoozeUntil: new Date(Date.now() + SNOOZE_MIN * 60000).toISOString() }) };
-      if (kind === "tomado") st = { ...st, meds: st.meds.map((x) => (x.id === d.medId ? { ...x, stock: Math.max(0, x.stock - 1) } : x)) };
+      if (kind === "tomado") {
+        const consumed = Number.isFinite(m?.quantityPerDose) && (m?.quantityPerDose ?? 0) > 0 ? m!.quantityPerDose! : 1;
+        st = { ...st, meds: st.meds.map((x) => (x.id === d.medId ? { ...x, stock: Math.max(0, x.stock - consumed) } : x)) };
+      }
       if (kind === "nao") st = { ...st, alerts: [{ id: uid(), ownerId: d.ownerId, at: new Date().toISOString(), read: false, text: `⚠ ${p?.name ?? "Paciente"} informou que NÃO tomou ${m?.name ?? "o medicamento"} (${fmtTime(d.scheduledAt)}).` }, ...st.alerts] };
       return st;
     });
@@ -777,6 +780,93 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
   );
 }
 
+const DOSE_PERIODS: { value: DosePeriod; label: string }[] = [
+  { value: "manhã", label: "Manhã" },
+  { value: "tarde", label: "Tarde" },
+  { value: "noite", label: "Noite" },
+  { value: "madrugada", label: "Madrugada" },
+  { value: "antes-almoco", label: "Antes do almoço" },
+  { value: "depois-almoco", label: "Depois do almoço" },
+  { value: "antes-jantar", label: "Antes do jantar" },
+  { value: "depois-jantar", label: "Depois do jantar" },
+  { value: "personalizado", label: "Personalizado" },
+];
+
+const STRENGTH_UNITS = ["mcg", "mg", "g", "mL", "UI", "mg/mL", "mcg/mL", "UI/mL", "%"];
+const PRESENTATIONS = ["Comprimido", "Cápsula", "Drágea", "Solução oral", "Suspensão", "Gotas", "Sachê", "Ampola", "Spray", "Creme", "Pomada", "Outro"];
+const QUANTITY_UNITS = ["Comprimido(s)", "Cápsula(s)", "Drágea(s)", "mL", "Gota(s)", "Sachê(s)", "Ampola(s)", "Jato(s)", "Aplicação(ões)", "Unidade(s)"];
+const DEFAULT_TIMES = ["08:00", "13:00", "20:00", "06:00", "10:00", "16:00"];
+const DEFAULT_PERIODS: DosePeriod[] = ["manhã", "depois-almoco", "noite", "madrugada", "manhã", "tarde"];
+
+function defaultQuantityUnit(presentation: string) {
+  if (presentation === "Comprimido") return "Comprimido(s)";
+  if (presentation === "Cápsula") return "Cápsula(s)";
+  if (presentation === "Drágea") return "Drágea(s)";
+  if (presentation === "Solução oral" || presentation === "Suspensão") return "mL";
+  if (presentation === "Gotas") return "Gota(s)";
+  if (presentation === "Sachê") return "Sachê(s)";
+  if (presentation === "Ampola") return "Ampola(s)";
+  if (presentation === "Spray") return "Jato(s)";
+  if (presentation === "Creme" || presentation === "Pomada") return "Aplicação(ões)";
+  return "Unidade(s)";
+}
+
+function TimeWheelColumn({ label, values, selected, onChange }: {
+  label: string;
+  values: string[];
+  selected: string;
+  onChange: (value: string) => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemHeight = 44;
+  const selectedIndex = Math.max(0, values.indexOf(selected));
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = selectedIndex * itemHeight;
+  }, [selectedIndex]);
+
+  const selectIndex = (index: number) => {
+    const bounded = Math.max(0, Math.min(values.length - 1, index));
+    listRef.current?.scrollTo({ top: bounded * itemHeight, behavior: "smooth" });
+    onChange(values[bounded] ?? values[0] ?? "");
+  };
+
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="mb-2 text-center text-xs font-semibold text-muted-foreground">{label}</p>
+      <div className="relative h-44 overflow-hidden rounded-2xl border border-border bg-background">
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 z-10 h-11 -translate-y-1/2 rounded-xl border border-primary/25 bg-primary/10" />
+        <div
+          ref={listRef}
+          className="relative z-0 h-full overflow-y-auto overscroll-contain snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onScroll={(event) => {
+            const index = Math.max(0, Math.min(values.length - 1, Math.round(event.currentTarget.scrollTop / itemHeight)));
+            const next = values[index];
+            if (next && next !== selected) onChange(next);
+          }}
+        >
+          <div aria-hidden="true" className="h-[66px]" />
+          {values.map((value, index) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => selectIndex(index)}
+              className={cls(
+                "flex h-11 w-full snap-center items-center justify-center text-lg tabular-nums transition-colors",
+                value === selected ? "font-extrabold text-primary" : "font-medium text-muted-foreground/70"
+              )}
+              aria-pressed={value === selected}
+            >
+              {value}
+            </button>
+          ))}
+          <div aria-hidden="true" className="h-[66px]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Meds({ me, activePatientId = "", go }: {
   me: User;
   activePatientId?: string;
@@ -786,7 +876,30 @@ function Meds({ me, activePatientId = "", go }: {
   const allMeds = useStore((s) => s.meds.filter((m) => me.role === "mestre" || m.ownerId === me.id));
   const meds = allMeds.filter((m) => !activePatientId || m.patientId === activePatientId);
   const [step, setStep] = useState(1);
-  const [f, setF] = useState({ patientId: activePatientId, name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" });
+  const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
+  const [f, setF] = useState<{
+    patientId: string;
+    name: string;
+    strengthValue: string;
+    strengthUnit: string;
+    presentation: string;
+    quantityPerDose: string;
+    quantityUnit: string;
+    schedule: DoseSchedule[];
+    stock: string;
+    tolerance: string;
+  }>({
+    patientId: activePatientId,
+    name: "",
+    strengthValue: "50",
+    strengthUnit: "mg",
+    presentation: "Comprimido",
+    quantityPerDose: "1",
+    quantityUnit: "Comprimido(s)",
+    schedule: [{ time: "08:00", period: "manhã" }],
+    stock: "30",
+    tolerance: "15",
+  });
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -796,32 +909,71 @@ function Meds({ me, activePatientId = "", go }: {
   const selectedPatientId = patients.some((p) => p.id === f.patientId)
     ? f.patientId
     : activePatientId || patients[0]?.id || "";
-  const parseTimes = () => f.times.split(",").map((time) => time.trim()).filter(Boolean);
-  const validTimes = () => {
-    const times = parseTimes();
-    return times.length > 0 && times.every((time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(time));
+
+  const updateSchedule = (index: number, patch: Partial<DoseSchedule>) => {
+    setF((current) => ({
+      ...current,
+      schedule: current.schedule.map((slot, slotIndex) => slotIndex === index ? { ...slot, ...patch } : slot),
+    }));
   };
+
+  const setFrequency = (count: number) => {
+    setF((current) => ({
+      ...current,
+      schedule: Array.from({ length: count }, (_, index) => current.schedule[index] ?? {
+        time: DEFAULT_TIMES[index] ?? "08:00",
+        period: DEFAULT_PERIODS[index] ?? "personalizado",
+      }),
+    }));
+  };
+
+  const validSchedule = () => {
+    const values = f.schedule.map((slot) => slot.time);
+    return values.length >= 1
+      && values.length <= 6
+      && values.every((time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(time))
+      && new Set(values).size === values.length;
+  };
+
   const focusMedicationName = () => {
     setStep(1);
     document.getElementById("medication-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
     document.getElementById("medication-name")?.focus();
   };
+
   const nextStep = () => {
     setErr("");
-    if (step === 1 && (!f.name.trim() || !f.dose.trim())) return setErr("Informe o nome e a dosagem do medicamento.");
-    if (step === 2 && !validTimes()) return setErr("Informe ao menos um horário válido no formato HH:MM. Separe vários horários por vírgula.");
+    if (step === 1) {
+      const strength = Number(f.strengthValue);
+      const quantity = Number(f.quantityPerDose);
+      if (!f.name.trim()) return setErr("Informe o nome do medicamento.");
+      if (!Number.isFinite(strength) || strength <= 0) return setErr("Informe uma concentração ou dosagem numérica maior que zero.");
+      if (!Number.isFinite(quantity) || quantity <= 0) return setErr("Informe quanto será utilizado em cada dose.");
+    }
+    if (step === 2 && !validSchedule()) {
+      return setErr("Confira os horários. Cada dose precisa ter um horário válido e diferente.");
+    }
     setStep((current) => Math.min(3, current + 1));
   };
+
   const saveMedication = (event: React.FormEvent) => {
     event.preventDefault();
     setErr("");
-    const times = parseTimes();
     const patient = patients.find((p) => p.id === selectedPatientId);
     if (!patient) return setErr("Selecione o paciente que receberá este medicamento.");
-    if (!f.name.trim() || !f.dose.trim()) { setStep(1); return setErr("Informe o nome e a dosagem do medicamento."); }
-    if (!validTimes()) { setStep(2); return setErr("Confira os horários informados."); }
-    if (!Number.isFinite(Number(f.stock)) || Number(f.stock) < 0) return setErr("Informe uma quantidade disponível igual ou maior que zero.");
+    const strength = Number(f.strengthValue);
+    const quantity = Number(f.quantityPerDose);
+    const stock = Number(f.stock);
+    if (!f.name.trim() || !Number.isFinite(strength) || strength <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+      setStep(1);
+      return setErr("Confira o nome, a dosagem e a quantidade usada por dose.");
+    }
+    if (!validSchedule()) { setStep(2); return setErr("Confira os horários informados."); }
+    if (!Number.isFinite(stock) || stock < 0) return setErr("Informe uma quantidade disponível igual ou maior que zero.");
+    const orderedSchedule = [...f.schedule].sort((a, b) => a.time.localeCompare(b.time));
+    const times = orderedSchedule.map((slot) => slot.time);
     const medicationId = uid();
+    const doseSummary = strength + " " + f.strengthUnit + " · " + quantity + " " + f.quantityUnit.toLowerCase();
     setState((s) => ({
       ...s,
       meds: [...s.meds, {
@@ -829,21 +981,44 @@ function Meds({ me, activePatientId = "", go }: {
         ownerId: patient.ownerId,
         patientId: patient.id,
         name: f.name.trim(),
-        dose: f.dose.trim(),
-        times: [...new Set(times)].sort(),
-        stock: Number(f.stock),
+        dose: doseSummary,
+        times,
+        schedule: orderedSchedule,
+        strengthValue: strength,
+        strengthUnit: f.strengthUnit,
+        presentation: f.presentation,
+        quantityPerDose: quantity,
+        quantityUnit: f.quantityUnit,
+        stock,
+        initialStock: stock,
         tolerance: Math.max(0, Number(f.tolerance) || 0),
       }],
     }));
-    setF({ patientId: activePatientId || patient.id, name: "", dose: "", times: "08:00", stock: "30", tolerance: "15" });
+    setF({
+      patientId: activePatientId || patient.id,
+      name: "",
+      strengthValue: "50",
+      strengthUnit: "mg",
+      presentation: "Comprimido",
+      quantityPerDose: "1",
+      quantityUnit: "Comprimido(s)",
+      schedule: [{ time: "08:00", period: "manhã" }],
+      stock: "30",
+      tolerance: "15",
+    });
     setStep(1);
+    setTimePickerIndex(null);
   };
+
+  const pickerSlot = timePickerIndex === null ? null : f.schedule[timePickerIndex];
+  const hourValues = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+  const minuteValues = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 
   return (
     <div className="space-y-6">
       <div>
         <T k="med-title" as="h1" className="font-display text-3xl text-foreground">Medicamentos</T>
-        <p className="mt-1 text-sm text-muted-foreground">Cadastre cada medicamento em três etapas rápidas.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Cadastre o medicamento, os horários e o paciente em três etapas.</p>
       </div>
 
       {patients.length === 0 ? (
@@ -855,13 +1030,13 @@ function Meds({ me, activePatientId = "", go }: {
           onAction={() => go("pacientes")}
         />
       ) : (
-        <form id="medication-form" className={cls(card, "space-y-5")} onSubmit={saveMedication}>
+        <form id="medication-form" className={cls(card, "space-y-4")} onSubmit={saveMedication}>
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-foreground">Novo medicamento</p>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Etapa {step} de 3</span>
           </div>
           <div className="grid grid-cols-3 gap-2" aria-label="Progresso do cadastro">
-            {["Medicamento", "Horários", "Paciente e quantidade"].map((label, index) => (
+            {["Medicamento", "Horários", "Paciente e estoque"].map((label, index) => (
               <div key={label} className="space-y-1.5">
                 <div className={cls("h-1.5 rounded-full", step >= index + 1 ? "bg-primary" : "bg-muted")} />
                 <p className={cls("text-[10px] leading-tight sm:text-xs", step >= index + 1 ? "font-semibold text-primary" : "text-muted-foreground")}>{label}</p>
@@ -873,38 +1048,100 @@ function Meds({ me, activePatientId = "", go }: {
             <section className="space-y-3">
               <div>
                 <h2 className="font-display text-xl font-semibold text-foreground">Qual medicamento será cadastrado?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Informe o nome e a dosagem conforme a prescrição ou embalagem.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Informe a concentração, a apresentação e a quantidade utilizada em cada horário.</p>
               </div>
               <label className="block space-y-1.5 text-sm font-medium text-foreground">
                 Nome do medicamento
                 <input id="medication-name" className={input} autoComplete="off" required placeholder="Ex.: Losartana" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
               </label>
+              <div className="grid grid-cols-[minmax(0,1fr)_7.25rem] gap-2">
+                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
+                  Concentração / dose
+                  <input className={input} type="number" inputMode="decimal" min="0.001" step="any" required placeholder="Ex.: 500" value={f.strengthValue} onChange={(e) => setF({ ...f, strengthValue: e.target.value })} />
+                </label>
+                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
+                  Unidade
+                  <select className={input} value={f.strengthUnit} onChange={(e) => setF({ ...f, strengthUnit: e.target.value })}>
+                    {STRENGTH_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
+                </label>
+              </div>
               <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                Dosagem / apresentação
-                <input className={input} required placeholder="Ex.: 50 mg, 1 comprimido" value={f.dose} onChange={(e) => setF({ ...f, dose: e.target.value })} />
+                Apresentação
+                <select
+                  className={input}
+                  value={f.presentation}
+                  onChange={(e) => {
+                    const presentation = e.target.value;
+                    setF((current) => ({ ...current, presentation, quantityUnit: defaultQuantityUnit(presentation) }));
+                  }}
+                >
+                  {PRESENTATIONS.map((presentation) => <option key={presentation} value={presentation}>{presentation}</option>)}
+                </select>
               </label>
+              <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
+                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
+                  Quantidade por dose
+                  <input className={input} type="number" inputMode="decimal" min="0.01" step="0.01" required value={f.quantityPerDose} onChange={(e) => setF({ ...f, quantityPerDose: e.target.value })} />
+                </label>
+                <label className="block min-w-0 space-y-1.5 text-sm font-medium text-foreground">
+                  Unidade
+                  <select className={input} value={f.quantityUnit} onChange={(e) => setF({ ...f, quantityUnit: e.target.value })}>
+                    {QUANTITY_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
+                </label>
+              </div>
             </section>
           )}
 
           {step === 2 && (
             <section className="space-y-3">
-              <div>
-                <h2 className="font-display text-xl font-semibold text-foreground">Em quais horários?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Use o formato de 24 horas. Separe os horários por vírgula quando houver mais de um.</p>
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="font-display text-xl font-semibold text-foreground">Horários das doses</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Escolha quantas vezes ao dia e configure cada alarme.</p>
+                </div>
+                <label className="w-36 space-y-1 text-xs font-semibold text-muted-foreground">
+                  Vezes ao dia
+                  <select className={cls(input, "py-2 text-sm")} value={f.schedule.length} onChange={(e) => setFrequency(Number(e.target.value))}>
+                    {[1, 2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count} {count === 1 ? "vez" : "vezes"}</option>)}
+                  </select>
+                </label>
               </div>
-              <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                Horários
-                <input className={input} required placeholder="08:00, 14:00, 20:00" value={f.times} onChange={(e) => setF({ ...f, times: e.target.value })} />
-              </label>
-              <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">Exemplo: 08:00 para uma vez ao dia ou 08:00, 20:00 para duas vezes ao dia.</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                {f.schedule.map((slot, index) => (
+                  <div key={index} className="min-w-0 rounded-2xl border border-border bg-background/80 p-2">
+                    <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">Dose {index + 1}</p>
+                    <button
+                      type="button"
+                      onClick={() => setTimePickerIndex(index)}
+                      aria-label={"Escolher horário da dose " + (index + 1)}
+                      className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-primary/20 bg-primary/5 px-2 py-2 text-base font-extrabold tabular-nums text-primary transition hover:bg-primary/10"
+                    >
+                      <Clock3 className="h-4 w-4 shrink-0" />{slot.time}
+                    </button>
+                    <select
+                      aria-label={"Período da dose " + (index + 1)}
+                      className="mt-2 h-9 w-full min-w-0 rounded-lg border border-input bg-card px-1.5 text-[11px] font-semibold text-foreground"
+                      value={slot.period}
+                      onChange={(e) => updateSchedule(index, { period: e.target.value as DosePeriod })}
+                    >
+                      {DOSE_PERIODS.map((period) => <option key={period.value} value={period.value}>{period.label}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <p className="rounded-xl bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                Os períodos ajudam a identificar cada dose. Os horários iniciais são apenas sugestões: ajuste todos conforme a prescrição ou orientação profissional.
+              </p>
             </section>
           )}
 
           {step === 3 && (
             <section className="space-y-3">
               <div>
-                <h2 className="font-display text-xl font-semibold text-foreground">Para quem e qual a quantidade?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Vincule o medicamento à pessoa certa e informe quanto há disponível.</p>
+                <h2 className="font-display text-xl font-semibold text-foreground">Paciente e quantidade disponível</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Informe o estoque usando a mesma unidade escolhida para cada dose.</p>
               </div>
               <label className="block space-y-1.5 text-sm font-medium text-foreground">
                 Paciente
@@ -913,13 +1150,16 @@ function Meds({ me, activePatientId = "", go }: {
                 </select>
               </label>
               <label className="block space-y-1.5 text-sm font-medium text-foreground">
-                Quantidade disponível (unidades)
-                <input className={input} type="number" min="0" step="1" required value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} />
+                Quantidade disponível ({f.quantityUnit.toLowerCase()})
+                <input className={input} type="number" inputMode="decimal" min="0" step="0.01" required value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} />
               </label>
               <label className="block space-y-1.5 text-sm font-medium text-foreground">
                 Avisar após atraso (minutos)
-                <input className={input} type="number" min="0" value={f.tolerance} onChange={(e) => setF({ ...f, tolerance: e.target.value })} />
+                <input className={input} type="number" min="0" step="1" value={f.tolerance} onChange={(e) => setF({ ...f, tolerance: e.target.value })} />
               </label>
+              <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Quando restarem 10% ou menos do estoque inicial, a quantidade será destacada em vermelho e negrito.
+              </p>
             </section>
           )}
 
@@ -943,26 +1183,111 @@ function Meds({ me, activePatientId = "", go }: {
         />
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {meds.map((m) => (
-          <article key={m.id} className={card}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="break-words font-display text-lg font-semibold text-foreground">{m.name} <span className="text-sm font-medium text-muted-foreground">{m.dose}</span></p>
-                <p className="mt-1 text-sm text-muted-foreground">{patients.find((p) => p.id === m.patientId)?.name} · {m.times.join(", ")}</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {meds.map((m) => {
+          const level = stockLevel(m);
+          const schedule = m.schedule?.length
+            ? m.schedule
+            : m.times.map((time) => ({ time, period: "personalizado" as DosePeriod }));
+          const summary = m.strengthValue !== undefined
+            ? String(m.strengthValue) + " " + (m.strengthUnit ?? "mg") + " · " + (m.quantityPerDose ?? 1) + " " + (m.quantityUnit ?? "unidade(s)")
+            : m.dose;
+          return (
+            <article key={m.id} className={cls(card, "space-y-3 !p-4 sm:!p-5")}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-words font-display text-lg font-semibold text-foreground">{m.name}</p>
+                  <p className="mt-0.5 text-xs font-semibold text-muted-foreground">{summary}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{patients.find((p) => p.id === m.patientId)?.name}</p>
+                </div>
+                <button aria-label={"Excluir medicamento " + m.name} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id), doses: s.doses.filter((d) => d.medId !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
               </div>
-              <button aria-label={`Excluir medicamento ${m.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => setState((s) => ({ ...s, meds: s.meds.filter((x) => x.id !== m.id), doses: s.doses.filter((d) => d.medId !== m.id) }))}><Trash2 className="h-4 w-4" /></button>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <span className={cls("rounded-full px-3 py-1 font-bold", stockLevel(m) !== "ok" ? "bg-destructive/15 text-destructive" : "bg-primary/15 text-primary")}>Estoque: {m.stock}</span>
-              <span className="text-xs text-muted-foreground">{stockLevel(m) === "empty" ? "Estoque esgotado" : stockLevel(m) === "low" ? "Estoque baixo" : "Estoque suficiente"}</span>
-              <button className={btnOutline} onClick={() => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, stock: x.stock + 30 } : x)) }))}>+30</button>
-              <label className="ml-auto flex items-center gap-1 text-muted-foreground">Tol.<input className="w-16 rounded-lg border border-input bg-card px-2 py-1" type="number" min="0" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} /></label>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">Estimativa: {estimateStockDays(m) === null ? "cadastre horários para estimar a duração" : `${estimateStockDays(m)} dia(s) restantes, considerando uma unidade por horário`}.</p>
-          </article>
-        ))}
+
+              <div className="grid grid-cols-2 gap-2">
+                {schedule.map((slot, index) => (
+                  <div key={slot.time + "-" + index} className="rounded-xl border border-border/70 bg-background/60 px-2.5 py-2">
+                    <p className="text-sm font-extrabold tabular-nums text-foreground">{slot.time}</p>
+                    <p className="truncate text-[10px] font-semibold text-muted-foreground">{DOSE_PERIODS.find((period) => period.value === slot.period)?.label ?? "Personalizado"}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
+                <span className={cls(
+                  "rounded-full px-3 py-1 text-sm tabular-nums",
+                  level === "empty" || level === "low"
+                    ? "bg-destructive/15 font-extrabold text-destructive"
+                    : "bg-primary/15 font-semibold text-primary"
+                )}>
+                  Estoque: {m.stock} {m.quantityUnit ?? "un."}
+                </span>
+                <span className={cls("text-[11px] font-semibold", level === "low" || level === "empty" ? "font-extrabold text-destructive" : "text-muted-foreground")}>
+                  {level === "empty" ? "Estoque esgotado" : level === "low" ? (m.initialStock ? "10% ou menos restante" : "Estoque baixo") : "Estoque suficiente"}
+                </span>
+                <button
+                  className={cls(btnOutline, "ml-auto px-3 py-1.5 text-xs")}
+                  onClick={() => setState((s) => ({
+                    ...s,
+                    meds: s.meds.map((x) => x.id === m.id
+                      ? { ...x, stock: x.stock + 30, initialStock: (x.initialStock ?? x.stock) + 30 }
+                      : x),
+                  }))}
+                >+30</button>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>{schedule.length} {schedule.length === 1 ? "dose" : "doses"} por dia</span>
+                <span className="text-right">Estoque estimado: {estimateStockDays(m) === null ? "—" : String(estimateStockDays(m)) + " dia(s)"}</span>
+              </div>
+              <label className="flex items-center justify-end gap-2 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+                Tolerância
+                <input className="w-16 rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground" type="number" min="0" step="1" value={m.tolerance} onChange={(e) => setState((s) => ({ ...s, meds: s.meds.map((x) => (x.id === m.id ? { ...x, tolerance: Number(e.target.value) } : x)) }))} />
+                min
+              </label>
+            </article>
+          );
+        })}
       </div>
+
+      {pickerSlot && timePickerIndex !== null && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-sm"
+          role="presentation"
+          onClick={() => setTimePickerIndex(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dose-time-picker-title"
+            className="w-full max-w-sm rounded-[1.75rem] border border-border bg-card p-4 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Dose {timePickerIndex + 1}</p>
+                <h3 id="dose-time-picker-title" className="font-display text-xl font-semibold text-foreground">Escolher horário</h3>
+              </div>
+              <span className="rounded-xl bg-primary/10 px-3 py-2 font-mono text-xl font-extrabold tabular-nums text-primary">{pickerSlot.time}</span>
+            </div>
+            <div className="flex gap-3">
+              <TimeWheelColumn
+                label="Hora"
+                values={hourValues}
+                selected={pickerSlot.time.slice(0, 2)}
+                onChange={(hour) => updateSchedule(timePickerIndex, { time: hour + ":" + pickerSlot.time.slice(3, 5) })}
+              />
+              <TimeWheelColumn
+                label="Minuto"
+                values={minuteValues}
+                selected={pickerSlot.time.slice(3, 5)}
+                onChange={(minute) => updateSchedule(timePickerIndex, { time: pickerSlot.time.slice(0, 2) + ":" + minute })}
+              />
+            </div>
+            <p className="my-3 text-center text-[11px] text-muted-foreground">Deslize as colunas para cima ou para baixo para ajustar.</p>
+            <Button className="w-full" onClick={() => setTimePickerIndex(null)}>Confirmar horário</Button>
+          </section>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
