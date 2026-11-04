@@ -16,7 +16,6 @@ export function buildMissingDoses(
   existing: Dose[],
   ownerId: string,
   day: Date,
-  createId: () => string,
 ): Dose[] {
   const start = new Date(day);
   start.setHours(0, 0, 0, 0);
@@ -34,7 +33,7 @@ export function buildMissingDoses(
       const key = `${med.id}|${scheduledAt}`;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
-      additions.push({ id: createId(), medId: med.id, patientId: med.patientId, ownerId, scheduledAt, status: "pendente" });
+      additions.push({ id: `scheduled-${med.id}-${scheduledAt}`, medId: med.id, patientId: med.patientId, ownerId, scheduledAt, status: "pendente" });
     }
   }
   return additions;

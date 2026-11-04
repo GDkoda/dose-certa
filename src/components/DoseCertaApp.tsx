@@ -17,6 +17,7 @@ import { DoseCertaMark } from "./DoseCertaMark";
 import { readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
+import { confirmDoseTaken } from "@/lib/dose.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
 import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
 import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
@@ -470,12 +471,16 @@ function ForceChangePassword({ me }: { me: User }) {
 /* ---------------- alarm engine ---------------- */
 function ensureTodayDoses(ownerId: string) {
   const s = getState();
-  const add = buildMissingDoses(s.meds, s.doses, ownerId, new Date(), uid);
+  const add = buildMissingDoses(s.meds, s.doses, ownerId, new Date());
   if (add.length) setState((st) => ({ ...st, doses: [...st.doses, ...add] }));
 }
 
 function AlarmEngine({ me }: { me: User }) {
   const [active, setActive] = useState<Dose | null>(null);
+  const activeRef = useRef<Dose | null>(null);
+  const confirmDose = useServerFn(confirmDoseTaken);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const doses = useStore((s) => s.doses); const meds = useStore((s) => s.meds); const patients = useStore((s) => s.patients);
   useEffect(() => {
     if (me.role !== "cuidador") return;
@@ -490,9 +495,11 @@ function AlarmEngine({ me }: { me: User }) {
         alerts: [...late.map((d) => ({ id: uid(), ownerId: me.id, at: new Date().toISOString(), read: false, text: `Dose atrasada além da tolerância: ${st.meds.find((m) => m.id === d.medId)?.name} (${st.patients.find((p) => p.id === d.patientId)?.name})` })), ...st.alerts],
       }));
       const due = findDueDose(getState().doses, me.id, now);
-      if (due) {
-        setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
+      // Keep one alarm on screen until it is resolved; never replace it every poll.
+      if (due && !activeRef.current) {
+        activeRef.current = due;
         setActive(due);
+        setState((st) => ({ ...st, doses: st.doses.map((d) => (d.id === due.id ? { ...d, lastShown: new Date().toISOString() } : d)) }));
         const currentState = getState();
         const m = currentState.meds.find((x) => x.id === due.medId);
         const p = currentState.patients.find((x) => x.id === due.patientId);
@@ -507,11 +514,39 @@ function AlarmEngine({ me }: { me: User }) {
         }
       }
     };
-    const resume = () => { if (!document.hidden) tick(); };
+    const resume = () => {
+      if (document.hidden) return;
+      // A notification action may have been completed while this tab was suspended.
+      void refreshCloud().catch(() => undefined).finally(tick);
+    };
+    const onWorkerMessage = (event: MessageEvent<{ type?: string; owner?: string }>) => {
+      if (event.data?.type === "DOSE_ACTION_COMPLETED" && event.data.owner === me.id) {
+        void refreshCloud().catch(() => undefined);
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", onWorkerMessage);
     tick(); const id = setInterval(tick, 15000);
     document.addEventListener("visibilitychange", resume); window.addEventListener("focus", resume);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", resume); window.removeEventListener("focus", resume); };
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("focus", resume);
+      navigator.serviceWorker?.removeEventListener("message", onWorkerMessage);
+    };
   }, [me.id, me.role]);
+
+  useEffect(() => {
+    if (!active) {
+      activeRef.current = null;
+      return;
+    }
+    const current = doses.find((dose) => dose.id === active.id);
+    const snoozed = current?.snoozeUntil && Date.parse(current.snoozeUntil) > Date.now();
+    if (!current || current.status !== "pendente" || snoozed) {
+      activeRef.current = null;
+      setActive(null);
+    }
+  }, [active?.id, doses]);
 
   useEffect(() => {
     if (!active) return;
@@ -541,17 +576,66 @@ function AlarmEngine({ me }: { me: User }) {
 
   if (!active) return null;
   const d = doses.find((x) => x.id === active.id) ?? active; const m = meds.find((x) => x.id === d.medId); const p = patients.find((x) => x.id === d.patientId);
-  const act = (kind: "tomado" | "snooze" | "nao") => {
-    setState((s) => {
-      let st = { ...s, doses: s.doses.map((x) => x.id !== d.id ? x : kind === "tomado" ? { ...x, status: "tomado" as const, takenAt: new Date().toISOString() } : kind === "nao" ? { ...x, status: "nao_tomado" as const } : { ...x, snoozeUntil: new Date(Date.now() + SNOOZE_MIN * 60000).toISOString() }) };
-      if (kind === "tomado") {
-        const consumed = Number.isFinite(m?.quantityPerDose) && (m?.quantityPerDose ?? 0) > 0 ? m!.quantityPerDose! : 1;
-        st = { ...st, meds: st.meds.map((x) => (x.id === d.medId ? { ...x, stock: Math.max(0, x.stock - consumed) } : x)) };
-      }
-      if (kind === "nao") st = { ...st, alerts: [{ id: uid(), ownerId: d.ownerId, at: new Date().toISOString(), read: false, text: `⚠ ${p?.name ?? "Paciente"} informou que NÃO tomou ${m?.name ?? "o medicamento"} (${fmtTime(d.scheduledAt)}).` }, ...st.alerts] };
-      return st;
-    });
+  const closeActive = () => {
+    activeRef.current = null;
     setActive(null);
+  };
+  const act = async (kind: "tomado" | "snooze" | "nao") => {
+    if (actionBusy) return;
+    setActionError(null);
+
+    if (kind === "tomado" && typeof navigator !== "undefined" && navigator.onLine) {
+      setActionBusy(true);
+      try {
+        await confirmDose({ data: { doseId: d.id } });
+        await refreshCloud();
+        closeActive();
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : "Não foi possível registrar a dose.");
+      } finally {
+        setActionBusy(false);
+      }
+      return;
+    }
+
+    setState((s) => {
+      const current = s.doses.find((dose) => dose.id === d.id);
+      if (!current || current.status !== "pendente") return s;
+
+      if (kind === "tomado") {
+        const currentMed = s.meds.find((med) => med.id === current.medId);
+        const consumed = Number.isFinite(currentMed?.quantityPerDose) && (currentMed?.quantityPerDose ?? 0) > 0
+          ? currentMed!.quantityPerDose!
+          : 1;
+        return {
+          ...s,
+          doses: s.doses.map((dose) => dose.id === d.id ? { ...dose, status: "tomado" as const, takenAt: new Date().toISOString() } : dose),
+          meds: s.meds.map((med) => med.id === current.medId ? { ...med, stock: Math.max(0, med.stock - consumed) } : med),
+        };
+      }
+
+      if (kind === "snooze") {
+        return {
+          ...s,
+          doses: s.doses.map((dose) => dose.id === d.id
+            ? { ...dose, snoozeUntil: new Date(Date.now() + SNOOZE_MIN * 60000).toISOString() }
+            : dose),
+        };
+      }
+
+      return {
+        ...s,
+        doses: s.doses.map((dose) => dose.id === d.id ? { ...dose, status: "nao_tomado" as const } : dose),
+        alerts: [{
+          id: uid(),
+          ownerId: d.ownerId,
+          at: new Date().toISOString(),
+          read: false,
+          text: `⚠ ${p?.name ?? "Paciente"} informou que NÃO tomou ${m?.name ?? "o medicamento"} (${fmtTime(d.scheduledAt)}).`,
+        }, ...s.alerts],
+      };
+    });
+    closeActive();
   };
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-foreground/65 p-3 backdrop-blur-md sm:p-6" role="alertdialog" aria-modal="true" aria-labelledby="dose-alarm-title" aria-describedby="dose-alarm-description">
@@ -595,13 +679,14 @@ function AlarmEngine({ me }: { me: User }) {
           </div>
 
           <div className="space-y-2.5 pt-1">
-            <button className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-base font-extrabold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 sm:min-h-16 sm:text-lg" onClick={() => act("tomado")}>
+            {actionError && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{actionError}</p>}
+            <button disabled={actionBusy} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 text-base font-extrabold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 disabled:cursor-wait disabled:opacity-60 sm:min-h-16 sm:text-lg" onClick={() => void act("tomado")}>
               <CheckCircle2 className="h-5 w-5" /><T k="alarm-yes">Já tomei meu medicamento</T>
             </button>
-            <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary/35 bg-primary/8 px-5 py-3.5 text-sm font-bold text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 sm:text-base" onClick={() => act("snooze")}>
+            <button disabled={actionBusy} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary/35 bg-primary/8 px-5 py-3.5 text-sm font-bold text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:opacity-60 sm:text-base" onClick={() => void act("snooze")}>
               <Clock3 className="h-5 w-5" /><T k="alarm-snooze">Lembrar em 5 minutos</T>
             </button>
-            <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground" onClick={() => act("nao")}>
+            <button disabled={actionBusy} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-60" onClick={() => void act("nao")}>
               <X className="h-4 w-4" /><T k="alarm-no">Não tomei</T>
             </button>
           </div>

@@ -8,27 +8,13 @@ if (hasFirebaseConfig) {
   firebase.initializeApp(config);
   messaging = firebase.messaging();
 
-  // Experimental background alert burst for mobile notification channels.
-  // Android 8+ Chrome may ignore NotificationOptions.vibrate. We re-present
-  // the SAME tagged notification to request another system-channel alert.
-  const BACKGROUND_ALERT_COUNT = 20;
-  const BACKGROUND_ALERT_INTERVAL_MS = 500;
+  // One persistent notification per delivery. The operating system controls
+  // vibration and sound; repeatedly re-presenting the same notification can
+  // race with the user's action and create additional alerts.
   const BACKGROUND_VIBRATION_PULSE = [400, 100];
-  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   async function showBackgroundAlarm(title, options) {
     await self.registration.showNotification(title, options);
-
-    for (let pulse = 1; pulse < BACKGROUND_ALERT_COUNT; pulse += 1) {
-      await wait(BACKGROUND_ALERT_INTERVAL_MS);
-      const visible = await self.registration.getNotifications({ tag: options.tag });
-      if (!visible.length) break;
-      await self.registration.showNotification(title, {
-        ...options,
-        vibrate: BACKGROUND_VIBRATION_PULSE,
-        timestamp: Date.now(),
-      });
-    }
   }
 
   messaging.onBackgroundMessage((payload) => {
@@ -48,7 +34,7 @@ if (hasFirebaseConfig) {
         { action: "taken", title: "Já tomei" },
         { action: "snooze", title: "Lembrar em 5 min" },
       ] : [],
-      data: { url: d.url || "/", owner: d.owner, doseIds: d.doseIds, sig: d.sig },
+      data: { url: d.url || "/", tag, owner: d.owner, doseIds: d.doseIds, sig: d.sig },
     });
   });
 }
@@ -75,6 +61,18 @@ self.addEventListener("notificationclick", (event) => {
           body: JSON.stringify({ owner: data.owner, doseIds: String(data.doseIds).split(","), sig: data.sig, action: event.action }),
         });
         if (!res.ok) throw new Error(String(res.status));
+        const activeNotifications = await self.registration.getNotifications({ tag: data.tag });
+        for (const notification of activeNotifications) notification.close();
+
+        const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of windows) {
+          client.postMessage({
+            type: "DOSE_ACTION_COMPLETED",
+            owner: data.owner,
+            doseIds: String(data.doseIds).split(","),
+            action: event.action,
+          });
+        }
         await self.registration.showNotification(event.action === "taken" ? "Dose registrada ✓" : "Lembraremos em 5 minutos", { tag: "dose-certa-ack", icon: "/icon-192.png", silent: true });
       } catch {
         await openApp(data.url);

@@ -2,8 +2,8 @@
 const GATEWAY = "https://connector-gateway.lovable.dev/firebase_messaging/v1/projects/_/messages:send";
 
 async function hmac(text: string) {
-  const secret = process.env["LOVABLE_API_KEY"];
-  if (!secret) throw new Error("LOVABLE_API_KEY missing");
+  const secret = process.env["DOSE_ACTION_SIGNING_SECRET"] || process.env["LOVABLE_API_KEY"];
+  if (!secret) throw new Error("DOSE_ACTION_SIGNING_SECRET missing");
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(`dose-action:${secret}`), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text));
   return btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
