@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronDown, Clock3, Droplets,
-  GlassWater, Heart, ListChecks, Pencil, Plus, Sparkles, Utensils, X,
+  ArrowLeft, CalendarDays, Check, CheckCircle2, Clock3, Droplets,
+  Heart, ListChecks, Pencil, Plus, Sparkles, Utensils, X,
 } from "lucide-react";
 import {
   setState, uid, useStore,
@@ -31,8 +31,8 @@ type TimelineItem =
   | { key: string; kind: "medication"; title: string; time: string; description: string; status: string; }
   | { key: string; kind: "task"; task: RoutineTask; time: string; log?: RoutineLog };
 
-export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
-  me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void;
+export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPatient }: {
+  me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void; onSelectPatient: (patientId: string) => void;
 }) {
   const patients = useStore((state) => state.patients.filter((patient) => me.role === "mestre" || patient.ownerId === me.id));
   const meds = useStore((state) => state.meds);
@@ -55,6 +55,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
   const [logTask, setLogTask] = useState<RoutineTask | null>(null);
   const [offered, setOffered] = useState("200");
   const [accepted, setAccepted] = useState("200");
+  const [amountUnit, setAmountUnit] = useState("porção");
   const [logNotes, setLogNotes] = useState("");
   const [logError, setLogError] = useState("");
   const [goalDraft, setGoalDraft] = useState("");
@@ -114,10 +115,9 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
   const progress = timeline.length ? Math.round((completed / timeline.length) * 100) : 0;
   const now = new Date();
   const isToday = selectedDate === dateKey(now);
-  const nextItem = timeline.find((item) => {
-    const status = item.kind === "medication" ? item.status : item.log?.status;
-    return (!status || status === "pendente") && (!isToday || item.time >= now.toTimeString().slice(0, 5));
-  });
+  const pendingTimeline = timeline.filter((item) => item.kind === "medication" ? item.status === "pendente" : !item.log || item.log.status === "pendente");
+  const nextItem = pendingTimeline[0];
+  const afterItem = pendingTimeline[1];
   const waterPercent = waterGoal > 0 ? Math.min(100, Math.round((waterAccepted / waterGoal) * 100)) : 0;
 
   const resetForm = () => {
@@ -180,7 +180,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
       id: patientLogs.find((log) => log.taskId === logTask.id && log.date === selectedDate)?.id ?? uid(),
       patientId: patient.id, ownerId: patient.ownerId, taskId: logTask.id, date: selectedDate,
       status, offeredAmount: offeredNumber, acceptedAmount: acceptedNumber,
-      unit: logTask.category === "hidratacao" ? "ml" : "porção",
+      unit: logTask.category === "hidratacao" ? "ml" : amountUnit,
       notes: logNotes.trim(), completedAt: new Date().toISOString(),
     };
     setState((state) => ({
@@ -200,6 +200,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
     if (task.category === "hidratacao" || task.category === "alimentacao") {
       setOffered(task.category === "hidratacao" ? "200" : "1");
       setAccepted(task.category === "hidratacao" ? "200" : "1");
+      setAmountUnit("porção");
       setLogNotes("");
       setLogError("");
       setLogTask(task);
@@ -234,6 +235,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
   const openLog = (task: RoutineTask) => {
     setOffered(task.category === "hidratacao" ? "200" : "1");
     setAccepted(task.category === "hidratacao" ? "200" : "1");
+    setAmountUnit("porção");
     setLogNotes("");
     setLogError("");
     setLogTask(task);
@@ -247,7 +249,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
           <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary"><CalendarDays className="h-7 w-7" /></div>
           <h1 className="font-display text-2xl font-bold text-foreground">Rotina e cuidados</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">Escolha um paciente para organizar a agenda visual, registrar alimentação e acompanhar a hidratação.</p>
-          <select className={field + " mt-5 max-w-md"} aria-label="Escolher paciente" value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}>
+          <select className={field + " mt-5 max-w-md"} aria-label="Escolher paciente" value={selectedPatientId} onChange={(event) => { setSelectedPatientId(event.target.value); onSelectPatient(event.target.value); }}>
             <option value="">Selecione um paciente</option>
             {patients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
@@ -268,12 +270,19 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
           </div>
           <button type="button" className={quietButton} onClick={() => setVisualMode(false)}><X className="h-4 w-4" />Sair do modo visual</button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-[1.75rem] border border-primary/20 bg-primary/[0.07] p-5">
             <p className="text-xs font-extrabold uppercase tracking-wider text-primary">Agora</p>
             <div className="mt-2 flex items-center gap-3">
               <span className="text-4xl">{nextItem?.kind === "task" ? nextItem.task.pictogram : "💊"}</span>
               <div><p className="font-display text-xl font-bold text-foreground">{nextItem?.title ?? "Rotina livre"}</p><p className="text-sm text-muted-foreground">{nextItem ? nextItem.time : "Nenhuma atividade pendente"}</p></div>
+            </div>
+          </div>
+          <div className="rounded-[1.75rem] border border-border bg-card p-5">
+            <p className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Depois</p>
+            <div className="mt-2 flex items-center gap-3">
+              <span className="text-4xl">{afterItem?.kind === "task" ? afterItem.task.pictogram : afterItem ? "💊" : "🌿"}</span>
+              <div><p className="font-display text-xl font-bold text-foreground">{afterItem?.title ?? "Sem próxima atividade"}</p><p className="text-sm text-muted-foreground">{afterItem?.time ?? "Agenda em dia"}</p></div>
             </div>
           </div>
           <div className="rounded-[1.75rem] border border-border bg-card p-5">
@@ -427,7 +436,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
             <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Os registros são separados por paciente e por data. Selecione outro dia na agenda para consultar o histórico.</p>
           </section>
 
-          {patients.length > 1 && <label className="block space-y-1.5 text-xs font-bold text-foreground">Trocar paciente<select className={field} value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}>{patients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+          {patients.length > 1 && <label className="block space-y-1.5 text-xs font-bold text-foreground">Trocar paciente<select className={field} value={selectedPatientId} onChange={(event) => { setSelectedPatientId(event.target.value); onSelectPatient(event.target.value); }}>{patients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
         </aside>
       </div>
 
@@ -439,10 +448,11 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines }: {
               <label className="space-y-1.5 text-xs font-bold text-foreground">Quantidade oferecida<input autoFocus type="number" min="0" step="any" className={field} value={offered} onChange={(event) => setOffered(event.target.value)} /></label>
               <label className="space-y-1.5 text-xs font-bold text-foreground">Quantidade aceita<input type="number" min="0" step="any" className={field} value={accepted} onChange={(event) => setAccepted(event.target.value)} /></label>
             </div>
-            <p className="text-[11px] text-muted-foreground">{logTask.category === "hidratacao" ? "Volumes em mililitros (ml)." : "Use uma medida consistente para comparar o que foi oferecido e aceito (porção, unidade ou gramas)."}</p>
-            <label className="block space-y-1.5 text-xs font-bold text-foreground">Observações<textarea rows={3} className={field + " min-h-20 resize-y"} placeholder="Ex.: aceitou melhor com o copo azul..." value={logNotes} onChange={(event) => setLogNotes(event.target.value)} /></label>
+            {logTask.category === "alimentacao" && <label className="block space-y-1.5 text-xs font-bold text-foreground">Unidade de medida<select className={field} value={amountUnit} onChange={(event) => setAmountUnit(event.target.value)}><option value="porção">Porção</option><option value="g">Gramas (g)</option><option value="unidade">Unidade</option><option value="ml">Mililitros (ml)</option></select></label>}
+            <p className="text-[11px] text-muted-foreground">{logTask.category === "hidratacao" ? "Volumes em mililitros (ml)." : "Informe o alimento ou a refeição nas observações e mantenha a mesma unidade ao comparar as quantidades."}</p>
+            <label className="block space-y-1.5 text-xs font-bold text-foreground">Alimentos oferecidos / observações<textarea rows={3} className={field + " min-h-20 resize-y"} placeholder="Ex.: aceitou melhor com o copo azul..." value={logNotes} onChange={(event) => setLogNotes(event.target.value)} /></label>
             {logError && <p role="alert" className="text-xs font-semibold text-destructive">{logError}</p>}
-            <div className="flex flex-wrap justify-end gap-2"><button type="button" className={quietButton} onClick={() => { setAccepted("0"); }}>Registrar recusa</button><button type="button" className={quietButton} onClick={() => setLogTask(null)}>Cancelar</button><button type="submit" className={primaryButton}><Check className="h-4 w-4" />Salvar registro</button></div>
+            <div className="flex flex-wrap justify-end gap-2"><button type="button" className={quietButton} onClick={() => { setAccepted("0"); }}>Aceitou 0</button><button type="button" className={quietButton} onClick={() => setLogTask(null)}>Cancelar</button><button type="submit" className={primaryButton}><Check className="h-4 w-4" />Salvar registro</button></div>
           </form>
         </div>
       )}
