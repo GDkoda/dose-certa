@@ -17,7 +17,8 @@ describe("Dose Certa rules", () => {
     expect(attemptLogin(r.state, "ana", "123")?.mustChange).toBe(true);
     expect(recoverPassword(s, "ana", "wrong").ok).toBe(false);
   });
-  it("master account Koda/batata exists", () => {
-    expect(attemptLogin(initialState(), "Koda", "batata")?.role).toBe("mestre");
+  it("does not ship with a shared master account or default credentials", () => {
+    expect(initialState().users).toEqual([]);
+    expect(attemptLogin(initialState(), "Koda", "batata")).toBeNull();
   });
 });
