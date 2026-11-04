@@ -19,6 +19,12 @@ export type OfflinePackage = {
 const DATABASE_NAME = "dose-certa-offline";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "accounts";
+let lastChangeRevision = 0;
+
+function nextChangeRevision(): number {
+  lastChangeRevision = Math.max(Date.now(), lastChangeRevision + 1);
+  return lastChangeRevision;
+}
 
 /** Ask the browser to reduce the chance of evicting the offline cache. */
 export async function requestPersistentOfflineStorage(): Promise<boolean> {
@@ -122,7 +128,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
           kind,
           ownerId: ownerFor(kind, record, userId),
           payload: clone(record),
-          changedAt: Date.now(),
+          changedAt: nextChangeRevision(),
         });
       }
       for (const record of previousRecords) {
@@ -135,7 +141,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
           kind,
           ownerId: ownerFor(kind, record, userId),
           payload: null,
-          changedAt: Date.now(),
+          changedAt: nextChangeRevision(),
         });
       }
     }
@@ -149,7 +155,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
         kind: "config",
         ownerId: userId,
         payload: clone({ texts: after.texts, images: after.images }),
-        changedAt: Date.now(),
+        changedAt: nextChangeRevision(),
       });
     }
 
