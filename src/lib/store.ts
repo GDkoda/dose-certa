@@ -55,7 +55,7 @@ export interface Med {
 }
 export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }
-export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean }
+export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean; sourceKey?: string }
 export type RoutineCategory = "hidratacao" | "alimentacao" | "higiene" | "terapia" | "descanso" | "escola" | "atividade" | "consulta" | "outro";
 export interface RoutineTask {
   id: string; patientId: string; ownerId: string; title: string; category: RoutineCategory;
