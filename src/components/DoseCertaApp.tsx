@@ -891,7 +891,7 @@ function Meds({ me, activePatientId = "", go }: {
   }>({
     patientId: activePatientId,
     name: "",
-    strengthValue: "50",
+    strengthValue: "",
     strengthUnit: "mg",
     presentation: "Comprimido",
     quantityPerDose: "1",
@@ -997,7 +997,7 @@ function Meds({ me, activePatientId = "", go }: {
     setF({
       patientId: activePatientId || patient.id,
       name: "",
-      strengthValue: "50",
+      strengthValue: "",
       strengthUnit: "mg",
       presentation: "Comprimido",
       quantityPerDose: "1",
