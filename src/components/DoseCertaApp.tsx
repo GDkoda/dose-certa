@@ -916,7 +916,7 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
             setErr(f.birthDate && calculatedAge === null ? "Confira a data de nascimento." : "Informe o nome e a idade ou a data de nascimento.");
             return;
           }
-          if (!canAddPatient(getState(), me.id)) return setErr(\`Limite de \${MAX_PATIENTS} pacientes.\`);
+          if (!canAddPatient(getState(), me.id)) return setErr(`Limite de ${MAX_PATIENTS} pacientes.`);
           const patientId = uid();
           setState((state) => ({
             ...state,
@@ -1029,11 +1029,11 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
                     <p className="text-sm text-muted-foreground">{p.age} anos</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <button type="button" aria-label={\`Editar paciente \${p.name}\`} title="Editar paciente" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => beginPatientEdit(p)}>
+                    <button type="button" aria-label={`Editar paciente ${p.name}`} title="Editar paciente" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => beginPatientEdit(p)}>
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button type="button" aria-label={\`Excluir paciente \${p.name}\`} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
-                      if (confirm(\`Excluir \${p.name} e seus medicamentos?\`)) {
+                    <button type="button" aria-label={`Excluir paciente ${p.name}`} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
+                      if (confirm(`Excluir ${p.name} e seus medicamentos?`)) {
                         setState((state) => ({ ...state, patients: state.patients.filter((x) => x.id !== p.id), meds: state.meds.filter((m) => m.patientId !== p.id), doses: state.doses.filter((d) => d.patientId !== p.id) }));
                         if (activePatientId === p.id) onSelectPatient("");
                       }
