@@ -224,7 +224,7 @@ Deno.serve(async (request) => {
   }
 
   for (const task of routines) {
-    if (!task.enabled || !task.title || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(task.time) || !Array.isArray(task.weekdays)) {
+    if (!task.enabled || !task.title || !/^([01]\d|2[0-3]):[0-5]\d$/.test(task.time) || !Array.isArray(task.weekdays)) {
       skipped++;
       continue;
     }
