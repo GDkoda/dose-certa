@@ -520,16 +520,23 @@ function AlarmEngine({ me }: { me: User }) {
 
   useEffect(() => {
     if (!active) return;
+    // 20 pulsos de 400 ms com 100 ms de intervalo (aprox. 10 segundos).
+    const foregroundVibrationPattern = Array.from({ length: 20 }, () => [400, 100]).flat();
     const vibrate = () => {
-      try { if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate([350, 160, 350, 160, 650]); } catch { /* Vibração pode não estar disponível. */ }
+      try {
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate(foregroundVibrationPattern);
+        }
+      } catch { /* Vibração pode não estar disponível. */ }
     };
     const stopVibration = () => {
       try { if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(0); } catch { /* Sem suporte. */ }
     };
     beep();
     vibrate();
+    // Keep the existing sound cadence, while allowing the full vibration burst to finish.
     const soundLoop = window.setInterval(beep, 2400);
-    const vibrationLoop = window.setInterval(vibrate, 2400);
+    const vibrationLoop = window.setInterval(vibrate, 10_500);
     return () => {
       window.clearInterval(soundLoop);
       window.clearInterval(vibrationLoop);
