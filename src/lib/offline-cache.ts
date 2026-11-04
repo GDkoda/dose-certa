@@ -6,7 +6,6 @@ export type OfflineChange = {
   kind: string;
   ownerId: string;
   payload: unknown | null;
-  basePayload: unknown | null;
   changedAt: number;
 };
 
@@ -124,7 +123,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
           kind,
           ownerId: ownerFor(kind, record, userId),
           payload: clone(record),
-          basePayload: existing ? existing.basePayload : previous ? clone(previous) : null,
           changedAt: Date.now(),
         });
       }
@@ -139,7 +137,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
           kind,
           ownerId: ownerFor(kind, record, userId),
           payload: null,
-          basePayload: existing ? existing.basePayload : clone(record),
           changedAt: Date.now(),
         });
       }
@@ -155,7 +152,6 @@ export async function persistLocalMutation(userId: string, before: State, after:
         kind: "config",
         ownerId: userId,
         payload: clone({ texts: after.texts, images: after.images }),
-        basePayload: existing ? existing.basePayload : clone({ texts: before.texts, images: before.images }),
         changedAt: Date.now(),
       });
     }
