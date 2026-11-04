@@ -2,7 +2,31 @@ import { useSyncExternalStore } from "react";
 
 export type Role = "cuidador" | "operador" | "mestre";
 export interface User { id: string; login: string; password: string; role: Role; question: string; answer: string; mustChange?: boolean }
-export interface Patient { id: string; ownerId: string; name: string; age: number; notes: string }
+export type PatientCardTheme =
+  | "rosas"
+  | "coracoes"
+  | "praia"
+  | "girassol"
+  | "folhas"
+  | "ondas"
+  | "lavanda"
+  | "xadrez";
+
+export interface Patient {
+  id: string;
+  ownerId: string;
+  name: string;
+  age: number;
+  notes: string;
+  /** Optional identification details shown on the patient's private information card. */
+  birthDate?: string;
+  susCard?: string;
+  healthPlan?: string;
+  identityNumber?: string;
+  cpf?: string;
+  photoDataUrl?: string;
+  cardTheme?: PatientCardTheme;
+}
 export type DosePeriod =
   | "manhã" | "tarde" | "noite" | "madrugada"
   | "antes-almoco" | "depois-almoco" | "antes-jantar" | "depois-jantar"
