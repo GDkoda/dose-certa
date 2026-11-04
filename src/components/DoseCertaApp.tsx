@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  AlarmClock, Archive, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  AlarmClock, Archive, ArrowRight, Bell, BellRing, CalendarDays, Camera, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, ImagePlus, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
   CloudOff, CloudUpload, Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -786,14 +786,58 @@ function StatusBadge({ s }: { s: Dose["status"] }) {
   return <span className={cls("shrink-0 rounded-full px-3 py-1 text-xs font-bold", map[s][1])}>{map[s][0]}</span>;
 }
 
+function getPatientAge(birthDate: string): number | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate + "T12:00:00");
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function compressPatientPhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) return reject(new Error("Selecione um arquivo de imagem."));
+    if (file.size > 8 * 1024 * 1024) return reject(new Error("A foto precisa ter no máximo 8 MB."));
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, 720 / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Não foi possível processar a foto.");
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const data = canvas.toDataURL("image/jpeg", 0.76);
+        URL.revokeObjectURL(url);
+        if (data.length > 280_000) throw new Error("A foto ficou muito grande. Escolha outra imagem.");
+        resolve(data);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error instanceof Error ? error : new Error("Não foi possível processar a foto."));
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Não foi possível abrir esta imagem."));
+    };
+    image.src = url;
+  });
+}
+
 function Patients({ me, activePatientId = "", onSelectPatient }: {
   me: User;
   activePatientId?: string;
   onSelectPatient: (patientId: string) => void;
 }) {
   const patients = useStore((s) => s.patients.filter((p) => me.role === "mestre" || p.ownerId === me.id));
-  const [f, setF] = useState({ name: "", age: "", notes: "" });
+  const [f, setF] = useState({ name: "", age: "", birthDate: "", susCard: "", healthPlan: "", identityNumber: "", cpf: "", notes: "", photoDataUrl: "" });
   const [err, setErr] = useState("");
+  const [photoError, setPhotoError] = useState("");
+  const [showExtraFields, setShowExtraFields] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [viewingPatientCardId, setViewingPatientCardId] = useState<string | null>(null);
   const [editPatientForm, setEditPatientForm] = useState({ name: "", age: "", notes: "" });
@@ -828,8 +872,24 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
     document.getElementById("patient-name")?.focus();
   };
 
+  const updateBirthDate = (birthDate: string) => {
+    const age = getPatientAge(birthDate);
+    setF((current) => ({ ...current, birthDate, age: age === null ? current.age : String(age) }));
+  };
+
+  const addPhoto = async (file?: File) => {
+    if (!file) return;
+    setPhotoError("");
+    try {
+      const photoDataUrl = await compressPatientPhoto(file);
+      setF((current) => ({ ...current, photoDataUrl }));
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Não foi possível adicionar a foto.");
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <T k="pat-title" as="h1" className="font-display text-3xl text-foreground">Pacientes</T>
         <p className="mt-1 text-sm text-muted-foreground">{patients.length} de {MAX_PATIENTS} pacientes cadastrados.</p>
@@ -839,28 +899,120 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
         <EmptyState
           icon={<UsersRound className="h-6 w-6" />}
           title="Comece cadastrando um paciente"
-          description="Adicione a pessoa que receberá os cuidados. Depois, você poderá vincular medicamentos e horários ao cadastro dela."
+          description="Informe os dados básicos agora. Os dados de identificação podem ser preenchidos em seguida, se necessário."
           actionLabel="Cadastrar primeiro paciente"
           onAction={focusPatientForm}
         />
       )}
 
       {patients.length < MAX_PATIENTS && (
-        <form id="patient-form" className={cls(card, "grid gap-3 sm:grid-cols-[1fr_120px]")} onSubmit={(e) => {
-          e.preventDefault();
+        <form id="patient-form" className={cls(card, "space-y-3 p-3 sm:p-4")} onSubmit={(event) => {
+          event.preventDefault();
           setErr("");
-          if (!f.name.trim() || f.age.trim() === "" || !Number.isFinite(Number(f.age)) || Number(f.age) < 0) return setErr("Informe nome e idade válida.");
-          if (!canAddPatient(getState(), me.id)) return setErr(`Limite de ${MAX_PATIENTS} pacientes.`);
+          const name = f.name.trim();
+          const age = getPatientAge(f.birthDate) ?? Number(f.age);
+          if (!name || !Number.isFinite(age) || age < 0 || (f.birthDate === "" && f.age.trim() === "")) {
+            setErr("Informe o nome e a idade ou a data de nascimento.");
+            return;
+          }
+          if (!canAddPatient(getState(), me.id)) return setErr(\`Limite de \${MAX_PATIENTS} pacientes.\`);
           const patientId = uid();
-          setState((s) => ({ ...s, patients: [...s.patients, { id: patientId, ownerId: me.id, name: f.name.trim(), age: Number(f.age), notes: f.notes.trim() }] }));
+          setState((state) => ({
+            ...state,
+            patients: [...state.patients, {
+              id: patientId,
+              ownerId: me.id,
+              name,
+              age,
+              notes: f.notes.trim(),
+              ...(f.birthDate ? { birthDate: f.birthDate } : {}),
+              ...(f.susCard.trim() ? { susCard: f.susCard.trim() } : {}),
+              ...(f.healthPlan.trim() ? { healthPlan: f.healthPlan.trim() } : {}),
+              ...(f.identityNumber.trim() ? { identityNumber: f.identityNumber.trim() } : {}),
+              ...(f.cpf.trim() ? { cpf: f.cpf.trim() } : {}),
+              ...(f.photoDataUrl ? { photoDataUrl: f.photoDataUrl } : {}),
+            }],
+          }));
           if (me.role === "cuidador") onSelectPatient(patientId);
-          setF({ name: "", age: "", notes: "" });
+          setF({ name: "", age: "", birthDate: "", susCard: "", healthPlan: "", identityNumber: "", cpf: "", notes: "", photoDataUrl: "" });
+          setShowExtraFields(false);
+          setPhotoError("");
         }}>
-          <input id="patient-name" className={input} placeholder="Nome do paciente" aria-label="Nome do paciente" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          <input className={input} type="number" min="0" placeholder="Idade" aria-label="Idade" value={f.age} onChange={(e) => setF({ ...f, age: e.target.value })} />
-          <textarea className={cls(input, "sm:col-span-2")} placeholder="Observações (opcional)" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
-          {err && <p className="text-sm text-destructive sm:col-span-2">{err}</p>}
-          <button className={cls(btnPrimary, "sm:col-span-2")}><Plus className="h-4 w-4" />Adicionar paciente</button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-foreground">Novo paciente</h2>
+              <p className="text-xs text-muted-foreground">Os dados preenchidos também serão usados no cartão de identificação.</p>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary">Campos essenciais</span>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1.5fr)_minmax(150px,1fr)_100px]">
+            <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+              Nome completo *
+              <input id="patient-name" className={cls(input, "w-full")} placeholder="Nome do paciente" autoComplete="name" value={f.name} onChange={(event) => setF((current) => ({ ...current, name: event.target.value }))} />
+            </label>
+            <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+              Data de nascimento
+              <input className={cls(input, "w-full")} type="date" value={f.birthDate} onChange={(event) => updateBirthDate(event.target.value)} />
+            </label>
+            <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+              Idade
+              <input className={cls(input, "w-full")} type="number" min="0" max="130" step="1" placeholder="Anos" aria-label="Idade" value={f.age} disabled={Boolean(f.birthDate && getPatientAge(f.birthDate) !== null)} onChange={(event) => setF((current) => ({ ...current, age: event.target.value }))} />
+            </label>
+          </div>
+
+          <button type="button" aria-expanded={showExtraFields} onClick={() => setShowExtraFields((current) => !current)} className="flex min-h-9 w-full items-center justify-between rounded-xl border border-border bg-background/70 px-3 py-2 text-left text-xs font-semibold text-foreground transition hover:bg-muted">
+            <span>{showExtraFields ? "Ocultar dados adicionais" : "Adicionar dados do cartão e foto (opcional)"}</span>
+            <span className="text-primary">{showExtraFields ? "−" : "+"}</span>
+          </button>
+
+          {showExtraFields && (
+            <div className="space-y-3 rounded-xl border border-border bg-background/50 p-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+                  Cartão do SUS (CNS)
+                  <input className={cls(input, "w-full")} placeholder="Número do CNS" inputMode="numeric" value={f.susCard} onChange={(event) => setF((current) => ({ ...current, susCard: event.target.value }))} />
+                </label>
+                <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+                  Plano de saúde
+                  <input className={cls(input, "w-full")} placeholder="Operadora / número" value={f.healthPlan} onChange={(event) => setF((current) => ({ ...current, healthPlan: event.target.value }))} />
+                </label>
+                <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+                  RG
+                  <input className={cls(input, "w-full")} placeholder="Número da identidade" value={f.identityNumber} onChange={(event) => setF((current) => ({ ...current, identityNumber: event.target.value }))} />
+                </label>
+                <label className="min-w-0 space-y-1 text-xs font-semibold text-foreground">
+                  CPF
+                  <input className={cls(input, "w-full")} placeholder="000.000.000-00" inputMode="numeric" value={f.cpf} onChange={(event) => setF((current) => ({ ...current, cpf: event.target.value }))} />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-muted">
+                  {f.photoDataUrl ? <img src={f.photoDataUrl} alt="Prévia da foto do paciente" className="h-full w-full object-cover" /> : <Camera className="h-5 w-5 text-muted-foreground" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">
+                    <ImagePlus className="h-4 w-4" />{f.photoDataUrl ? "Trocar foto" : "Adicionar foto"}
+                    <input className="sr-only" type="file" accept="image/*" onChange={(event) => { void addPhoto(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+                  </label>
+                  {f.photoDataUrl && <button type="button" onClick={() => setF((current) => ({ ...current, photoDataUrl: "" }))} className="ml-2 text-xs font-semibold text-destructive hover:underline">Remover</button>}
+                  <p className="mt-1 text-[10px] text-muted-foreground">Opcional · imagem reduzida automaticamente.</p>
+                </div>
+              </div>
+              {photoError && <p role="alert" className="text-xs font-semibold text-destructive">{photoError}</p>}
+            </div>
+          )}
+
+          <label className="block space-y-1 text-xs font-semibold text-foreground">
+            Observações para o cuidador (opcional)
+            <textarea className={cls(input, "min-h-9 w-full")} rows={2} placeholder="Ex.: prefere tomar os medicamentos após o café." value={f.notes} onChange={(event) => setF((current) => ({ ...current, notes: event.target.value }))} />
+          </label>
+          {err && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{err}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+            <p className="text-[10px] text-muted-foreground">* Obrigatório. Idade ou nascimento.</p>
+            <button className={cls(btnPrimary, "min-h-10 px-4")}><Plus className="h-4 w-4" />Adicionar paciente</button>
+          </div>
         </form>
       )}
 
@@ -876,12 +1028,12 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
                     <p className="text-sm text-muted-foreground">{p.age} anos</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <button type="button" aria-label={`Editar paciente ${p.name}`} title="Editar paciente" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => beginPatientEdit(p)}>
+                    <button type="button" aria-label={\`Editar paciente \${p.name}\`} title="Editar paciente" className="grid h-9 w-9 place-items-center rounded-full text-primary hover:bg-primary/10" onClick={() => beginPatientEdit(p)}>
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button type="button" aria-label={`Excluir paciente ${p.name}`} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
-                      if (confirm(`Excluir ${p.name} e seus medicamentos?`)) {
-                        setState((s) => ({ ...s, patients: s.patients.filter((x) => x.id !== p.id), meds: s.meds.filter((m) => m.patientId !== p.id), doses: s.doses.filter((d) => d.patientId !== p.id) }));
+                    <button type="button" aria-label={\`Excluir paciente \${p.name}\`} className="grid h-9 w-9 place-items-center rounded-full text-destructive hover:bg-destructive/10" onClick={() => {
+                      if (confirm(\`Excluir \${p.name} e seus medicamentos?\`)) {
+                        setState((state) => ({ ...state, patients: state.patients.filter((x) => x.id !== p.id), meds: state.meds.filter((m) => m.patientId !== p.id), doses: state.doses.filter((d) => d.patientId !== p.id) }));
                         if (activePatientId === p.id) onSelectPatient("");
                       }
                     }}><Trash2 className="h-4 w-4" /></button>
@@ -945,24 +1097,6 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
     </div>
   );
 }
-
-const DOSE_PERIODS: { value: DosePeriod; label: string }[] = [
-  { value: "manhã", label: "Manhã" },
-  { value: "tarde", label: "Tarde" },
-  { value: "noite", label: "Noite" },
-  { value: "madrugada", label: "Madrugada" },
-  { value: "antes-almoco", label: "Antes do almoço" },
-  { value: "depois-almoco", label: "Depois do almoço" },
-  { value: "antes-jantar", label: "Antes do jantar" },
-  { value: "depois-jantar", label: "Depois do jantar" },
-  { value: "personalizado", label: "Personalizado" },
-];
-
-const STRENGTH_UNITS = ["mcg", "mg", "g", "mL", "UI", "mg/mL", "mcg/mL", "UI/mL", "%"];
-const PRESENTATIONS = ["Comprimido", "Cápsula", "Drágea", "Solução oral", "Suspensão", "Gotas", "Sachê", "Ampola", "Spray", "Creme", "Pomada", "Outro"];
-const QUANTITY_UNITS = ["Comprimido(s)", "Cápsula(s)", "Drágea(s)", "mL", "Gota(s)", "Sachê(s)", "Ampola(s)", "Jato(s)", "Aplicação(ões)", "Unidade(s)"];
-const DEFAULT_TIMES = ["08:00", "13:00", "20:00", "06:00", "10:00", "16:00"];
-const DEFAULT_PERIODS: DosePeriod[] = ["manhã", "depois-almoco", "noite", "madrugada", "manhã", "tarde"];
 
 function defaultQuantityUnit(presentation: string) {
   if (presentation === "Comprimido") return "Comprimido(s)";
