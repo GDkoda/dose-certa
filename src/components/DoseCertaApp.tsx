@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlarmClock, ArrowRight, Bell, BellRing, CalendarDays, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
-  Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
+  CloudOff, CloudUpload, Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { enablePush } from "@/lib/push-browser";
 import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { PatientIdentityCard } from "./PatientIdentityCard";
+import { readOfflinePackage } from "@/lib/offline-cache";
 import { useInstallPrompt } from "@/lib/install-prompt";
 import { registerAccount, finishPasswordChange } from "@/lib/accounts.functions";
 import { cloudLogin, cloudLogout, initializeCloud, onCloudError, refreshCloud, updateOwnPassword } from "@/lib/cloud-store";
@@ -2025,9 +2026,28 @@ function UrgentAlertToast({ me }: { me: User }) {
 /* ---------------- shell ---------------- */
 function Shell({ me }: { me: User }) {
   const removeDevice = useServerFn(removePushDevice);
+  const [connectionOnline, setConnectionOnline] = useState(true);
+  const [pendingSync, setPendingSync] = useState(0);
   const [page, setPage] = useState<Page>(me.role === "mestre" ? "admin" : "inicio");
   const patientOptions = useStore((s) => s.patients.filter((p) => p.ownerId === me.id));
   const patientIdsKey = patientOptions.map((p) => p.id).join("|");
+  useEffect(() => {
+    const syncOnlineState = () => setConnectionOnline(navigator.onLine);
+    const syncPendingState = (event?: Event) => {
+      const detail = (event as CustomEvent<{ pending?: number }> | undefined)?.detail;
+      if (typeof detail?.pending === "number") setPendingSync(detail.pending);
+    };
+    syncOnlineState();
+    void readOfflinePackage(me.id).then((cached) => setPendingSync(cached?.pending.length ?? 0)).catch(() => undefined);
+    window.addEventListener("online", syncOnlineState);
+    window.addEventListener("offline", syncOnlineState);
+    window.addEventListener("dc-offline-status", syncPendingState);
+    return () => {
+      window.removeEventListener("online", syncOnlineState);
+      window.removeEventListener("offline", syncOnlineState);
+      window.removeEventListener("dc-offline-status", syncPendingState);
+    };
+  }, [me.id]);
   const [activePatientId, setActivePatientId] = useState("");
   useEffect(() => {
     const saved = localStorage.getItem(`dc-patient-${me.id}`);
@@ -2090,6 +2110,20 @@ function Shell({ me }: { me: User }) {
           <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
+        {(!connectionOnline || pendingSync > 0) && (
+          <div role="status" className="no-print border-b border-border/70 bg-muted/70 px-4 py-2.5 md:px-8">
+            <div className="mx-auto flex w-full max-w-[1600px] items-center gap-2.5">
+              {connectionOnline ? <CloudUpload className="h-4 w-4 shrink-0 text-primary" /> : <CloudOff className="h-4 w-4 shrink-0 text-amber-600" />}
+              <p className="min-w-0 text-xs font-semibold leading-relaxed text-foreground">
+                {!connectionOnline
+                  ? "Sem internet. Os dados salvos neste aparelho continuam disponíveis e serão sincronizados quando a conexão voltar."
+                  : pendingSync > 0
+                    ? pendingSync + (pendingSync === 1 ? " alteração aguardando sincronização." : " alterações aguardando sincronização.")
+                    : "Conexão restabelecida."}
+              </p>
+            </div>
+          </div>
+        )}
         {me.role === "cuidador" && patientOptions.length > 0 && (
           <div className="no-print border-b border-border/60 bg-card/65 px-4 py-2.5 md:px-8">
             <div className="mx-auto flex w-full max-w-[1600px] items-center gap-2.5">
