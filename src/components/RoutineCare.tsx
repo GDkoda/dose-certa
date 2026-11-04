@@ -113,8 +113,6 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
     ? item.status === "tomado"
     : item.log?.status === "concluido" || item.log?.status === "parcial").length;
   const progress = timeline.length ? Math.round((completed / timeline.length) * 100) : 0;
-  const now = new Date();
-  const isToday = selectedDate === dateKey(now);
   const pendingTimeline = timeline.filter((item) => item.kind === "medication" ? item.status === "pendente" : !item.log || item.log.status === "pendente");
   const nextItem = pendingTimeline[0];
   const afterItem = pendingTimeline[1];
