@@ -910,9 +910,10 @@ function Patients({ me, activePatientId = "", onSelectPatient }: {
           event.preventDefault();
           setErr("");
           const name = f.name.trim();
-          const age = getPatientAge(f.birthDate) ?? Number(f.age);
-          if (!name || !Number.isFinite(age) || age < 0 || (f.birthDate === "" && f.age.trim() === "")) {
-            setErr("Informe o nome e a idade ou a data de nascimento.");
+          const calculatedAge = getPatientAge(f.birthDate);
+          const age = calculatedAge ?? Number(f.age);
+          if (!name || (f.birthDate !== "" && calculatedAge === null) || !Number.isFinite(age) || age < 0 || (f.birthDate === "" && f.age.trim() === "")) {
+            setErr(f.birthDate && calculatedAge === null ? "Confira a data de nascimento." : "Informe o nome e a idade ou a data de nascimento.");
             return;
           }
           if (!canAddPatient(getState(), me.id)) return setErr(\`Limite de \${MAX_PATIENTS} pacientes.\`);
