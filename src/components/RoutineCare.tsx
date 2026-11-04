@@ -242,10 +242,11 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
   };
 
   const openLog = (task: RoutineTask) => {
-    setOffered(task.category === "hidratacao" ? "200" : "1");
-    setAccepted(task.category === "hidratacao" ? "200" : "1");
-    setAmountUnit("porção");
-    setLogNotes("");
+    const existing = patientLogs.find((log) => log.taskId === task.id && log.date === selectedDate);
+    setOffered(existing?.offeredAmount !== undefined ? String(existing.offeredAmount) : task.category === "hidratacao" ? "200" : "1");
+    setAccepted(existing?.acceptedAmount !== undefined ? String(existing.acceptedAmount) : task.category === "hidratacao" ? "200" : "1");
+    setAmountUnit(existing?.unit ?? "porção");
+    setLogNotes(existing?.notes ?? "");
     setLogError("");
     setLogTask(task);
   };
@@ -310,7 +311,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
                 <h2 className="mt-4 font-display text-xl font-bold text-foreground">{item.title}</h2>
                 <p className="mt-1 min-h-10 text-sm text-muted-foreground">{item.kind === "medication" ? item.description : item.task.description || categoryInfo(item.task.category).label}</p>
                 {item.kind === "medication" ? <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">{done ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Clock3 className="h-4 w-4" />}{done ? "Concluído no controle de medicamentos" : "Acompanhar em medicamentos"}</span>
-                  : <button type="button" onClick={() => item.log ? openLog(item.task) : markTask(item.task, "concluido")} className={done ? quietButton + " mt-3 w-full" : primaryButton + " mt-3 w-full"}>{done ? <><CheckCircle2 className="h-4 w-4" />Ver registro</> : <><Check className="h-4 w-4" />Concluir atividade</>}</button>}
+                  : <button type="button" onClick={() => item.task.category === "hidratacao" || item.task.category === "alimentacao" ? openLog(item.task) : markTask(item.task, "concluido")} className={done ? quietButton + " mt-3 w-full" : primaryButton + " mt-3 w-full"}>{done ? <><CheckCircle2 className="h-4 w-4" />Ver registro</> : <><Check className="h-4 w-4" />Concluir atividade</>}</button>}
               </article>
             );
           })}
