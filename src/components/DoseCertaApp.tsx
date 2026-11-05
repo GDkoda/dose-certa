@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  AlarmClock, Archive, ArrowRight, Bell, BellRing, CalendarDays, Camera, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, ImagePlus, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
-  CloudOff, CloudUpload, Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, X,
+  Activity, AlarmClock, Archive, ArrowRight, Bell, BellRing, BookOpen, CalendarDays, Camera, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, ImagePlus, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
+  CloudOff, CloudUpload, Pill, Plus, Palette as PaletteIcon, Printer, Shield, ShieldCheck, Smartphone, Sun, Trash2, UserRound, Users, UsersRound, Vibrate, Wifi, X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -245,36 +245,8 @@ function usePalette() {
   return { palette, setPalette };
 }
 
-function PalettePicker() {
-  const { palette, setPalette } = usePalette();
-  return (
-    <div className={cls(card, "max-w-md !p-4 space-y-3 sm:!p-5")}>
-      <h2 className="font-display text-lg text-foreground">Cor do aplicativo</h2>
-      <p className="text-sm text-muted-foreground">Escolha a paleta deste aparelho. Ela combina com o modo claro e o noturno.</p>
-      <div className="grid w-full grid-cols-4 gap-2 sm:gap-3" role="radiogroup" aria-label="Cor do aplicativo">
-        {PALETTES.map((p) => (
-          <button key={p.id} role="radio" aria-checked={palette === p.id} onClick={() => setPalette(p.id)} className={cls("flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border p-2 transition sm:p-3", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}>
-            <span className="flex max-w-full shrink-0 overflow-hidden rounded-full border border-border">
-              <span className="h-5 w-5 sm:h-6 sm:w-6" style={{ background: p.light }} />
-              <span className="h-5 w-5 sm:h-6 sm:w-6" style={{ background: p.dark }} />
-            </span>
-            <span className="whitespace-nowrap text-[11px] leading-tight text-foreground sm:text-xs">{p.name}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-function ThemeToggle() {
+function AppearanceQuickAccess() {
   const { dark, toggle } = useTheme();
-  return (
-    <button onClick={toggle} aria-label="Alternar modo noturno" className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
-      {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-    </button>
-  );
-}
-
-function PaletteQuickAccess() {
   const { palette, setPalette } = usePalette();
   const [open, setOpen] = useState(false);
 
@@ -289,40 +261,24 @@ function PaletteQuickAccess() {
 
   const dialog = open && typeof document !== "undefined"
     ? createPortal(
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/35 p-3 backdrop-blur-sm sm:p-5"
-          onClick={() => setOpen(false)}
-          role="presentation"
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Escolher tema de cores"
-            className={cls(card, "w-[min(25rem,calc(100vw-1.5rem))] max-h-[min(82dvh,42rem)] overflow-y-auto !p-4 shadow-2xl sm:!p-5")}
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/35 p-3 backdrop-blur-sm sm:p-5" onClick={() => setOpen(false)} role="presentation">
+          <section role="dialog" aria-modal="true" aria-label="Aparência do Dose Certa" className={cls(card, "w-[min(26rem,calc(100vw-1.5rem))] max-h-[min(82dvh,42rem)] overflow-y-auto !p-4 shadow-2xl sm:!p-5")} onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-display text-lg font-semibold text-foreground">Tema de cores</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">A aparência muda neste aparelho.</p>
-              </div>
-              <button type="button" aria-label="Fechar temas" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted">
-                <X className="h-4 w-4" />
-              </button>
+              <div><p className="font-display text-lg font-semibold text-foreground">Aparência</p><p className="mt-0.5 text-xs text-muted-foreground">Tema de cores e modo de exibição deste aparelho.</p></div>
+              <button type="button" aria-label="Fechar aparência" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
+            <div className="mb-4 rounded-2xl border border-border bg-background/70 p-3">
+              <p className="mb-2 text-xs font-bold text-foreground">Modo de exibição</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" aria-pressed={!dark} onClick={() => { if (dark) toggle(); }} className={cls("flex min-h-11 items-center justify-center gap-2 rounded-xl border text-xs font-bold transition", !dark ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:bg-muted")}><Sun className="h-4 w-4" />Claro</button>
+                <button type="button" aria-pressed={dark} onClick={() => { if (!dark) toggle(); }} className={cls("flex min-h-11 items-center justify-center gap-2 rounded-xl border text-xs font-bold transition", dark ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:bg-muted")}><Moon className="h-4 w-4" />Escuro</button>
+              </div>
+            </div>
+            <p className="mb-2 text-xs font-bold text-foreground">Paleta de cores</p>
             <div className="grid grid-cols-2 gap-2.5">
               {PALETTES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  aria-pressed={palette === p.id}
-                  onClick={() => { setPalette(p.id); setOpen(false); }}
-                  className={cls("flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}
-                >
-                  <span className="flex shrink-0 overflow-hidden rounded-full border border-border">
-                    <span className="h-4 w-4" style={{ background: p.light }} />
-                    <span className="h-4 w-4" style={{ background: p.dark }} />
-                  </span>
+                <button key={p.id} type="button" aria-pressed={palette === p.id} onClick={() => setPalette(p.id)} className={cls("flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition", palette === p.id ? "border-primary bg-accent" : "border-border bg-card hover:bg-muted")}>
+                  <span className="flex shrink-0 overflow-hidden rounded-full border border-border"><span className="h-4 w-4" style={{ background: p.light }} /><span className="h-4 w-4" style={{ background: p.dark }} /></span>
                   <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{p.name}</span>
                   {palette === p.id && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />}
                 </button>
@@ -336,19 +292,43 @@ function PaletteQuickAccess() {
 
   return (
     <>
-      <button
-        type="button"
-        aria-label="Escolher tema de cores"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title="Temas e cores"
-        onClick={() => setOpen((value) => !value)}
-        className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted"
-      >
+      <button type="button" aria-label="Aparência: tema e modo" aria-haspopup="dialog" aria-expanded={open} title="Tema e modo de exibição" onClick={() => setOpen((value) => !value)} className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
         <PaletteIcon className="h-5 w-5" />
       </button>
       {dialog}
     </>
+  );
+}
+
+function QuickGuideAccess({ onNavigate, hasPatient }: { onNavigate: (page: Page) => void; hasPatient: boolean }) {
+  const [open, setOpen] = useState(false);
+  const entries: { title: string; description: string; icon: ReactNode; page: Page }[] = [
+    { title: "Ativar notificações", description: "Permissões e teste de alertas", icon: <BellRing className="h-4 w-4" />, page: "perfil" },
+    { title: "Organizar pacientes", description: "Cadastrar e escolher quem acompanhar", icon: <UsersRound className="h-4 w-4" />, page: "pacientes" },
+    { title: "Cadastrar medicamento", description: "Dosagem, horários e estoque", icon: <PillBottle className="h-4 w-4" />, page: "medicamentos" },
+    { title: "Montar rotina visual", description: "Alimentação, hidratação e atividades", icon: <CalendarDays className="h-4 w-4" />, page: hasPatient ? "rotina" : "pacientes" },
+    { title: "Central de atendimento", description: "Dúvidas e suporte do aplicativo", icon: <LifeBuoy className="h-4 w-4" />, page: "suporte" },
+  ];
+  return (
+    <div className="relative">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Abrir guia rápido" title="Guia rápido" onClick={() => setOpen((value) => !value)} className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
+        <BookOpen className="h-5 w-5" />
+      </button>
+      {open && (
+        <div role="menu" aria-label="Guia rápido" className="absolute right-0 z-40 mt-2 w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3 shadow-xl">
+          <div className="mb-2 px-1"><p className="font-display text-base font-bold text-foreground">Guia rápido</p><p className="text-[10px] text-muted-foreground">Acesse direto as tarefas mais comuns.</p></div>
+          <div className="space-y-1">
+            {entries.map((entry) => (
+              <button key={entry.title} type="button" role="menuitem" onClick={() => { onNavigate(entry.page); setOpen(false); }} className="group flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition hover:bg-muted">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{entry.icon}</span>
+                <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">{entry.title}</span><span className="block text-[10px] text-muted-foreground">{entry.description}</span></span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -400,7 +380,7 @@ function AuthScreen() {
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-background p-4">
       <GeometricDissolve variant="dense" className="-right-24 -bottom-24 h-[38rem] w-[38rem] dc-geometry-ink opacity-65" />
       <GeometricDissolve variant="sparse" className="-left-28 -top-28 h-[29rem] w-[29rem] dc-geometry-ink opacity-45" />
-      <div className="absolute right-4 top-4"><ThemeToggle /></div>
+      <div className="absolute right-4 top-4"><AppearanceQuickAccess /></div>
       <div className={cls(card, "relative w-full max-w-md")}>
         <div className="mb-6 flex items-center gap-3">
           <Logo size={48} />
@@ -1348,10 +1328,17 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
             {patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name}</option>)}
           </select>
         </label>
-        <label className="block space-y-1 text-xs font-semibold text-foreground">
-          Estoque atual ({form.quantityUnit.toLowerCase()})
-          <input className={input} type="number" min="0" step="0.01" inputMode="decimal" value={form.stock} onChange={(event) => setForm((current) => ({ ...current, stock: event.target.value }))} />
-        </label>
+        <div className="space-y-2 rounded-2xl border border-primary/20 bg-primary/[0.045] p-3 sm:col-span-2">
+          <label className="block space-y-1 text-xs font-semibold text-foreground">
+            Total disponível agora ({form.quantityUnit.toLowerCase()})
+            <input className={cls(input, "min-h-12 text-base font-bold tabular-nums")} type="number" min="0" step="0.01" inputMode="decimal" value={form.stock} onChange={(event) => setForm((current) => ({ ...current, stock: event.target.value }))} />
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[10px] font-semibold text-muted-foreground">Somar reposição:</span>
+            {[1, 10, 30].map((amount) => <button key={amount} type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[11px] font-bold text-foreground hover:bg-muted" onClick={() => setForm((current) => ({ ...current, stock: String(Math.max(0, Number(current.stock) || 0) + amount) }))}>+{amount}</button>)}
+          </div>
+          <p className="text-[10px] leading-relaxed text-muted-foreground">Informe o total real que existe no momento. Os atalhos somam uma reposição ao valor atual; salvar não altera doses que já foram registradas.</p>
+        </div>
         <label className="block space-y-1 text-xs font-semibold text-foreground">
           Tolerância do atraso (minutos)
           <input className={input} type="number" min="0" step="1" value={form.tolerance} onChange={(event) => setForm((current) => ({ ...current, tolerance: event.target.value }))} />
@@ -1411,6 +1398,10 @@ function Meds({ me, activePatientId = "", go }: {
   const [step, setStep] = useState(1);
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
   const [editingMedicationId, setEditingMedicationId] = useState<string | null>(null);
+  const [stockEditorId, setStockEditorId] = useState<string | null>(null);
+  const [stockMode, setStockMode] = useState<"add" | "set">("add");
+  const [stockAmount, setStockAmount] = useState("30");
+  const [stockError, setStockError] = useState("");
   const [f, setF] = useState<{
     patientId: string;
     name: string;
@@ -1542,6 +1533,31 @@ function Meds({ me, activePatientId = "", go }: {
     });
     setStep(1);
     setTimePickerIndex(null);
+  };
+
+  const applyStockAdjustment = (med: Med) => {
+    const amount = Number(stockAmount);
+    if (!Number.isFinite(amount) || amount < 0 || (stockMode === "add" && amount <= 0)) {
+      setStockError(stockMode === "add" ? "Informe uma quantidade de reposição maior que zero." : "Informe um total válido, igual ou maior que zero.");
+      return;
+    }
+    setState((state) => ({
+      ...state,
+      meds: state.meds.map((item) => {
+        if (item.id !== med.id) return item;
+        const currentBaseline = item.initialStock ?? item.stock;
+        const nextStock = stockMode === "add" ? item.stock + amount : amount;
+        return {
+          ...item,
+          stock: nextStock,
+          initialStock: stockMode === "add" ? currentBaseline + amount : Math.max(currentBaseline, nextStock),
+        };
+      }),
+    }));
+    setStockEditorId(null);
+    setStockError("");
+    setStockAmount("30");
+    setStockMode("add");
   };
 
   const pickerSlot = timePickerIndex === null ? null : f.schedule[timePickerIndex];
@@ -1807,16 +1823,30 @@ function Meds({ me, activePatientId = "", go }: {
                     <span className={cls("text-[11px] font-semibold", level === "low" || level === "empty" ? "font-extrabold text-destructive" : "text-muted-foreground")}>
                       {level === "empty" ? "Estoque esgotado" : level === "low" ? (m.initialStock ? "10% ou menos restante" : "Estoque baixo") : "Estoque suficiente"}
                     </span>
-                    <button
-                      className={cls(btnOutline, "ml-auto px-3 py-1.5 text-xs")}
-                      onClick={() => setState((state) => ({
-                        ...state,
-                        meds: state.meds.map((item) => item.id === m.id
-                          ? { ...item, stock: item.stock + 30, initialStock: (item.initialStock ?? item.stock) + 30 }
-                          : item),
-                      }))}
-                    >+30</button>
+                    <button type="button" className={cls(btnOutline, "ml-auto px-3 py-1.5 text-xs")} onClick={() => {
+                      setStockEditorId((current) => current === m.id ? null : m.id);
+                      setStockMode("add");
+                      setStockAmount("30");
+                      setStockError("");
+                    }}>{stockEditorId === m.id ? "Fechar ajuste" : "Ajustar estoque"}</button>
                   </div>
+                  {stockEditorId === m.id && (
+                    <form className="space-y-3 rounded-2xl border border-primary/20 bg-primary/[0.045] p-3" onSubmit={(event) => { event.preventDefault(); applyStockAdjustment(m); }}>
+                      <div><p className="text-xs font-bold text-foreground">Ajuste de estoque</p><p className="mt-0.5 text-[10px] text-muted-foreground">Escolha se está adicionando uma reposição ou corrigindo a contagem.</p></div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" aria-pressed={stockMode === "add"} onClick={() => { setStockMode("add"); setStockError(""); }} className={cls("min-h-10 rounded-xl border px-2 text-[11px] font-bold", stockMode === "add" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground")}>Adicionar reposição</button>
+                        <button type="button" aria-pressed={stockMode === "set"} onClick={() => { setStockMode("set"); setStockAmount(String(m.stock)); setStockError(""); }} className={cls("min-h-10 rounded-xl border px-2 text-[11px] font-bold", stockMode === "set" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground")}>Corrigir total atual</button>
+                      </div>
+                      <label className="block space-y-1 text-[11px] font-bold text-foreground">
+                        {stockMode === "add" ? "Quantidade recebida" : "Quantidade que existe agora"} ({m.quantityUnit ?? "un."})
+                        <input autoFocus className={cls(input, "min-h-11 font-bold tabular-nums")} type="number" min={stockMode === "add" ? "0.01" : "0"} step="0.01" inputMode="decimal" value={stockAmount} onChange={(event) => setStockAmount(event.target.value)} />
+                      </label>
+                      {stockMode === "add" && <div className="flex flex-wrap gap-1.5">{[1, 10, 30].map((amount) => <button key={amount} type="button" className="rounded-lg border border-border bg-card px-3 py-1.5 text-[10px] font-bold text-foreground hover:bg-muted" onClick={() => setStockAmount(String(amount))}>+{amount}</button>)}</div>}
+                      <p className="text-[10px] leading-relaxed text-muted-foreground">{stockMode === "add" ? "A quantidade recebida será somada ao estoque que já existe." : "O valor substituirá a contagem atual. O histórico de doses permanece intacto."}</p>
+                      {stockError && <p role="alert" className="text-[10px] font-semibold text-destructive">{stockError}</p>}
+                      <div className="flex justify-end gap-2"><button type="button" className={btnOutline + " px-3 py-1.5 text-xs"} onClick={() => { setStockEditorId(null); setStockError(""); }}>Cancelar</button><button type="submit" className={btnPrimary + " px-3 py-1.5 text-xs"}>Salvar estoque</button></div>
+                    </form>
+                  )}
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span>{schedule.length} {schedule.length === 1 ? "dose" : "doses"} por dia</span>
                     <span className="text-right">Estoque estimado: {estimateStockDays(m) === null ? "—" : String(estimateStockDays(m)) + " dia(s)"}</span>
@@ -2061,6 +2091,8 @@ function Profile({ me }: { me: User }) {
   const [notificationMessage, setNotificationMessage] = useState("");
   const [vibrationMessage, setVibrationMessage] = useState("");
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<{ label: string; detail: string; ok: boolean; icon: typeof Wifi }[]>([]);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const installFlow = useInstallPrompt();
   const registerDevice = useServerFn(registerPushDevice);
   const testPush = useServerFn(sendTestPush);
@@ -2090,6 +2122,39 @@ function Profile({ me }: { me: User }) {
       window.removeEventListener("appinstalled", syncInstalledState);
     };
   }, [me.id]);
+
+  const refreshDiagnostics = async () => {
+    if (typeof window === "undefined") return;
+    setDiagnosticsBusy(true);
+    const online = navigator.onLine;
+    const secure = window.isSecureContext;
+    const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
+    let serviceWorker = false;
+    try {
+      serviceWorker = "serviceWorker" in navigator && (await navigator.serviceWorker.getRegistrations()).length > 0;
+    } catch { serviceWorker = false; }
+    const standalone = window.matchMedia?.("(display-mode: standalone)").matches === true
+      || window.matchMedia?.("(display-mode: fullscreen)").matches === true
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    setDiagnostics([
+      { label: "Conexão com a internet", detail: online ? "Aparelho conectado" : "Sem conexão no momento", ok: online, icon: Wifi },
+      { label: "Permissão de notificações", detail: permission === "granted" ? "Permissão concedida" : permission === "denied" ? "Permissão bloqueada pelo navegador" : permission === "unsupported" ? "Não suportado neste navegador" : "Ainda não foi solicitada", ok: permission === "granted", icon: BellRing },
+      { label: "Serviço de notificações", detail: serviceWorker ? "Serviço instalado neste navegador" : "Nenhum serviço registrado foi encontrado", ok: serviceWorker, icon: Activity },
+      { label: "Contexto seguro", detail: secure ? "Navegador permite recursos seguros" : "Abra o aplicativo por HTTPS", ok: secure, icon: ShieldCheck },
+      { label: "Aplicativo instalado", detail: standalone ? "Aberto como aplicativo" : "Aberto em uma aba do navegador", ok: standalone, icon: Smartphone },
+    ]);
+    setDiagnosticsBusy(false);
+  };
+
+  useEffect(() => {
+    void refreshDiagnostics();
+    window.addEventListener("online", refreshDiagnostics);
+    window.addEventListener("offline", refreshDiagnostics);
+    return () => {
+      window.removeEventListener("online", refreshDiagnostics);
+      window.removeEventListener("offline", refreshDiagnostics);
+    };
+  }, []);
 
   const activateNotifications = async () => {
     setPushBusy(true);
@@ -2214,14 +2279,6 @@ function Profile({ me }: { me: User }) {
             </div>
           </section>
 
-          <div className="space-y-2">
-            <div className="px-1">
-              <h2 className="text-sm font-extrabold text-foreground">Aparência do aplicativo</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">As cores e o modo visual ficam salvos neste aparelho.</p>
-            </div>
-            <PalettePicker />
-          </div>
-
           <form className={cls(card, "space-y-3 !p-4 sm:!p-5")} onSubmit={async (event) => {
             event.preventDefault();
             try {
@@ -2252,6 +2309,17 @@ function Profile({ me }: { me: User }) {
         </div>
 
         <div className="space-y-4">
+          <section className={cls(card, "space-y-3 !p-4 sm:!p-5")}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Activity className="h-4 w-4" /></span><div><h2 className="font-display text-lg font-semibold text-foreground">Diagnóstico rápido</h2><p className="text-[10px] text-muted-foreground">Verificação deste aparelho e navegador</p></div></div>
+              <button type="button" title="Atualizar diagnóstico" aria-label="Executar diagnóstico novamente" onClick={() => void refreshDiagnostics()} disabled={diagnosticsBusy} className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted disabled:opacity-50"><Activity className={"h-4 w-4 " + (diagnosticsBusy ? "animate-pulse" : "")} /></button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {diagnostics.map((item) => <div key={item.label} className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-background/60 p-3"><span className={cls("mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg", item.ok ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700 dark:text-amber-300")}><item.icon className="h-3.5 w-3.5" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold text-foreground">{item.label}</p><p className="text-[10px] leading-relaxed text-muted-foreground">{item.detail}</p></div><span className={cls("mt-1 h-2 w-2 shrink-0 rounded-full", item.ok ? "bg-primary" : "bg-amber-500")} /></div>)}
+            </div>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">O diagnóstico é informativo. Permissões de bateria, som e execução em segundo plano podem depender do fabricante do aparelho.</p>
+          </section>
+
           <section className={cls(card, "space-y-4 !p-4 sm:!p-5")}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-2.5">
@@ -2481,7 +2549,7 @@ function Shell({ me }: { me: User }) {
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
           <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{items.find((item) => item.id === page)?.label ?? "Dose Certa"}</p></div>
-          <div className="flex items-center gap-2"><PaletteQuickAccess /><ThemeToggle />{me.role === "cuidador" && <AlertsBell me={me} />}
+          <div className="flex items-center gap-2"><QuickGuideAccess onNavigate={setPage} hasPatient={Boolean(activePatientId)} /><AppearanceQuickAccess />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
         {(!browserOnline || !cloudConnected || pendingSync > 0 || !!syncError) && (
@@ -2536,7 +2604,7 @@ function Shell({ me }: { me: User }) {
           {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} onOpenRoutine={(patientId) => { selectPatient(patientId); setPage("rotina"); }} />}
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "historico" && <HistoryPage me={me} activePatientId={activePatientId} go={setPage} />}
-          {page === "suporte" && <SupportPage me={me} onOpenProfile={() => setPage("perfil")} onOpenPatients={() => setPage("pacientes")} onOpenRoutine={() => setPage(activePatientId ? "rotina" : "pacientes")} />}
+          {page === "suporte" && <SupportPage me={me} />}
           {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} onSelectPatient={selectPatient} />}
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
