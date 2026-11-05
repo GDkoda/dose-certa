@@ -69,8 +69,17 @@ export interface RoutineLog {
 export interface RoutineSettings { id: string; patientId: string; ownerId: string; dailyWaterGoalMl?: number }
 export interface TicketAttachment { name: string; type: string; dataUrl: string }
 export interface Ticket { id: string; userId: string; subject: string; category?: string; status: "aberto" | "respondido" | "fechado"; messages: { from: string; text: string; at: string; attachments?: TicketAttachment[] }[] }
+export interface PublicFaq {
+  id: string;
+  ownerId: string;
+  sourceTicketId?: string;
+  question: string;
+  answer: string;
+  category: string;
+  publishedAt: string;
+}
 export interface State {
-  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[]; routines: RoutineTask[]; routineLogs: RoutineLog[]; routineSettings: RoutineSettings[];
+  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[]; faqs: PublicFaq[]; routines: RoutineTask[]; routineLogs: RoutineLog[]; routineSettings: RoutineSettings[];
   texts: Record<string, string>; images: Record<string, string>; sessionId: string | null;
 }
 
@@ -84,7 +93,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 export function initialState(): State {
   return {
     users: [],
-    patients: [], meds: [], doses: [], alerts: [], tickets: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null,
+    patients: [], meds: [], doses: [], alerts: [], tickets: [], faqs: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null,
   };
 }
 
