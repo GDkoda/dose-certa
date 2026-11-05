@@ -1,5 +1,19 @@
 -- Publish reviewed, anonymized support questions as shared help articles.
 -- Existing records and their payloads are preserved.
+-- Recreate this helper defensively: older live databases may not have received
+-- the original shared-account migration in full.
+CREATE OR REPLACE FUNCTION public.password_change_completed(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT COALESCE((SELECT NOT must_change FROM public.profiles WHERE id = _user_id), false)
+$;
+REVOKE ALL ON FUNCTION public.password_change_completed(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.password_change_completed(uuid) TO authenticated, service_role;
+
 ALTER TABLE public.app_records
   DROP CONSTRAINT IF EXISTS app_records_kind_check;
 
