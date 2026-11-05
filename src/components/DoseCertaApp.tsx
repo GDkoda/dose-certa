@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity, AlarmClock, Archive, ArrowRight, Bell, BellRing, BookOpen, CalendarDays, Camera, CheckCircle2, ClipboardList, Clock3, Download, Headphones, History, Home, ImagePlus, LifeBuoy, LogOut, Moon, Pencil, PillBottle,
@@ -1275,7 +1275,7 @@ function MedicationEditor({ med, patients, onCancel, onSave }: {
       quantityPerDose: quantity,
       quantityUnit: form.quantityUnit,
       stock,
-      initialStock: Math.max(med.initialStock ?? med.stock, stock),
+      initialStock: quantityUnitChanged ? stock : Math.max(med.initialStock ?? med.stock, stock),
       tolerance: Math.max(0, Number(form.tolerance) || 0),
     };
     onSave(updated);
@@ -2123,7 +2123,7 @@ function Profile({ me }: { me: User }) {
     };
   }, [me.id]);
 
-  const refreshDiagnostics = async () => {
+  const refreshDiagnostics = useCallback(async () => {
     if (typeof window === "undefined") return;
     setDiagnosticsBusy(true);
     const online = navigator.onLine;
@@ -2144,7 +2144,7 @@ function Profile({ me }: { me: User }) {
       { label: "Aplicativo instalado", detail: standalone ? "Aberto como aplicativo" : "Aberto em uma aba do navegador", ok: standalone, icon: Smartphone },
     ]);
     setDiagnosticsBusy(false);
-  };
+  }, []);
 
   useEffect(() => {
     void refreshDiagnostics();
@@ -2154,7 +2154,7 @@ function Profile({ me }: { me: User }) {
       window.removeEventListener("online", refreshDiagnostics);
       window.removeEventListener("offline", refreshDiagnostics);
     };
-  }, []);
+  }, [refreshDiagnostics]);
 
   const activateNotifications = async () => {
     setPushBusy(true);
