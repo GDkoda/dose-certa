@@ -317,26 +317,83 @@ function QuickGuideAccess({ onNavigate, hasPatient, role }: { onNavigate: (page:
         { title: "Meu perfil", description: "Conta e diagnóstico do aparelho", icon: <UserRound className="h-4 w-4" />, page: "perfil" },
         ...(role === "mestre" ? [{ title: "Painel do Mestre", description: "Contas e administração", icon: <ShieldCheck className="h-4 w-4" />, page: "admin" as Page }] : []),
       ];
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const dialog = open && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          className="no-print fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-foreground/40 p-3 backdrop-blur-sm sm:p-6"
+          role="presentation"
+          onClick={() => setOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-guide-title"
+            className="my-auto flex max-h-[min(86dvh,44rem)] w-full max-w-md flex-col overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><BookOpen className="h-5 w-5" /></span>
+                <div className="min-w-0">
+                  <h2 id="quick-guide-title" className="font-display text-lg font-bold text-foreground">Guia rápido</h2>
+                  <p className="text-[11px] text-muted-foreground">Acesse direto as tarefas mais comuns.</p>
+                </div>
+              </div>
+              <button type="button" aria-label="Fechar guia rápido" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            <div className="min-h-0 space-y-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+              {entries.map((entry) => (
+                <button
+                  key={entry.title}
+                  type="button"
+                  onClick={() => { onNavigate(entry.page); setOpen(false); }}
+                  className="group flex min-h-14 w-full items-center gap-3 rounded-xl border border-transparent p-3 text-left transition hover:border-border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{entry.icon}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-foreground">{entry.title}</span>
+                    <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">{entry.description}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                </button>
+              ))}
+            </div>
+            <footer className="shrink-0 border-t border-border/70 px-4 py-3 text-center text-[10px] text-muted-foreground">
+              Toque em uma opção para abrir a área correspondente.
+            </footer>
+          </section>
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
-    <div className="relative">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Abrir guia rápido" title="Guia rápido" onClick={() => setOpen((value) => !value)} className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label="Abrir guia rápido"
+        title="Guia rápido"
+        onClick={() => setOpen(true)}
+        className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted"
+      >
         <BookOpen className="h-5 w-5" />
       </button>
-      {open && (
-        <div role="menu" aria-label="Guia rápido" className="absolute right-0 z-40 mt-2 w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border border-border bg-card p-3 shadow-xl">
-          <div className="mb-2 px-1"><p className="font-display text-base font-bold text-foreground">Guia rápido</p><p className="text-[10px] text-muted-foreground">Acesse direto as tarefas mais comuns.</p></div>
-          <div className="space-y-1">
-            {entries.map((entry) => (
-              <button key={entry.title} type="button" role="menuitem" onClick={() => { onNavigate(entry.page); setOpen(false); }} className="group flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition hover:bg-muted">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{entry.icon}</span>
-                <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">{entry.title}</span><span className="block text-[10px] text-muted-foreground">{entry.description}</span></span>
-                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+      {dialog}
+    </>
   );
 }
 
