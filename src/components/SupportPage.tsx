@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  Activity, ArrowRight, BellRing, BookOpen, CalendarDays, CheckCircle2, ChevronDown, CircleHelp,
-  Clock3, FileImage, FileText, Headphones, LifeBuoy, MessageCircle, Paperclip,
-  Plus, Search, Send, Settings2, ShieldCheck, Smartphone, Wifi, X,
+  CheckCircle2, ChevronDown, CircleHelp, Clock3, FileImage, FileText, Headphones,
+  LifeBuoy, MessageCircle, Paperclip, Plus, Search, Send, ShieldCheck, X,
 } from "lucide-react";
 import { TicketManagement } from "@/components/TicketManagement";
-import { setState, uid, useStore, type Ticket, type TicketAttachment, type User } from "@/lib/store";
+import { flushCloudWrites } from "@/lib/cloud-store";
+import { setState, uid, useStore, type PublicFaq, type Ticket, type TicketAttachment, type User } from "@/lib/store";
 
 const field = "min-h-11 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15";
 const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50";
@@ -17,8 +17,8 @@ const statusTone: Record<Ticket["status"], string> = {
   fechado: "bg-muted text-muted-foreground",
 };
 
-type Diagnostic = { label: string; detail: string; ok: boolean; icon: typeof Wifi };
-const faqItems: { category: string; question: string; answer: string; keywords: string }[] = [
+type HelpArticle = { id?: string; category: string; question: string; answer: string; keywords: string; userExample?: boolean };
+const faqItems: HelpArticle[] = [
   { category: "Medicamentos", question: "Como cadastrar um medicamento?", answer: "Acesse Medicamentos, escolha Adicionar medicamento e informe o nome, a dosagem, os horários e a quantidade disponível. Confira os horários antes de salvar.", keywords: "cadastro dose remédio remedio estoque" },
   { category: "Alarmes", question: "O alarme não apareceu. O que fazer?", answer: "Confira se as notificações estão permitidas, se o aparelho está conectado e se o Dose Certa está instalado. No Perfil, use o teste de notificações e verifique as configurações do aparelho.", keywords: "alarme notificação notificacao push celular" },
   { category: "Alarmes", question: "O aviso funciona com o aplicativo fechado?", answer: "Os avisos em segundo plano dependem do serviço de notificações, da instalação do aplicativo e das permissões do sistema. A entrega também pode ser limitada pela economia de bateria ou pelas regras do aparelho.", keywords: "segundo plano fechado bateria pwa" },
@@ -37,11 +37,10 @@ function fileToDataUrl(file: File) {
   });
 }
 
-export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }: {
-  me: User; onOpenProfile: () => void; onOpenPatients: () => void; onOpenRoutine: () => void;
-}) {
+export function SupportPage({ me }: { me: User }) {
   const tickets = useStore((state) => state.tickets);
   const users = useStore((state) => state.users);
+  const publishedFaqs = useStore((state) => state.faqs);
   const mine = me.role === "cuidador" ? tickets.filter((ticket) => ticket.userId === me.id) : tickets;
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -56,41 +55,92 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
   const [faqSearch, setFaqSearch] = useState("");
   const [faqCategory, setFaqCategory] = useState("Todas");
   const [statusFilter, setStatusFilter] = useState<"todos" | "aberto" | "respondido" | "fechado">("todos");
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [checking, setChecking] = useState(false);
+  const [faqDraft, setFaqDraft] = useState<{
+    ticketId: string; question: string; answer: string; category: string; reviewed: boolean;
+  } | null>(null);
+  const [faqSaveBusy, setFaqSaveBusy] = useState(false);
 
   const openCount = mine.filter((ticket) => ticket.status === "aberto").length;
   const answeredCount = mine.filter((ticket) => ticket.status === "respondido").length;
   const closedCount = mine.filter((ticket) => ticket.status === "fechado").length;
   const visibleTickets = mine.filter((ticket) => statusFilter === "todos" || ticket.status === statusFilter);
-  const faqCategories = ["Todas", ...Array.from(new Set(faqItems.map((item) => item.category)))];
-  const filteredFaq = faqItems.filter((item) => (faqCategory === "Todas" || item.category === faqCategory)
+  const helpArticles: HelpArticle[] = [
+    ...faqItems,
+    ...publishedFaqs.map((item) => ({
+      id: item.id,
+      category: item.category,
+      question: item.question,
+      answer: item.answer,
+      keywords: item.question + " " + item.answer + " " + item.category,
+      userExample: true,
+    })),
+  ];
+  const faqCategories = ["Todas", ...Array.from(new Set(helpArticles.map((item) => item.category)))];
+  const filteredFaq = helpArticles.filter((item) => (faqCategory === "Todas" || item.category === faqCategory)
     && (item.question + " " + item.answer + " " + item.keywords).toLocaleLowerCase("pt-BR").includes(faqSearch.toLocaleLowerCase("pt-BR")));
 
-  const refreshDiagnostics = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    setChecking(true);
-    const online = navigator.onLine;
-    const secure = window.isSecureContext;
-    const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
-    let serviceWorker = false;
-    try {
-      serviceWorker = "serviceWorker" in navigator && (await navigator.serviceWorker.getRegistrations()).length > 0;
-    } catch { serviceWorker = false; }
-    const standalone = window.matchMedia?.("(display-mode: standalone)").matches === true
-      || window.matchMedia?.("(display-mode: fullscreen)").matches === true
-      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    setDiagnostics([
-      { label: "Conexão com a internet", detail: online ? "Aparelho conectado" : "Sem conexão no momento", ok: online, icon: Wifi },
-      { label: "Permissão de notificações", detail: permission === "granted" ? "Permissão concedida" : permission === "denied" ? "Permissão bloqueada pelo navegador" : permission === "unsupported" ? "Não suportado neste navegador" : "Ainda não foi solicitada", ok: permission === "granted", icon: BellRing },
-      { label: "Serviço de notificações", detail: serviceWorker ? "Serviço instalado neste navegador" : "Nenhum serviço registrado foi encontrado", ok: serviceWorker, icon: Activity },
-      { label: "Contexto seguro", detail: secure ? "Navegador permite recursos seguros" : "Abra o aplicativo por HTTPS", ok: secure, icon: ShieldCheck },
-      { label: "Aplicativo instalado", detail: standalone ? "Aberto como aplicativo" : "Aberto em uma aba do navegador", ok: standalone, icon: Smartphone },
-    ]);
-    setChecking(false);
-  }, []);
+  const startFaqDraft = (ticket: Ticket) => {
+    const existing = publishedFaqs.find((item) => item.sourceTicketId === ticket.id);
+    const latestStaffReply = [...ticket.messages].reverse().find((message) => /\((operador|mestre)\)$/i.test(message.from));
+    setFaqDraft({
+      ticketId: ticket.id,
+      question: existing?.question ?? ticket.subject,
+      answer: existing?.answer ?? latestStaffReply?.text ?? "",
+      category: existing?.category ?? (ticket.category === "Problema técnico" ? "Uso do aplicativo" : "Dúvidas de usuários"),
+      reviewed: false,
+    });
+  };
 
-  useEffect(() => { void refreshDiagnostics(); }, [refreshDiagnostics]);
+  const publishFaq = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!faqDraft || me.role === "cuidador" || faqSaveBusy) return;
+    if (faqDraft.question.trim().length < 8 || faqDraft.answer.trim().length < 20) {
+      setFormError("A pergunta precisa ser clara e a resposta deve orientar o usuário.");
+      return;
+    }
+    if (!faqDraft.reviewed) {
+      setFormError("Confirme que revisou e removeu os dados pessoais e clínicos antes de publicar.");
+      return;
+    }
+    setFaqSaveBusy(true);
+    setFormError("");
+    try {
+      const previous = publishedFaqs.find((item) => item.sourceTicketId === faqDraft.ticketId);
+      const entry: PublicFaq = {
+        id: previous?.id ?? uid(),
+        ownerId: me.id,
+        sourceTicketId: faqDraft.ticketId,
+        question: faqDraft.question.trim(),
+        answer: faqDraft.answer.trim(),
+        category: faqDraft.category,
+        publishedAt: new Date().toISOString(),
+      };
+      setState((state) => ({
+        ...state,
+        faqs: [...state.faqs.filter((item) => item.sourceTicketId !== faqDraft.ticketId), entry],
+      }));
+      await flushCloudWrites();
+      setFaqDraft(null);
+      setSuccess("Pergunta anônima publicada em Encontre uma resposta.");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Não foi possível publicar a pergunta.");
+    } finally {
+      setFaqSaveBusy(false);
+    }
+  };
+
+  const removePublishedFaq = async (faqId: string) => {
+    if (me.role === "cuidador") return;
+    const target = publishedFaqs.find((item) => item.id === faqId);
+    if (!target || !window.confirm("Remover esta pergunta da área pública de ajuda?")) return;
+    setState((state) => ({ ...state, faqs: state.faqs.filter((item) => item.id !== faqId) }));
+    try {
+      await flushCloudWrites();
+      setSuccess("Pergunta removida da área de ajuda.");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Não foi possível remover a pergunta.");
+    }
+  };
 
   const addAttachments = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -148,7 +198,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><Headphones className="h-6 w-6" /></span>
-            <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-primary">Estamos aqui para ajudar</p><h1 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Central de Atendimento</h1><p className="mt-1 text-xs text-muted-foreground sm:text-sm">Ajuda rápida, diagnóstico e acompanhamento em um só lugar.</p></div>
+            <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-primary">Estamos aqui para ajudar</p><h1 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Central de Atendimento</h1><p className="mt-1 text-xs text-muted-foreground sm:text-sm">Encontre respostas e acompanhe as solicitações em um só lugar.</p></div>
           </div>
           {me.role === "cuidador" && <button type="button" className={primaryButton} onClick={() => setFormOpen((value) => !value)}><Plus className="h-4 w-4" />Abrir chamado</button>}
         </div>
@@ -180,7 +230,7 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.85fr)]">
         <section className="min-w-0 space-y-4">
           <div className="rounded-[1.7rem] border border-border bg-card p-4 shadow-sm sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Search className="h-4 w-4" /></span><h2 className="font-display text-lg font-bold text-foreground">Encontre uma resposta</h2></div><p className="mt-1 text-xs text-muted-foreground">Pesquise por assunto ou escolha uma categoria.</p></div><span className="rounded-full bg-muted px-3 py-1 text-[10px] font-bold text-muted-foreground">{filteredFaq.length} artigos</span></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Search className="h-4 w-4" /></span><h2 className="font-display text-lg font-bold text-foreground">Encontre uma resposta</h2></div><p className="mt-1 text-xs text-muted-foreground">Pesquise por assunto ou escolha uma categoria.</p></div><span className="rounded-full bg-muted px-3 py-1 text-[10px] font-bold text-muted-foreground">{filteredFaq.length} respostas</span></div>
             <div className="relative mt-4"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input aria-label="Buscar na central de ajuda" className={field + " pl-9"} placeholder="Ex.: alarme, senha, paciente..." value={faqSearch} onChange={(event) => setFaqSearch(event.target.value)} /></div>
             <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">{faqCategories.map((item) => <button type="button" key={item} onClick={() => setFaqCategory(item)} className={"shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition " + (faqCategory === item ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{item}</button>)}</div>
             <div className="mt-2 divide-y divide-border/70">
@@ -207,26 +257,10 @@ export function SupportPage({ me, onOpenProfile, onOpenPatients, onOpenRoutine }
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-[1.7rem] border border-border bg-card p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Activity className="h-4 w-4" /></span><div><h2 className="font-display text-lg font-bold text-foreground">Diagnóstico rápido</h2><p className="text-[10px] text-muted-foreground">Verifique este aparelho</p></div></div><button type="button" title="Executar diagnóstico" aria-label="Executar diagnóstico novamente" onClick={() => void refreshDiagnostics()} disabled={checking} className="grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition hover:bg-muted disabled:opacity-50"><Activity className={"h-4 w-4 " + (checking ? "animate-pulse" : "")} /></button></div>
-            <div className="mt-4 space-y-3">{diagnostics.map((item) => <div key={item.label} className="flex items-start gap-2.5"><span className={"mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg " + (item.ok ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700 dark:text-amber-300")}><item.icon className="h-3.5 w-3.5" /></span><div className="min-w-0 flex-1"><p className="text-xs font-bold text-foreground">{item.label}</p><p className="text-[10px] leading-relaxed text-muted-foreground">{item.detail}</p></div><span className={"mt-1 h-2 w-2 shrink-0 rounded-full " + (item.ok ? "bg-primary" : "bg-amber-500")} /></div>)}</div>
-            <button type="button" className={quietButton + " mt-4 w-full"} onClick={onOpenProfile}><Settings2 className="h-4 w-4" />Abrir configurações do aparelho</button>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">O diagnóstico é informativo. Permissões de bateria, som e execução em segundo plano podem depender do fabricante do aparelho.</p>
-          </section>
-
-          <section className="rounded-[1.7rem] border border-border bg-card p-4 shadow-sm sm:p-5">
-            <div className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /><h2 className="font-display text-lg font-bold text-foreground">Guias rápidos</h2></div>
-            <p className="mt-1 text-xs text-muted-foreground">Atalhos para as tarefas mais comuns.</p>
-            <div className="mt-3 space-y-2">
-              <button type="button" onClick={onOpenProfile} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300"><BellRing className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Ativar notificações</span><span className="block text-[10px] text-muted-foreground">Permissões e teste de alertas</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
-              <button type="button" onClick={onOpenPatients} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300"><Smartphone className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Organizar pacientes</span><span className="block text-[10px] text-muted-foreground">Cadastro, cartão e seleção</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
-              <button type="button" onClick={onOpenRoutine} className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 p-3 text-left transition hover:border-primary/30 hover:bg-primary/[0.035]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"><CalendarDays className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-foreground">Montar rotina visual</span><span className="block text-[10px] text-muted-foreground">Alimentação, água e atividades</span></span><ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5" /></button>
-            </div>
-          </section>
-
           <section className="rounded-[1.7rem] border border-primary/20 bg-primary/[0.045] p-4 sm:p-5">
             <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><CircleHelp className="h-5 w-5" /></span><div><h2 className="font-display text-lg font-bold text-foreground">Ainda precisa de ajuda?</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Envie uma dúvida, relate um problema ou compartilhe uma sugestão para melhorar o Dose Certa.</p></div></div>
             {me.role === "cuidador" && <button type="button" className={primaryButton + " mt-4 w-full"} onClick={() => { setFormOpen(true); window.setTimeout(() => document.querySelector("#support-subject")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); }}><Plus className="h-4 w-4" />Falar com a equipe</button>}
+            {me.role !== "cuidador" && <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Perguntas selecionadas podem virar respostas públicas. Antes de publicar, revise os textos e remova qualquer dado pessoal ou clínico.</p>}
           </section>
         </aside>
       </div>
