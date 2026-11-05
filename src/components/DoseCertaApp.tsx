@@ -300,15 +300,23 @@ function AppearanceQuickAccess() {
   );
 }
 
-function QuickGuideAccess({ onNavigate, hasPatient }: { onNavigate: (page: Page) => void; hasPatient: boolean }) {
+function QuickGuideAccess({ onNavigate, hasPatient, role }: { onNavigate: (page: Page) => void; hasPatient: boolean; role: Role }) {
   const [open, setOpen] = useState(false);
-  const entries: { title: string; description: string; icon: ReactNode; page: Page }[] = [
-    { title: "Ativar notificações", description: "Permissões e teste de alertas", icon: <BellRing className="h-4 w-4" />, page: "perfil" },
-    { title: "Organizar pacientes", description: "Cadastrar e escolher quem acompanhar", icon: <UsersRound className="h-4 w-4" />, page: "pacientes" },
-    { title: "Cadastrar medicamento", description: "Dosagem, horários e estoque", icon: <PillBottle className="h-4 w-4" />, page: "medicamentos" },
-    { title: "Montar rotina visual", description: "Alimentação, hidratação e atividades", icon: <CalendarDays className="h-4 w-4" />, page: hasPatient ? "rotina" : "pacientes" },
-    { title: "Central de atendimento", description: "Dúvidas e suporte do aplicativo", icon: <LifeBuoy className="h-4 w-4" />, page: "suporte" },
-  ];
+  const entries: { title: string; description: string; icon: ReactNode; page: Page }[] = role === "operador"
+    ? [
+        { title: "Fila de atendimento", description: "Responder dúvidas e solicitações", icon: <LifeBuoy className="h-4 w-4" />, page: "suporte" },
+        { title: "Histórico", description: "Consultar registros disponíveis", icon: <History className="h-4 w-4" />, page: "historico" },
+        { title: "Meu perfil", description: "Conta e diagnóstico do aparelho", icon: <UserRound className="h-4 w-4" />, page: "perfil" },
+      ]
+    : [
+        ...(role === "cuidador" ? [{ title: "Ativar notificações", description: "Permissões e teste de alertas", icon: <BellRing className="h-4 w-4" />, page: "perfil" as Page }] : []),
+        { title: "Organizar pacientes", description: "Cadastrar e escolher quem acompanhar", icon: <UsersRound className="h-4 w-4" />, page: "pacientes" },
+        { title: "Cadastrar medicamento", description: "Dosagem, horários e estoque", icon: <PillBottle className="h-4 w-4" />, page: "medicamentos" },
+        { title: "Montar rotina visual", description: "Alimentação, hidratação e atividades", icon: <CalendarDays className="h-4 w-4" />, page: hasPatient ? "rotina" : "pacientes" },
+        { title: "Central de atendimento", description: "Dúvidas e suporte do aplicativo", icon: <LifeBuoy className="h-4 w-4" />, page: "suporte" },
+        { title: "Meu perfil", description: "Conta e diagnóstico do aparelho", icon: <UserRound className="h-4 w-4" />, page: "perfil" },
+        ...(role === "mestre" ? [{ title: "Painel do Mestre", description: "Contas e administração", icon: <ShieldCheck className="h-4 w-4" />, page: "admin" as Page }] : []),
+      ];
   return (
     <div className="relative">
       <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="Abrir guia rápido" title="Guia rápido" onClick={() => setOpen((value) => !value)} className="no-print grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground hover:bg-muted">
@@ -2549,7 +2557,7 @@ function Shell({ me }: { me: User }) {
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
           <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{items.find((item) => item.id === page)?.label ?? "Dose Certa"}</p></div>
-          <div className="flex items-center gap-2"><QuickGuideAccess onNavigate={setPage} hasPatient={Boolean(activePatientId)} /><AppearanceQuickAccess />{me.role === "cuidador" && <AlertsBell me={me} />}
+          <div className="flex items-center gap-2"><QuickGuideAccess onNavigate={setPage} hasPatient={Boolean(activePatientId)} role={me.role} /><AppearanceQuickAccess />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
         {(!browserOnline || !cloudConnected || pendingSync > 0 || !!syncError) && (
