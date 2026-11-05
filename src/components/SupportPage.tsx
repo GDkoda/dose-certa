@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
   CheckCircle2, ChevronDown, CircleHelp, Clock3, FileImage, FileText, Headphones,
-  LifeBuoy, MessageCircle, Paperclip, Plus, Search, Send, ShieldCheck, X,
+  LifeBuoy, MessageCircle, Paperclip, Plus, Search, Send, X,
 } from "lucide-react";
 import { TicketManagement } from "@/components/TicketManagement";
 import { flushCloudWrites } from "@/lib/cloud-store";
