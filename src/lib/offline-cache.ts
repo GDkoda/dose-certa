@@ -135,8 +135,13 @@ export async function persistLocalMutation(userId: string, before: State, after:
       const pending = new Map((cached?.pending ?? []).map((change) => [change.key, change]));
       const kinds = ["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings", "hydrationLogs", "careEvents"] as const;
 
+      // Compare against the last durable snapshot, not only the immediately
+      // previous in-memory state. If an earlier IndexedDB write failed, its
+      // unsaved fields are included in this successful retry.
+      const baseline = cached?.snapshot ?? before;
+
       for (const kind of kinds) {
-        const previousRecords = before[kind] as unknown as Record<string, unknown>[];
+        const previousRecords = baseline[kind] as unknown as Record<string, unknown>[];
         const nextRecords = after[kind] as unknown as Record<string, unknown>[];
         const previousById = new Map(previousRecords.map((record) => [String(record["id"]), record]));
         const nextIds = new Set(nextRecords.map((record) => String(record["id"])));
@@ -171,8 +176,8 @@ export async function persistLocalMutation(userId: string, before: State, after:
         }
       }
 
-      if (JSON.stringify(before.texts) !== JSON.stringify(after.texts)
-        || JSON.stringify(before.images) !== JSON.stringify(after.images)) {
+      if (JSON.stringify(baseline.texts) !== JSON.stringify(after.texts)
+        || JSON.stringify(baseline.images) !== JSON.stringify(after.images)) {
         const key = "config:app-config";
         pending.set(key, {
           key,
