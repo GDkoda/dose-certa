@@ -234,6 +234,17 @@ export async function refreshCloud() {
       if (resolved.length) await clearSyncedChanges(id, resolved);
       pending = reconciled;
     }
+    // clearSyncedChanges above is asynchronous. Recheck the generation directly
+    // before replacing the live store so an edit made during that transaction survives.
+    if (
+      localMutationRevision !== localRevisionBeforeCacheRead ||
+      persistedMutationRevision !== persistedRevisionBeforeCacheRead ||
+      persistedMutationRevision < localMutationRevision
+    ) {
+      refreshQueued = true;
+      return;
+    }
+
     const merged = applyPendingChanges(base, pending);
     merged.sessionId = id;
     replaceCloudState(merged);
