@@ -943,28 +943,46 @@ function Patients({ me, activePatientId = "", onSelectPatient, onOpenRoutine }: 
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [viewingPatientCardId, setViewingPatientCardId] = useState<string | null>(null);
   const [editPatientForm, setEditPatientForm] = useState({ name: "", age: "", notes: "" });
+  const [editPatientBaseline, setEditPatientBaseline] = useState({ name: "", age: "", notes: "" });
   const [editPatientError, setEditPatientError] = useState("");
 
   const beginPatientEdit = (patient: { id: string; name: string; age: number; notes: string }) => {
+    const original = { name: patient.name, age: String(patient.age), notes: patient.notes ?? "" };
     setEditingPatientId(patient.id);
-    setEditPatientForm({ name: patient.name, age: String(patient.age), notes: patient.notes ?? "" });
+    setEditPatientForm(original);
+    setEditPatientBaseline(original);
     setEditPatientError("");
   };
 
   const savePatientEdit = (event: React.FormEvent, patientId: string) => {
     event.preventDefault();
+    const current = getState().patients.find((patient) => patient.id === patientId);
+    if (!current) return setEditPatientError("Este paciente não está mais disponível. Atualize a lista.");
+    const patch: PatientPatch = { id: patientId };
     const name = editPatientForm.name.trim();
     const age = Number(editPatientForm.age);
-    if (!name) return setEditPatientError("Informe o nome do paciente.");
-    if (editPatientForm.age.trim() === "" || !Number.isFinite(age) || age < 0) {
-      return setEditPatientError("Informe uma idade válida, igual ou maior que zero.");
+    const notes = editPatientForm.notes.trim();
+
+    // Only fields changed in this form are written. A background refresh from
+    // another device must not replace newer fields with values from this form's
+    // older initial render.
+    if (name !== editPatientBaseline.name) {
+      if (!name) return setEditPatientError("Informe o nome do paciente.");
+      patch.name = name;
+    } else if (!current.name?.trim()) {
+      return setEditPatientError("Informe o nome do paciente.");
     }
-    setState((state) => ({
-      ...state,
-      patients: state.patients.map((patient) => patient.id === patientId
-        ? { ...patient, name, age, notes: editPatientForm.notes.trim() }
-        : patient),
-    }));
+    if (editPatientForm.age !== editPatientBaseline.age) {
+      if (editPatientForm.age.trim() === "" || !Number.isFinite(age) || age < 0) {
+        return setEditPatientError("Informe uma idade válida, igual ou maior que zero.");
+      }
+      patch.age = age;
+    }
+    if (notes !== editPatientBaseline.notes) patch.notes = notes;
+
+    if (Object.keys(patch).length > 1) {
+      setState((state) => mergePatientPatch(state, patch));
+    }
     setEditingPatientId(null);
     setEditPatientError("");
   };
