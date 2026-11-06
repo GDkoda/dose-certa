@@ -52,9 +52,16 @@ export interface Med {
   initialStock?: number;
   /** Archived medications remain available to historical dose records. */
   archivedAt?: string;
+  /** Structured caregiver notes retained with the medication record. */
+  observations?: MedicationObservation[];
 }
 export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }
+export type MedicationObservationCategory = "reacao" | "dificuldade" | "prescricao" | "orientacao" | "outro";
+export interface MedicationObservation { id: string; category: MedicationObservationCategory; text: string; recordedAt: string; recordedBy: string }
+export interface HydrationLog { id: string; patientId: string; ownerId: string; date: string; amountMl: number; notes?: string; recordedAt: string }
+export type CareEventCategory = "saude" | "intercorrencia" | "observacao";
+export interface CareEvent { id: string; patientId: string; ownerId: string; category: CareEventCategory; title: string; description: string; recordedAt: string; recordedBy: string }
 export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean; sourceKey?: string }
 export type RoutineCategory = "hidratacao" | "alimentacao" | "higiene" | "terapia" | "descanso" | "escola" | "atividade" | "consulta" | "outro";
 export interface RoutineTask {
@@ -79,7 +86,7 @@ export interface PublicFaq {
   publishedAt: string;
 }
 export interface State {
-  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[]; faqs: PublicFaq[]; routines: RoutineTask[]; routineLogs: RoutineLog[]; routineSettings: RoutineSettings[];
+  users: User[]; patients: Patient[]; meds: Med[]; doses: Dose[]; alerts: Alert[]; tickets: Ticket[]; faqs: PublicFaq[]; routines: RoutineTask[]; routineLogs: RoutineLog[]; routineSettings: RoutineSettings[]; hydrationLogs: HydrationLog[]; careEvents: CareEvent[];
   texts: Record<string, string>; images: Record<string, string>; sessionId: string | null;
 }
 
@@ -93,7 +100,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().to
 export function initialState(): State {
   return {
     users: [],
-    patients: [], meds: [], doses: [], alerts: [], tickets: [], faqs: [], routines: [], routineLogs: [], routineSettings: [], texts: {}, images: {}, sessionId: null,
+    patients: [], meds: [], doses: [], alerts: [], tickets: [], faqs: [], routines: [], routineLogs: [], routineSettings: [], hydrationLogs: [], careEvents: [], texts: {}, images: {}, sessionId: null,
   };
 }
 
