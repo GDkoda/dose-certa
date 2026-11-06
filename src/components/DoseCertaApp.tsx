@@ -14,6 +14,8 @@ import { removePushDevice } from "@/lib/push.functions";
 import { DeviceSetupAssistant } from "./DeviceSetupAssistant";
 import { PatientIdentityCard } from "./PatientIdentityCard";
 import { RoutineCare } from "./RoutineCare";
+import { DailyReport } from "./DailyReport";
+import { MedicationObservations } from "./MedicationObservations";
 import { SupportPage } from "./SupportPage";
 import { DoseCertaMark } from "./DoseCertaMark";
 import { getOfflineStatus, readOfflinePackage, requestPersistentOfflineStorage } from "@/lib/offline-cache";
@@ -785,7 +787,7 @@ function AlarmEngine({ me }: { me: User }) {
 }
 
 /* ---------------- pages ---------------- */
-type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "suporte" | "rotina" | "perfil" | "admin";
+type Page = "inicio" | "pacientes" | "medicamentos" | "historico" | "relatorio" | "suporte" | "rotina" | "perfil" | "admin";
 
 function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) => void; activePatientId?: string }) {
   const doses = useStore((s) => s.doses.filter((d) => d.ownerId === me.id && (!activePatientId || d.patientId === activePatientId) && new Date(d.scheduledAt).toDateString() === new Date().toDateString()));
@@ -977,6 +979,11 @@ function Patients({ me, activePatientId = "", onSelectPatient, onOpenRoutine }: 
       <div>
         <T k="pat-title" as="h1" className="font-display text-3xl text-foreground">Pacientes</T>
         <p className="mt-1 text-sm text-muted-foreground">{patients.length} de {MAX_PATIENTS} pacientes cadastrados.</p>
+        <div className="mt-3 max-w-xl rounded-2xl border border-border/70 bg-card p-3">
+          <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-muted-foreground">Pacientes em acompanhamento</span><strong className="text-sm tabular-nums text-foreground">{patients.length}/{MAX_PATIENTS}</strong></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: (patients.length / MAX_PATIENTS * 100) + "%" }} /></div>
+          <p className="mt-2 text-[11px] text-muted-foreground">{patients.length >= MAX_PATIENTS ? "Limite de cadastros atingido." : `${MAX_PATIENTS - patients.length} vaga(s) disponível(is) para cadastrar.`} Cada cadastro reúne medicamentos, rotina e relatório individual.</p>
+        </div>
       </div>
 
       {patients.length === 0 && (
@@ -1923,6 +1930,7 @@ function Meds({ me, activePatientId = "", go }: {
                   </label>
                 </>
               )}
+              <MedicationObservations med={m} me={me} />
             </article>
           );
         })}
@@ -1993,7 +2001,7 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><T k="hist-title" as="h1" className="font-display text-3xl text-foreground">Histórico de doses</T>
-        <div className="no-print flex gap-2"><button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Relatório</button></div></div>
+        <div className="no-print flex flex-wrap gap-2"><button className={btnOutline} onClick={() => go("relatorio")}><ClipboardList className="h-4 w-4" />Relatório diário</button><button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir histórico</button></div></div>
       <div className="no-print grid gap-3 sm:grid-cols-4">
         <select className={input} aria-label="Filtrar por paciente" value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Todos os pacientes</option>{myPatients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select className={input} aria-label="Filtrar por status da dose" value={st} onChange={(e) => setSt(e.target.value)}><option value="">Todos os status</option><option value="tomado">Tomado</option><option value="pendente">Pendente</option><option value="nao_tomado">Não tomado</option></select>
@@ -2579,7 +2587,7 @@ function Shell({ me }: { me: User }) {
     { id: "perfil", label: "Perfil", mobileLabel: "Perfil", icon: <UserRound className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["cuidador", "operador", "mestre"] },
     { id: "admin", label: "Painel do Mestre", mobileLabel: "Painel", icon: <ShieldCheck className="h-[1.15rem] w-[1.15rem] stroke-[1.8]" />, roles: ["mestre"] },
   ].filter((i) => i.roles.includes(me.role)) as typeof items;
-  useEffect(() => { if (!items.some((item) => item.id === page) && page !== "rotina") setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
+  useEffect(() => { if (!items.some((item) => item.id === page) && page !== "rotina" && page !== "relatorio") setPage(me.role === "mestre" ? "admin" : "inicio"); }, [me.role, page]);
   const registerDevice = useServerFn(registerPushDevice);
   // Re-link this phone to the signed-in caregiver on every open, so tokens stay fresh and follow the account in use.
   useEffect(() => {
@@ -2613,7 +2621,7 @@ function Shell({ me }: { me: User }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="dc-header no-print sticky top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/85 px-4 py-3 backdrop-blur-xl md:px-8">
           <div className="flex min-w-0 items-center gap-2 md:hidden"><Logo size={32} /><span className="truncate font-display text-xl text-foreground">Dose Certa</span></div>
-          <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{items.find((item) => item.id === page)?.label ?? "Dose Certa"}</p></div>
+          <div className="hidden min-w-0 md:block"><p className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{me.role === "mestre" ? "Área de administração" : "Seu espaço de cuidado"}</p><p className="truncate font-display text-lg font-semibold text-foreground">{(page === "relatorio" ? "Relatório diário" : items.find((item) => item.id === page)?.label ?? "Dose Certa")}</p></div>
           <div className="flex items-center gap-2"><QuickGuideAccess onNavigate={setPage} hasPatient={Boolean(activePatientId)} role={me.role} /><AppearanceQuickAccess />{me.role === "cuidador" && <AlertsBell me={me} />}
             <button aria-label="Sair" onClick={logout} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground md:hidden"><LogOut className="h-5 w-5" /></button></div>
         </header>
@@ -2669,8 +2677,9 @@ function Shell({ me }: { me: User }) {
           {page === "pacientes" && <Patients me={me} activePatientId={activePatientId} onSelectPatient={selectPatient} onOpenRoutine={(patientId) => { selectPatient(patientId); setPage("rotina"); }} />}
           {page === "medicamentos" && <Meds me={me} activePatientId={activePatientId} go={setPage} />}
           {page === "historico" && <HistoryPage me={me} activePatientId={activePatientId} go={setPage} />}
+          {page === "relatorio" && <DailyReport me={me} activePatientId={activePatientId} />}
           {page === "suporte" && <SupportPage me={me} />}
-          {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} onSelectPatient={selectPatient} />}
+          {page === "rotina" && <RoutineCare me={me} patientId={activePatientId} onBack={() => setPage("pacientes")} onOpenMedicines={() => setPage("medicamentos")} onOpenReport={() => setPage("relatorio")} onSelectPatient={selectPatient} />}
           {page === "perfil" && <Profile me={me} />}
           {page === "admin" && me.role === "mestre" && <AccountAdmin me={me} onNavigate={setPage} />}
         </main>
