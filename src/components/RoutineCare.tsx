@@ -242,7 +242,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onOpenRepo
     const recordedAt = new Date(selectedDate + "T" + now.toTimeString().slice(0, 8)).toISOString();
     const entry: HydrationLog = {
       id: uid(), patientId: patient.id, ownerId: patient.ownerId, date: selectedDate,
-      amountMl: Math.round(amount), notes: waterNote.trim(), recordedAt,
+      amountMl: Math.round(amount), notes: waterNote.trim(), recordedAt, recordedBy: me.login,
     };
     setState((state) => ({ ...state, hydrationLogs: [entry, ...state.hydrationLogs] }));
     setWaterAmount("200");
