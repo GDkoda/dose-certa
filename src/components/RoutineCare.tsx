@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import {
   setState, uid, useStore,
-  type RoutineCategory, type RoutineTask, type RoutineLog, type User,
+  type RoutineCategory, type RoutineTask, type RoutineLog, type HydrationLog, type User,
 } from "@/lib/store";
 
 const field = "min-h-11 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15";
@@ -40,6 +40,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
   const routines = useStore((state) => state.routines);
   const logs = useStore((state) => state.routineLogs);
   const settings = useStore((state) => state.routineSettings);
+  const hydrationLogs = useStore((state) => state.hydrationLogs);
   const [selectedPatientId, setSelectedPatientId] = useState(patientId);
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [visualMode, setVisualMode] = useState(false);
@@ -59,6 +60,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
   const [logNotes, setLogNotes] = useState("");
   const [logError, setLogError] = useState("");
   const [goalDraft, setGoalDraft] = useState("");
+  const [waterAmount, setWaterAmount] = useState("200");
+  const [waterNote, setWaterNote] = useState("");
 
   useEffect(() => { setSelectedPatientId(patientId); }, [patientId]);
   const patient = patients.find((item) => item.id === selectedPatientId);
@@ -72,6 +75,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
 
   const currentDate = new Date(selectedDate + "T12:00:00");
   const currentLogs = patientLogs.filter((log) => log.date === selectedDate);
+  const selectedHydrationLogs = hydrationLogs.filter((log) => log.patientId === selectedPatientId && log.date === selectedDate && (me.role === "mestre" || log.ownerId === me.id)).sort((a, b) => b.recordedAt.localeCompare(a.recordedAt));
   const currentTasks = patientTasks
     .filter((task) => task.enabled && task.weekdays.includes(currentDate.getDay()))
     .sort((a, b) => a.time.localeCompare(b.time));
@@ -108,7 +112,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
 
   const waterAccepted = currentLogs
     .filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "hidratacao")
-    .reduce((total, log) => total + (log.acceptedAmount ?? 0), 0);
+    .reduce((total, log) => total + (log.acceptedAmount ?? 0), 0)
+    + selectedHydrationLogs.reduce((total, log) => total + log.amountMl, 0);
   const mealsLogged = currentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "alimentacao").length;
   const completed = timeline.filter((item) => item.kind === "medication"
     ? item.status === "tomado"
@@ -123,7 +128,8 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
   const recentStart = dateKey(sevenDaysAgo);
   const recentEnd = dateKey(today);
   const recentLogs = patientLogs.filter((log) => log.date >= recentStart && log.date <= recentEnd);
-  const recentWater = recentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "hidratacao").reduce((total, log) => total + (log.acceptedAmount ?? 0), 0);
+  const recentWater = recentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "hidratacao").reduce((total, log) => total + (log.acceptedAmount ?? 0), 0)
+    + hydrationLogs.filter((log) => log.patientId === selectedPatientId && log.date >= recentStart && log.date <= recentEnd && (me.role === "mestre" || log.ownerId === me.id)).reduce((total, log) => total + log.amountMl, 0);
   const recentMeals = recentLogs.filter((log) => patientTasks.find((task) => task.id === log.taskId)?.category === "alimentacao").length;
   const recentCompleted = recentLogs.filter((log) => log.status === "concluido" || log.status === "parcial").length;
   const recentNotDone = recentLogs.filter((log) => log.status === "nao_realizado").length;
@@ -225,6 +231,22 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
       ...state,
       routineLogs: [...state.routineLogs.filter((log) => !(log.taskId === task.id && log.date === selectedDate)), entry],
     }));
+  };
+
+  const saveWater = (event: FormEvent) => {
+    event.preventDefault();
+    if (!patient) return;
+    const amount = Number(waterAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) return;
+    const now = new Date();
+    const recordedAt = new Date(selectedDate + "T" + now.toTimeString().slice(0, 8)).toISOString();
+    const entry: HydrationLog = {
+      id: uid(), patientId: patient.id, ownerId: patient.ownerId, date: selectedDate,
+      amountMl: Math.round(amount), notes: waterNote.trim(), recordedAt,
+    };
+    setState((state) => ({ ...state, hydrationLogs: [entry, ...state.hydrationLogs] }));
+    setWaterAmount("200");
+    setWaterNote("");
   };
 
   const saveGoal = () => {
@@ -423,6 +445,21 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
             <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-300"><Droplets className="h-5 w-5" /></span><div><h2 className="font-display text-lg font-bold text-foreground">Hidratação</h2><p className="text-xs text-muted-foreground">Acompanhamento diário</p></div></div>
             <div className="mt-5 flex items-end justify-between gap-3"><p className="font-display text-3xl font-bold text-foreground">{waterAccepted}<span className="ml-1 text-sm font-semibold text-muted-foreground">ml aceitos</span></p><span className="text-xs font-bold text-muted-foreground">{waterGoal ? waterPercent + "%" : "Sem meta"}</span></div>
             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: waterPercent + "%" }} /></div>
+            <form onSubmit={saveWater} className="mt-4 space-y-2 rounded-2xl border border-sky-500/20 bg-sky-500/[0.045] p-3">
+              <div className="flex items-center justify-between gap-2"><p className="text-xs font-extrabold text-foreground">Registrar ingestão</p><span className="text-[10px] text-muted-foreground">Cada lançamento fica salvo</span></div>
+              <label className="block space-y-1 text-[11px] font-semibold text-foreground">Quantidade ingerida (ml)
+                <input className={field} type="number" min="1" max="10000" step="1" inputMode="numeric" value={waterAmount} onChange={(event) => setWaterAmount(event.target.value)} />
+              </label>
+              <div className="flex flex-wrap gap-1.5">{[100, 150, 200, 250].map((amount) => <button key={amount} type="button" onClick={() => setWaterAmount(String(amount))} className={"rounded-lg border px-3 py-1.5 text-[10px] font-bold transition " + (Number(waterAmount) === amount ? "border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-200" : "border-border bg-card text-muted-foreground")}>{amount} ml</button>)}</div>
+              <label className="block space-y-1 text-[11px] font-semibold text-foreground">Observação (opcional)
+                <input className={field} maxLength={240} placeholder="Ex.: água oferecida após a caminhada" value={waterNote} onChange={(event) => setWaterNote(event.target.value)} />
+              </label>
+              <button type="submit" className={primaryButton + " w-full"}><Plus className="h-4 w-4" />Adicionar ao total do dia</button>
+            </form>
+            {selectedHydrationLogs.length > 0 && <div className="mt-3 space-y-2">
+              <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Lançamentos deste dia</p>
+              {selectedHydrationLogs.slice(0, 5).map((entry) => <div key={entry.id} className="flex items-start justify-between gap-3 text-xs"><div className="min-w-0"><p className="font-bold text-foreground">{entry.amountMl} ml</p>{entry.notes && <p className="truncate text-[10px] text-muted-foreground">{entry.notes}</p>}</div><span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{new Date(entry.recordedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>)}
+            </div>}
             <label className="mt-4 block space-y-1.5 text-xs font-bold text-foreground">Meta diária definida pelo responsável (ml)<input type="number" min="1" max="10000" step="50" className={field} placeholder="Ex.: 1500" value={goalDraft} onChange={(event) => setGoalDraft(event.target.value)} /></label>
             <button type="button" className={quietButton + " mt-2 w-full"} onClick={saveGoal}>Salvar meta de hidratação</button>
             <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">A meta é definida pelo cuidador ou profissional responsável. O aplicativo registra os volumes, sem prescrever uma quantidade ideal.</p>
