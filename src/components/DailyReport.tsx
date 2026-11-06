@@ -154,7 +154,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
   if (!patients.length) return <section className={card}><h1 className="font-display text-2xl font-bold text-foreground">Relatório diário</h1><p className="mt-2 text-sm text-muted-foreground">Cadastre um paciente para começar a reunir os registros do dia.</p></section>;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-5">
+    <main className="dc-daily-report-print mx-auto max-w-5xl space-y-5">
       <header className={card + " relative overflow-hidden"}>
         <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
@@ -162,13 +162,14 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
             <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-primary">Acompanhamento do cuidado</p>
             <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Relatório diário</h1>
             <p className="mt-1 text-sm text-muted-foreground">Reúna os registros do dia em uma única linha do tempo.</p>
+            {patient && <div className="dc-report-print-meta mt-3 text-sm text-foreground"><p><strong>Paciente:</strong> {patient.name}</p><p><strong>Data do relatório:</strong> {dayLabel(selectedDate)}</p></div>}
           </div>
           <div className="no-print flex gap-2">
             <button type="button" className={button} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir / PDF</button>
             {patient && <button type="button" className={primary} onClick={() => setShowEventForm((value) => !value)}><Plus className="h-4 w-4" />Novo registro</button>}
           </div>
         </div>
-        <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 no-print">
           <label className="space-y-1.5 text-xs font-bold text-foreground">Paciente
             <select className={field} value={patientId} onChange={(event) => setPatientId(event.target.value)}>
               <option value="">Selecione um paciente</option>
