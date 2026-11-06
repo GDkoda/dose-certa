@@ -7,6 +7,8 @@ export type OfflineChange = {
   ownerId: string;
   payload: unknown | null;
   changedAt: number;
+  /** Fields intentionally changed in this record since its durable baseline. */
+  changedFields?: string[];
 };
 
 export type OfflinePackage = {
@@ -127,6 +129,37 @@ function ownerFor(kind: string, record: Record<string, unknown>, fallback: strin
   return String(kind === "tickets" ? record["userId"] ?? fallback : record["ownerId"] ?? fallback);
 }
 
+function changedFieldsBetween(
+  previous: Record<string, unknown> | undefined,
+  next: Record<string, unknown>,
+): string[] {
+  const keys = new Set([...Object.keys(previous ?? {}), ...Object.keys(next)]);
+  return [...keys].filter((key) =>
+    key !== "id" &&
+    key !== "ownerId" &&
+    JSON.stringify(previous?.[key]) !== JSON.stringify(next[key]),
+  );
+}
+
+export async function replacePendingChanges(userId: string, replacements: OfflineChange[]): Promise<void> {
+  if (!replacements.length) return;
+  const database = await openDatabase();
+  try {
+    const byKey = new Map(replacements.map((change) => [change.key, change]));
+    await updatePackage(database, userId, (current) => {
+      if (!current) throw new Error("O pacote offline não foi encontrado.");
+      const pending = current.pending.map((change) => {
+        const replacement = byKey.get(change.key);
+        return replacement && replacement.changedAt === change.changedAt ? replacement : change;
+      });
+      return { ...current, pending };
+    });
+  } finally {
+    database.close();
+  }
+}
+
+
 export async function persistLocalMutation(userId: string, before: State, after: State): Promise<number> {
   const database = await openDatabase();
   try {
@@ -151,6 +184,9 @@ export async function persistLocalMutation(userId: string, before: State, after:
           const previous = previousById.get(id);
           if (previous && JSON.stringify(previous) === JSON.stringify(record)) continue;
           const key = kind + ":" + id;
+          const previousPending = pending.get(key);
+          const fields = new Set(previousPending?.changedFields ?? []);
+          changedFieldsBetween(previous, record).forEach((field) => fields.add(field));
           pending.set(key, {
             key,
             id,
@@ -158,6 +194,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
             ownerId: ownerFor(kind, record, userId),
             payload: clone(record),
             changedAt: nextChangeRevision(),
+            changedFields: [...fields],
           });
         }
 
@@ -233,7 +270,28 @@ export function reconcilePendingChanges(remote: State, changes: OfflineChange[])
   const finalizedRemoteDoses = new Set(
     remote.doses.filter((dose) => dose.status !== "pendente").map((dose) => dose.id),
   );
-  return changes.filter((change) => !(change.kind === "doses" && finalizedRemoteDoses.has(change.id)));
+  const remotePatients = new Map(remote.patients.map((patient) => [patient.id, patient]));
+
+  return changes
+    .filter((change) => !(change.kind === "doses" && finalizedRemoteDoses.has(change.id)))
+    .map((change) => {
+      if (change.kind !== "patients" || change.payload === null) return change;
+      const current = remotePatients.get(change.id);
+      if (!current) return change;
+
+      // Older versions queued entire patient objects without recording which
+      // fields had changed. For those legacy entries, the cloud copy wins.
+      // New entries carry changedFields and are safely rebased field by field.
+      const payload = clone(current) as unknown as Record<string, unknown>;
+      const localPayload = change.payload as Record<string, unknown>;
+      for (const field of change.changedFields ?? []) {
+        if (Object.prototype.hasOwnProperty.call(localPayload, field)) payload[field] = localPayload[field];
+        else delete payload[field];
+      }
+      payload["id"] = current.id;
+      payload["ownerId"] = current.ownerId;
+      return { ...change, payload };
+    });
 }
 
 export function applyPendingChanges(remote: State, changes: OfflineChange[]): State {
