@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, AlertTriangle, CalendarDays, ClipboardList, Download, Droplets, FileText, HeartPulse, Pill, Plus, Printer } from "lucide-react";
+import { FileText, Plus, Printer } from "lucide-react";
 import { setState, uid, useStore, type CareEventCategory, type User } from "@/lib/store";
 
 const field = "min-h-11 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15";
