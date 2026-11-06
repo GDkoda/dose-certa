@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Camera, CheckCircle2, ImagePlus, Palette, Pencil, UserRound, X } from "lucide-react";
 import { DoseCertaMark } from "./DoseCertaMark";
-import type { Patient, PatientCardTheme } from "@/lib/store";
+import type { Patient, PatientCardTheme, PatientPatch } from "@/lib/store";
 
 const themes: { id: PatientCardTheme; name: string; className: string; swatches: string[] }[] = [
   { id: "rosas", name: "Rubi metálico", className: "dc-patient-card--rosas", swatches: ["#190e1c", "#8d2448", "#e8a0ba"] },
@@ -168,16 +168,19 @@ function Detail({ label, value }: { label: string; value?: string }) {
   );
 }
 
-export function PatientIdentityCard({ patient, onClose, onSave }: {
-  patient: Patient;
-  onClose: () => void;
-  onSave: (updated: Patient) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [form, setForm] = useState({
+type PatientCardForm = {
+  name: string;
+  birthDate: string;
+  susCard: string;
+  healthPlan: string;
+  identityNumber: string;
+  cpf: string;
+  photoDataUrl: string;
+  cardTheme: PatientCardTheme;
+};
+
+function createPatientCardForm(patient: Patient): PatientCardForm {
+  return {
     name: patient.name,
     birthDate: patient.birthDate ?? "",
     susCard: patient.susCard ?? "",
@@ -185,15 +188,39 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
     identityNumber: patient.identityNumber ?? "",
     cpf: patient.cpf ?? "",
     photoDataUrl: patient.photoDataUrl ?? "",
-    cardTheme: patient.cardTheme ?? "folhas" as PatientCardTheme,
-  });
+    cardTheme: patient.cardTheme ?? "folhas",
+  };
+}
+
+export function PatientIdentityCard({ patient, onClose, onSave }: {
+  patient: Patient;
+  onClose: () => void;
+  onSave: (patch: PatientPatch) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const initialForm = createPatientCardForm(patient);
+  const [form, setForm] = useState<PatientCardForm>(initialForm);
+  const baselineRef = useRef<PatientCardForm>(initialForm);
+
+  // Keep the read-only card current when another tab/device changes this patient.
+  // While editing, retain the form but only submit fields that the user actually changed.
+  useEffect(() => {
+    if (editing) return;
+    const fresh = createPatientCardForm(patient);
+    baselineRef.current = fresh;
+    setForm(fresh);
+  }, [patient, editing]);
+
   const theme = themes.find((item) => item.id === (form.cardTheme ?? "folhas")) ?? themes[4]!;
   const age = calculateAge(form.birthDate) ?? patient.age;
   const dateLabel = formattedDate(form.birthDate);
 
   const selectTheme = (themeId: PatientCardTheme) => {
     setForm((current) => ({ ...current, cardTheme: themeId }));
-    onSave({ ...patient, cardTheme: themeId });
+    onSave({ id: patient.id, cardTheme: themeId });
     setShowThemePicker(false);
   };
 
@@ -204,19 +231,22 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
       return;
     }
     setSaving(true);
-    const updated: Patient = {
-      ...patient,
-      name: form.name.trim(),
-      ...(form.birthDate ? { birthDate: form.birthDate } : { birthDate: undefined }),
-      ...(form.susCard.trim() ? { susCard: form.susCard.trim() } : { susCard: undefined }),
-      ...(form.healthPlan.trim() ? { healthPlan: form.healthPlan.trim() } : { healthPlan: undefined }),
-      ...(form.identityNumber.trim() ? { identityNumber: form.identityNumber.trim() } : { identityNumber: undefined }),
-      ...(form.cpf.trim() ? { cpf: form.cpf.trim() } : { cpf: undefined }),
-      ...(form.photoDataUrl ? { photoDataUrl: form.photoDataUrl } : { photoDataUrl: undefined }),
-      cardTheme: form.cardTheme,
-      ...(age === null ? {} : { age }),
-    };
-    onSave(updated);
+    const baseline = baselineRef.current;
+    const patch: PatientPatch = { id: patient.id };
+    if (form.name.trim() !== baseline.name) patch.name = form.name.trim();
+    if (form.birthDate !== baseline.birthDate) {
+      patch.birthDate = form.birthDate || undefined;
+      const nextAge = calculateAge(form.birthDate);
+      if (nextAge !== null) patch.age = nextAge;
+    }
+    if (form.susCard.trim() !== baseline.susCard) patch.susCard = form.susCard.trim() || undefined;
+    if (form.healthPlan.trim() !== baseline.healthPlan) patch.healthPlan = form.healthPlan.trim() || undefined;
+    if (form.identityNumber.trim() !== baseline.identityNumber) patch.identityNumber = form.identityNumber.trim() || undefined;
+    if (form.cpf.trim() !== baseline.cpf) patch.cpf = form.cpf.trim() || undefined;
+    if (form.photoDataUrl !== baseline.photoDataUrl) patch.photoDataUrl = form.photoDataUrl || undefined;
+    if (form.cardTheme !== baseline.cardTheme) patch.cardTheme = form.cardTheme;
+
+    onSave(patch);
     setSaving(false);
     setEditing(false);
     setError("");
@@ -387,7 +417,7 @@ export function PatientIdentityCard({ patient, onClose, onSave }: {
             </div>
 
             <div className="mx-auto flex w-full max-w-[760px] flex-wrap gap-2">
-              <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
+              <button type="button" onClick={() => { const fresh = createPatientCardForm(patient); baselineRef.current = fresh; setForm(fresh); setEditing(true); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground hover:opacity-90">
                 <Pencil className="h-4 w-4" />Editar informações
               </button>
               <button type="button" aria-expanded={showThemePicker} onClick={() => setShowThemePicker(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold text-foreground hover:bg-muted">
