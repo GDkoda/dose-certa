@@ -27,8 +27,8 @@ import { buildMissingDoses, findDueDose } from "@/lib/alarm-rules";
 import { estimateStockDays, stockLevel } from "@/lib/stock-rules";
 import { summarizeDoseStatuses } from "@/lib/report-rules";
 import {
-  canAddPatient, getState, MAX_PATIENTS, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
-  type Dose, type DosePeriod, type DoseSchedule, type Med, type Role, type User,
+  canAddPatient, getState, MAX_PATIENTS, mergePatientPatch, RESET_PASSWORD, setState, SNOOZE_MIN, uid, useStore,
+  type Dose, type DosePeriod, type DoseSchedule, type Med, type PatientPatch, type Role, type User,
 } from "@/lib/store";
 
 /* ---------------- helpers ---------------- */
@@ -1197,11 +1197,8 @@ function Patients({ me, activePatientId = "", onSelectPatient, onOpenRoutine }: 
         <PatientIdentityCard
           patient={patients.find((patient) => patient.id === viewingPatientCardId)!}
           onClose={() => setViewingPatientCardId(null)}
-          onSave={(updated) => {
-            setState((state) => ({
-              ...state,
-              patients: state.patients.map((patient) => patient.id === updated.id ? updated : patient),
-            }));
+          onSave={(patch: PatientPatch) => {
+            setState((state) => mergePatientPatch(state, patch));
           }}
         />
       )}
