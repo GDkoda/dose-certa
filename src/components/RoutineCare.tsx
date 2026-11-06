@@ -31,8 +31,8 @@ type TimelineItem =
   | { key: string; kind: "medication"; title: string; time: string; description: string; status: string; }
   | { key: string; kind: "task"; title: string; task: RoutineTask; time: string; log?: RoutineLog | undefined };
 
-export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPatient }: {
-  me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void; onSelectPatient: (patientId: string) => void;
+export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onOpenReport, onSelectPatient }: {
+  me: User; patientId: string; onBack: () => void; onOpenMedicines: () => void; onOpenReport: () => void; onSelectPatient: (patientId: string) => void;
 }) {
   const patients = useStore((state) => state.patients.filter((patient) => me.role === "mestre" || patient.ownerId === me.id));
   const meds = useStore((state) => state.meds);
@@ -355,7 +355,7 @@ export function RoutineCare({ me, patientId, onBack, onOpenMedicines, onSelectPa
             <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Rotina de {patient.name}</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">Uma visão clara do que acontece ao longo do dia, com registros simples para cada cuidado.</p>
           </div>
-          <button type="button" className={quietButton} onClick={() => setVisualMode(true)}><Sparkles className="h-4 w-4 text-primary" />Modo visual</button>
+          <div className="flex flex-wrap gap-2"><button type="button" className={quietButton} onClick={onOpenReport}><ListChecks className="h-4 w-4 text-primary" />Relatório diário</button><button type="button" className={quietButton} onClick={() => setVisualMode(true)}><Sparkles className="h-4 w-4 text-primary" />Modo visual</button></div>
         </div>
         <div className="relative mt-6 grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-border/70 bg-background/75 p-3.5">
