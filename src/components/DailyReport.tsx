@@ -85,19 +85,19 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
     }));
     legacyRoutineLogs.forEach((entry) => {
       const task = tasksById.get(entry.taskId);
-      if (!task) return;
-      const isWater = task.category === "hidratacao";
-      const isMeal = task.category === "alimentacao";
-      if (!isWater && !isMeal) return;
-      const time = timeOf(entry.completedAt);
       const quantity = entry.offeredAmount !== undefined
         ? "Oferecido: " + entry.offeredAmount + " " + (entry.unit ?? "") + " · Aceito: " + (entry.acceptedAmount ?? 0) + " " + (entry.unit ?? "")
         : "";
+      const routineGroups = {
+        hidratacao: "Hidratação", alimentacao: "Alimentação", higiene: "Higiene",
+        terapia: "Terapia", descanso: "Descanso", escola: "Escola",
+        atividade: "Atividade", consulta: "Consulta", outro: "Outros cuidados",
+      };
       result.push({
         id: "routine-" + entry.id,
-        time,
-        group: isWater ? "Hidratação" : "Alimentação",
-        title: task.title,
+        time: timeOf(entry.completedAt),
+        group: task ? routineGroups[task.category] : "Rotina",
+        title: task?.title ?? "Registro de cuidado",
         detail: [quantity, entry.notes].filter(Boolean).join(" · ") || "Registro de rotina.",
         status: entry.status === "nao_realizado" ? "Não realizado" : entry.status === "parcial" ? "Parcial" : "Concluído",
         tone: entry.status === "nao_realizado" ? "warning" : "positive",
@@ -165,7 +165,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
           </div>
           <div className="no-print flex gap-2">
             <button type="button" className={button} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir / PDF</button>
-            <button type="button" className={primary} onClick={() => setShowEventForm((value) => !value)}><Plus className="h-4 w-4" />Novo registro</button>
+            {patient && <button type="button" className={primary} onClick={() => setShowEventForm((value) => !value)}><Plus className="h-4 w-4" />Novo registro</button>}
           </div>
         </div>
         <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
