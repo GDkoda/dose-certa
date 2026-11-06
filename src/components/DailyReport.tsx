@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { FileText, Plus, Printer } from "lucide-react";
+import { ClipboardList, FileText, Plus, Printer } from "lucide-react";
 import { setState, uid, useStore, type CareEventCategory, type User } from "@/lib/store";
 
 const field = "min-h-11 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15";
@@ -41,7 +41,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
   const patientMeds = meds.filter((med) => med.patientId === patientId);
   const patientRoutineTasks = routines.filter((task) => task.patientId === patientId);
   const tasksById = useMemo(() => new Map(patientRoutineTasks.map((task) => [task.id, task])), [patientRoutineTasks]);
-  const patientDoses = doses.filter((dose) => dose.patientId === patientId && dateOf(dose.scheduledAt) === selectedDate);
+  const patientDoses = doses.filter((dose) => dose.patientId === patientId && dateOf(dose.takenAt ?? dose.scheduledAt) === selectedDate);
   const patientHydration = hydrationLogs.filter((entry) => entry.patientId === patientId && entry.date === selectedDate);
   const patientCareEvents = careEvents.filter((entry) => entry.patientId === patientId && dateOf(entry.recordedAt) === selectedDate);
   const legacyRoutineLogs = routineLogs.filter((entry) => entry.patientId === patientId && entry.date === selectedDate);
@@ -79,7 +79,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
       time: timeOf(entry.recordedAt),
       group: "Hidratação",
       title: entry.amountMl + " ml registrados",
-      detail: entry.notes || "Oferta de água registrada pelo cuidador.",
+      detail: [entry.notes, entry.recordedBy ? "Registrado por " + entry.recordedBy : "Oferta de água registrada pelo cuidador."].filter(Boolean).join(" · "),
       status: "Ingerido",
       tone: "positive",
     }));
@@ -181,6 +181,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
         </div>
       </header>
 
+      {!patient && <section className={card + " text-center"}><ClipboardList className="mx-auto h-7 w-7 text-primary" /><h2 className="mt-2 font-display text-lg font-bold text-foreground">Escolha um paciente</h2><p className="mt-1 text-sm text-muted-foreground">Selecione a pessoa que deseja acompanhar para montar o relatório do dia.</p></section>}
       {patient && <>
         <section className="grid gap-3 grid-cols-2 sm:grid-cols-4">
           <div className={card}><p className="text-xs font-semibold text-muted-foreground">Doses administradas</p><p className="mt-2 font-display text-3xl font-bold text-foreground">{taken}</p><p className="text-[11px] text-muted-foreground">{missed} não tomadas</p></div>
