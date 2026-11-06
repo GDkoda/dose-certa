@@ -814,6 +814,22 @@ function Dashboard({ me, go, activePatientId = "" }: { me: User; go: (p: Page) =
       </section>
 
 
+      <section aria-label="Atalho para relatório completo" className="overflow-hidden rounded-[1.6rem] border border-primary/25 bg-card dc-surface-texture shadow-[var(--shadow-soft)]">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20"><ClipboardList className="h-6 w-6" /></span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-primary">Acompanhamento</p>
+              <h2 className="mt-1 font-display text-xl font-bold text-foreground">Relatório diário</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">Consulte o histórico completo de medicamentos, hidratação, alimentação, rotina e observações. Escolha um dia ou um período e gere um PDF.</p>
+            </div>
+          </div>
+          <button onClick={() => go("relatorio")} className={cls(btnPrimary, "min-h-12 shrink-0 rounded-xl px-5 py-3 shadow-[0_8px_22px_-10px_var(--primary)] ring-2 ring-primary/20 transition hover:-translate-y-0.5")}>
+            <ClipboardList className="h-4 w-4" />Abrir relatório<ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </section>
+
       <section aria-label="Resumo das doses de hoje" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[1.5rem] border border-border/70 bg-card dc-surface-texture p-5 shadow-sm sm:col-span-2">
           <div className="flex items-start justify-between gap-4">
@@ -2001,7 +2017,7 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><T k="hist-title" as="h1" className="font-display text-3xl text-foreground">Histórico de doses</T>
-        <div className="no-print flex flex-wrap gap-2">{me.role !== "operador" && <button className={btnOutline} onClick={() => go("relatorio")}><ClipboardList className="h-4 w-4" />Relatório diário</button>}<button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir histórico</button></div></div>
+        <div className="no-print flex flex-wrap gap-2">{me.role !== "operador" && <button className={cls(btnPrimary, "min-h-12 px-5 py-3 shadow-[0_8px_22px_-10px_var(--primary)] ring-2 ring-primary/20 transition hover:-translate-y-0.5")} onClick={() => go("relatorio")}><ClipboardList className="h-4 w-4" />Relatório diário</button>}<button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir histórico</button></div></div>
       <div className="no-print grid gap-3 sm:grid-cols-4">
         <select className={input} aria-label="Filtrar por paciente" value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Todos os pacientes</option>{myPatients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select className={input} aria-label="Filtrar por status da dose" value={st} onChange={(e) => setSt(e.target.value)}><option value="">Todos os status</option><option value="tomado">Tomado</option><option value="pendente">Pendente</option><option value="nao_tomado">Não tomado</option></select>
