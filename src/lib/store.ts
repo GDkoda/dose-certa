@@ -59,7 +59,7 @@ export type DoseStatus = "pendente" | "tomado" | "nao_tomado";
 export interface Dose { id: string; medId: string; patientId: string; ownerId: string; scheduledAt: string; status: DoseStatus; snoozeUntil?: string; lastShown?: string; takenAt?: string; lateAlerted?: boolean }
 export type MedicationObservationCategory = "reacao" | "dificuldade" | "prescricao" | "orientacao" | "outro";
 export interface MedicationObservation { id: string; category: MedicationObservationCategory; text: string; recordedAt: string; recordedBy: string }
-export interface HydrationLog { id: string; patientId: string; ownerId: string; date: string; amountMl: number; notes?: string; recordedAt: string }
+export interface HydrationLog { id: string; patientId: string; ownerId: string; date: string; amountMl: number; notes?: string; recordedAt: string; recordedBy?: string }
 export type CareEventCategory = "saude" | "intercorrencia" | "observacao";
 export interface CareEvent { id: string; patientId: string; ownerId: string; category: CareEventCategory; title: string; description: string; recordedAt: string; recordedBy: string }
 export interface Alert { id: string; ownerId: string; text: string; at: string; read: boolean; sourceKey?: string }
