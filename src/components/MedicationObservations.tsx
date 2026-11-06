@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { BookOpen, ChevronDown, CircleAlert, FileText, Plus } from "lucide-react";
+import { BookOpen, ChevronDown, FileText, Plus } from "lucide-react";
 import { setState, uid, type Med, type MedicationObservationCategory, type User } from "@/lib/store";
 
 const categories: { value: MedicationObservationCategory; label: string }[] = [
