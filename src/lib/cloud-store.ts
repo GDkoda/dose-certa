@@ -15,6 +15,9 @@ import {
 const kinds = ['patients', 'meds', 'doses', 'alerts', 'tickets', 'faqs', 'routines', 'routineLogs', 'routineSettings', 'hydrationLogs', 'careEvents'] as const;
 let currentId: string | null = null;
 let queue = Promise.resolve();
+// Reconciliation must never replace an in-memory edit that has not reached IndexedDB yet.
+let localMutationRevision = 0;
+let persistedMutationRevision = 0;
 let refreshing: Promise<void> | undefined;
 let refreshQueued = false;
 let errorHandler: (message: string) => void = () => {};
@@ -53,10 +56,38 @@ async function fetchAllPages<T>(
 
 async function loadRemoteState(id: string): Promise<State> {
   const [profiles, roles, records] = await Promise.all([
-    fetchAllPages((from, to) => supabase.from('profiles').select('*').range(from, to)),
-    fetchAllPages((from, to) => supabase.from('user_roles').select('*').range(from, to)),
-    fetchAllPages((from, to) => supabase.from('app_records').select('*').range(from, to)),
+    fetchAllPages((from, to) => supabase.from('profiles').select('*').order('id', { ascending: true }).range(from, to)),
+    fetchAllPages((from, to) => supabase.from('user_roles').select('*').order('user_id', { ascending: true }).range(from, to)),
+    fetchAllPages((from, to) => supabase.from('app_records').select('*').order('id', { ascending: true }).range(from, to)),
   ]);
+
+  // RLS can return an empty result set without an error. The authenticated profile
+  // must be visible before we trust any remote snapshot as a complete account read.
+  if (!profiles.some((profile) => profile.id === id)) {
+    throw new Error('A conta autenticada não foi encontrada na leitura dos dados. A cópia local foi preservada.');
+  }
+
+  const recordIds = new Set<string>();
+  for (const record of records) {
+    if (recordIds.has(record.id)) {
+      throw new Error('O servidor retornou registros repetidos durante a leitura. A cópia atual foi preservada.');
+    }
+    recordIds.add(record.id);
+    if (!record.payload || typeof record.payload !== 'object' || Array.isArray(record.payload)) {
+      throw new Error('O servidor retornou um registro incompleto. A cópia atual foi preservada.');
+    }
+  }
+
+  for (const record of records.filter((item) => item.kind === 'patients')) {
+    const payload = record.payload as Record<string, unknown>;
+    if (typeof payload.name !== 'string' || !payload.name.trim()) {
+      throw new Error('Um cadastro de paciente chegou sem nome. A atualização foi interrompida para proteger os dados existentes.');
+    }
+    if (payload.ownerId && payload.ownerId !== record.owner_id) {
+      throw new Error('Um cadastro de paciente chegou com proprietário divergente. A atualização foi interrompida.');
+    }
+  }
+
   const users: User[] = profiles.map((profile) => ({
     id: profile.id,
     login: profile.username,
@@ -146,11 +177,23 @@ export async function refreshCloud() {
       remoteError = new Error('O aparelho está sem conexão com a internet.');
     }
 
+    // Take a stable view of the local write generation around the IndexedDB read.
+    // If a user edit is still being persisted, retry only after the write queue has drained.
+    const localRevisionBeforeCacheRead = localMutationRevision;
+    const persistedRevisionBeforeCacheRead = persistedMutationRevision;
     let cached: Awaited<ReturnType<typeof readOfflinePackage>> = null;
     try {
       cached = await readOfflinePackage(id);
     } catch (error) {
       console.error('[CloudSync] Não foi possível ler a cópia offline.', error);
+    }
+    if (
+      localMutationRevision !== localRevisionBeforeCacheRead ||
+      persistedMutationRevision !== persistedRevisionBeforeCacheRead ||
+      persistedMutationRevision < localMutationRevision
+    ) {
+      refreshQueued = true;
+      return;
     }
     if (!remote && !cached) {
       const details = remoteError ? cloudErrorDetails(remoteError) : 'Não existe uma cópia offline neste aparelho.';
@@ -216,7 +259,13 @@ export async function refreshCloud() {
     refreshing = undefined;
     if (refreshQueued) {
       refreshQueued = false;
-      void refreshCloud().catch((error) => {
+      // Wait for edits that were queued while this refresh was fetching remote data.
+      // Never start another replacement while a failed local write is still only in memory.
+      const writesToFinish = queue;
+      void writesToFinish.then(() => {
+        if (!currentId || persistedMutationRevision < localMutationRevision) return;
+        return refreshCloud();
+      }).catch((error) => {
         lastSyncError = cloudErrorDetails(error);
         void readOfflinePackage(currentId ?? '').then((cached) => {
           publishOfflineStatus(false, cached?.pending.length ?? 0, cached?.lastSyncedAt ?? null, lastSyncError);
@@ -235,8 +284,10 @@ export async function initializeCloud() {
   connectCloudWriter((before, after) => {
     const actorId = currentId;
     if (!actorId) return;
+    const revision = ++localMutationRevision;
     queue = queue.then(async () => {
       const pendingCount = await persistLocalMutation(actorId, before, after);
+      persistedMutationRevision = Math.max(persistedMutationRevision, revision);
       publishOfflineStatus(typeof navigator === 'undefined' || navigator.onLine, pendingCount, null, null);
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         writeFailed = false;
@@ -267,11 +318,18 @@ export async function initializeCloud() {
   const { data, error } = await supabase.auth.getSession();
   if (error) throw new Error('Não foi possível recuperar a sessão do Supabase: ' + cloudErrorDetails(error));
   currentId = data.session?.user.id ?? null;
+  localMutationRevision = 0;
+  persistedMutationRevision = 0;
   await refreshCloud();
 
   const auth = supabase.auth.onAuthStateChange((event, session) => {
     if (!['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED', 'TOKEN_REFRESHED'].includes(event)) return;
-    currentId = session?.user.id ?? null;
+    const nextUserId = session?.user.id ?? null;
+    if (currentId !== nextUserId) {
+      currentId = nextUserId;
+      localMutationRevision = 0;
+      persistedMutationRevision = 0;
+    }
     setTimeout(() => {
       void refreshCloud().catch((error) => {
         lastSyncError = cloudErrorDetails(error);
@@ -337,11 +395,20 @@ export async function cloudLogin(login: string, password: string) {
     if (legacy.error || !legacy.data.user) throw new Error('Login ou senha incorretos.');
     user = legacy.data.user;
   }
-  currentId = user.id;
+  if (currentId !== user.id) {
+    currentId = user.id;
+    localMutationRevision = 0;
+    persistedMutationRevision = 0;
+  }
   await refreshCloud();
 }
 export async function cloudLogout() {
-  await queue; await supabase.auth.signOut(); currentId = null; await refreshCloud();
+  await queue;
+  await supabase.auth.signOut();
+  currentId = null;
+  localMutationRevision = 0;
+  persistedMutationRevision = 0;
+  await refreshCloud();
 }
 export async function updateOwnPassword(currentPassword: string, newPassword: string) {
   if (newPassword.length < 8) throw new Error('A senha precisa ter pelo menos 8 caracteres.');
