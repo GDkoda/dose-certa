@@ -133,7 +133,7 @@ export async function persistLocalMutation(userId: string, before: State, after:
     let pendingSize = 0;
     await updatePackage(database, userId, (cached) => {
       const pending = new Map((cached?.pending ?? []).map((change) => [change.key, change]));
-      const kinds = ["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings"] as const;
+      const kinds = ["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings", "hydrationLogs", "careEvents"] as const;
 
       for (const kind of kinds) {
         const previousRecords = before[kind] as unknown as Record<string, unknown>[];
@@ -233,7 +233,7 @@ export function reconcilePendingChanges(remote: State, changes: OfflineChange[])
 
 export function applyPendingChanges(remote: State, changes: OfflineChange[]): State {
   const merged = clone(remote);
-  for (const key of ["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings"] as const) {
+  for (const key of ["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings", "hydrationLogs", "careEvents"] as const) {
     if (!Array.isArray(merged[key])) merged[key] = [];
   }
   for (const change of changes) {
@@ -246,8 +246,8 @@ export function applyPendingChanges(remote: State, changes: OfflineChange[]): St
       continue;
     }
 
-    if (!["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings"].includes(change.kind)) continue;
-    const kind = change.kind as "patients" | "meds" | "doses" | "alerts" | "tickets" | "routines" | "routineLogs" | "routineSettings";
+    if (!["patients", "meds", "doses", "alerts", "tickets", "faqs", "routines", "routineLogs", "routineSettings", "hydrationLogs", "careEvents"].includes(change.kind)) continue;
+    const kind = change.kind as "patients" | "meds" | "doses" | "alerts" | "tickets" | "faqs" | "routines" | "routineLogs" | "routineSettings" | "hydrationLogs" | "careEvents";
     const list = merged[kind] as unknown as Record<string, unknown>[];
     const index = list.findIndex((record) => record["id"] === change.id);
     if (change.payload === null) {
