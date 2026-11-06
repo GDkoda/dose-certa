@@ -41,24 +41,45 @@ export async function flushCloudWrites() {
 export function onCloudError(handler: (message: string) => void) { errorHandler = handler; }
 
 async function fetchAllPages<T>(
-  loadPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  loadPage: (afterId: string | null, limit: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  getId: (row: T) => string,
 ): Promise<T[]> {
   const rows: T[] = [];
   const pageSize = 500;
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await loadPage(from, from + pageSize - 1);
+  let afterId: string | null = null;
+
+  for (;;) {
+    const { data, error } = await loadPage(afterId, pageSize);
     if (error) throw error;
-    const page = data ?? [];
+    if (!Array.isArray(data)) throw new Error('O servidor retornou uma página de dados inválida.');
+
+    const page = data;
+    if (page.length === 0) return rows;
+    const lastId = getId(page[page.length - 1]!);
+    if (!lastId || (afterId !== null && lastId <= afterId)) {
+      throw new Error('A paginação do servidor não avançou corretamente. A cópia local foi preservada.');
+    }
+
     rows.push(...page);
     if (page.length < pageSize) return rows;
+    afterId = lastId;
   }
 }
 
 async function loadRemoteState(id: string): Promise<State> {
   const [profiles, roles, records] = await Promise.all([
-    fetchAllPages((from, to) => supabase.from('profiles').select('*').order('id', { ascending: true }).range(from, to)),
-    fetchAllPages((from, to) => supabase.from('user_roles').select('*').order('user_id', { ascending: true }).range(from, to)),
-    fetchAllPages((from, to) => supabase.from('app_records').select('*').order('id', { ascending: true }).range(from, to)),
+    fetchAllPages((afterId, limit) => {
+      const query = supabase.from('profiles').select('*').order('id', { ascending: true }).limit(limit);
+      return afterId ? query.gt('id', afterId) : query;
+    }, (profile) => profile.id),
+    fetchAllPages((afterId, limit) => {
+      const query = supabase.from('user_roles').select('*').order('user_id', { ascending: true }).limit(limit);
+      return afterId ? query.gt('user_id', afterId) : query;
+    }, (role) => role.user_id),
+    fetchAllPages((afterId, limit) => {
+      const query = supabase.from('app_records').select('*').order('id', { ascending: true }).limit(limit);
+      return afterId ? query.gt('id', afterId) : query;
+    }, (record) => record.id),
   ]);
 
   // RLS can return an empty result set without an error. The authenticated profile
