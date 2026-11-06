@@ -978,12 +978,12 @@ function Patients({ me, activePatientId = "", onSelectPatient, onOpenRoutine }: 
     <div className="space-y-5">
       <div>
         <T k="pat-title" as="h1" className="font-display text-3xl text-foreground">Pacientes</T>
-        <p className="mt-1 text-sm text-muted-foreground">{patients.length} de {MAX_PATIENTS} pacientes cadastrados.</p>
-        <div className="mt-3 max-w-xl rounded-2xl border border-border/70 bg-card p-3">
+        <p className="mt-1 text-sm text-muted-foreground">{me.role === "mestre" ? `${patients.length} pacientes cadastrados no sistema.` : `${patients.length} de ${MAX_PATIENTS} pacientes cadastrados.`}</p>
+        {me.role === "cuidador" && <div className="mt-3 max-w-xl rounded-2xl border border-border/70 bg-card p-3">
           <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-muted-foreground">Pacientes em acompanhamento</span><strong className="text-sm tabular-nums text-foreground">{patients.length}/{MAX_PATIENTS}</strong></div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: (patients.length / MAX_PATIENTS * 100) + "%" }} /></div>
           <p className="mt-2 text-[11px] text-muted-foreground">{patients.length >= MAX_PATIENTS ? "Limite de cadastros atingido." : `${MAX_PATIENTS - patients.length} vaga(s) disponível(is) para cadastrar.`} Cada cadastro reúne medicamentos, rotina e relatório individual.</p>
-        </div>
+        </div>}
       </div>
 
       {patients.length === 0 && (
