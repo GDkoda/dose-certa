@@ -1137,6 +1137,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   body * {
     visibility: hidden !important;
   }
+
+  /* O relatório diário possui sua própria superfície de impressão.
+     Sem esta exceção, a regra global deixava somente o cartão do paciente visível. */
+  .dc-daily-report-print,
+  .dc-daily-report-print * {
+    visibility: visible !important;
+  }
+  .dc-daily-report-print {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    background: #fff !important;
+    color: #171717 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+  .dc-daily-report-print .no-print {
+    display: none !important;
+  }
+  .dc-report-print-meta {
+    display: block !important;
+    margin-top: 10px !important;
+    line-height: 1.5 !important;
+  }
+  .dc-daily-report-print .bg-card,
+  .dc-daily-report-print .bg-background {
+    background: #fff !important;
+  }
+  .dc-daily-report-print,
+  .dc-daily-report-print * {
+    color: #171717 !important;
+    border-color: #d8d8d8 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .dc-daily-report-print section,
+  .dc-daily-report-print li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   .dc-patient-card-print .dc-patient-card,
   .dc-patient-card-print .dc-patient-card * {
     visibility: visible !important;
