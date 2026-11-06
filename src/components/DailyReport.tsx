@@ -227,7 +227,7 @@ export function DailyReport({ me, activePatientId = "" }: { me: User; activePati
           </div>
           <div className="no-print flex flex-wrap gap-2">
             <button type="button" className={button} onClick={() => window.print()} disabled={!patient || !validRange}><Printer className="h-4 w-4" />Imprimir / PDF</button>
-            {patient && <button type="button" className={primary} onClick={() => setShowEventForm((value) => !value)}><Plus className="h-4 w-4" />Novo registro</button>}
+            {patient && <button type="button" className={primary + " min-h-12 px-5 py-3 shadow-[0_8px_22px_-10px_var(--primary)] ring-2 ring-primary/20 transition hover:-translate-y-0.5"} onClick={() => setShowEventForm((value) => !value)}><Plus className="h-5 w-5" />Novo registro</button>}
           </div>
         </div>
 
