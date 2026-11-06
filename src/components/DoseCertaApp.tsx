@@ -2001,7 +2001,7 @@ function HistoryPage({ me, activePatientId = "", go }: { me: User; activePatient
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><T k="hist-title" as="h1" className="font-display text-3xl text-foreground">Histórico de doses</T>
-        <div className="no-print flex flex-wrap gap-2"><button className={btnOutline} onClick={() => go("relatorio")}><ClipboardList className="h-4 w-4" />Relatório diário</button><button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir histórico</button></div></div>
+        <div className="no-print flex flex-wrap gap-2">{me.role !== "operador" && <button className={btnOutline} onClick={() => go("relatorio")}><ClipboardList className="h-4 w-4" />Relatório diário</button>}<button className={btnOutline} onClick={csv}><Download className="h-4 w-4" />CSV</button><button className={btnPrimary} onClick={() => window.print()}><Printer className="h-4 w-4" />Imprimir histórico</button></div></div>
       <div className="no-print grid gap-3 sm:grid-cols-4">
         <select className={input} aria-label="Filtrar por paciente" value={pid} onChange={(e) => setPid(e.target.value)}><option value="">Todos os pacientes</option>{myPatients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select className={input} aria-label="Filtrar por status da dose" value={st} onChange={(e) => setSt(e.target.value)}><option value="">Todos os status</option><option value="tomado">Tomado</option><option value="pendente">Pendente</option><option value="nao_tomado">Não tomado</option></select>
