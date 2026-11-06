@@ -48,4 +48,100 @@ describe("offline confirmation reconciliation", () => {
     };
     expect(reconcilePendingChanges(remote, [pendingChange])).toEqual([pendingChange]);
   });
+
+  it("prevents a legacy whole-patient update from restoring a stale name", () => {
+    const remote: State = {
+      ...initialState(),
+      patients: [{
+        id: "patient-1",
+        ownerId: "caregiver-1",
+        name: "Nome atual na nuvem",
+        age: 70,
+        notes: "Informação atual",
+      }],
+    };
+    const legacyChange: OfflineChange = {
+      key: "patients:patient-1",
+      id: "patient-1",
+      kind: "patients",
+      ownerId: "caregiver-1",
+      payload: {
+        id: "patient-1",
+        ownerId: "caregiver-1",
+        name: "Nome antigo",
+        age: 70,
+        notes: "Informação antiga",
+        cardTheme: "lavanda",
+      },
+      changedAt: 200,
+    };
+
+    const [rebased] = reconcilePendingChanges(remote, [legacyChange]);
+    expect(rebased?.payload).toMatchObject({
+      name: "Nome atual na nuvem",
+      notes: "Informação atual",
+    });
+    expect(rebased?.payload).not.toHaveProperty("cardTheme");
+  });
+
+  it("rebases only the fields intentionally changed by a newer patient update", () => {
+    const remote: State = {
+      ...initialState(),
+      patients: [{
+        id: "patient-1",
+        ownerId: "caregiver-1",
+        name: "Nome atual na nuvem",
+        age: 70,
+        notes: "Informação atual",
+      }],
+    };
+    const change: OfflineChange = {
+      key: "patients:patient-1",
+      id: "patient-1",
+      kind: "patients",
+      ownerId: "caregiver-1",
+      payload: {
+        id: "patient-1",
+        ownerId: "caregiver-1",
+        name: "Nome antigo",
+        age: 70,
+        notes: "Informação antiga",
+        cardTheme: "lavanda",
+      },
+      changedAt: 201,
+      changedFields: ["cardTheme"],
+    };
+
+    const [rebased] = reconcilePendingChanges(remote, [change]);
+    expect(rebased?.payload).toMatchObject({
+      name: "Nome atual na nuvem",
+      notes: "Informação atual",
+      cardTheme: "lavanda",
+    });
+  });
+
+  it("allows an intentional name edit to win when name is explicitly marked as changed", () => {
+    const remote: State = {
+      ...initialState(),
+      patients: [{
+        id: "patient-1",
+        ownerId: "caregiver-1",
+        name: "Nome anterior",
+        age: 70,
+        notes: "",
+      }],
+    };
+    const change: OfflineChange = {
+      key: "patients:patient-1",
+      id: "patient-1",
+      kind: "patients",
+      ownerId: "caregiver-1",
+      payload: { id: "patient-1", ownerId: "caregiver-1", name: "Nome escolhido" },
+      changedAt: 202,
+      changedFields: ["name"],
+    };
+
+    const [rebased] = reconcilePendingChanges(remote, [change]);
+    expect(rebased?.payload).toMatchObject({ name: "Nome escolhido" });
+  });
 });
