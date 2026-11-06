@@ -1177,9 +1177,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     print-color-adjust: exact;
   }
   .dc-daily-report-print section,
+  .dc-daily-report-print .dc-report-day {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
   .dc-daily-report-print li {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .dc-daily-report-print .dc-report-day-title {
+    break-after: avoid;
+    page-break-after: avoid;
   }
   .dc-patient-card-print .dc-patient-card,
   .dc-patient-card-print .dc-patient-card * {
