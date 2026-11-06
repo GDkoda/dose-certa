@@ -9,6 +9,7 @@ import {
   persistLocalMutation,
   publishOfflineStatus,
   reconcilePendingChanges,
+  replacePendingChanges,
   readOfflinePackage,
 } from './offline-cache';
 
@@ -230,9 +231,13 @@ export async function refreshCloud() {
     let syncError = remoteError ? cloudErrorDetails(remoteError) : null;
     if (remote && pending.length) {
       const reconciled = reconcilePendingChanges(remote, pending);
-      const resolved = pending.filter((change) => !reconciled.includes(change));
+      const remainingKeys = new Set(reconciled.map((change) => change.key + ":" + change.changedAt));
+      const resolved = pending.filter((change) => !remainingKeys.has(change.key + ":" + change.changedAt));
       if (resolved.length) await clearSyncedChanges(id, resolved);
       pending = reconciled;
+      // Persist rebased patient payloads before the queue is uploaded. The helper
+      // checks changedAt so it cannot overwrite a newer edit created meanwhile.
+      if (pending.length) await replacePendingChanges(id, pending);
     }
     // clearSyncedChanges above is asynchronous. Recheck the generation directly
     // before replacing the live store so an edit made during that transaction survives.
