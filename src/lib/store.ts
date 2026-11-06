@@ -90,6 +90,18 @@ export interface State {
   texts: Record<string, string>; images: Record<string, string>; sessionId: string | null;
 }
 
+export type PatientPatch = Pick<Patient, "id"> & Partial<Omit<Patient, "id">>;
+
+/** Merge only explicitly edited patient fields into the latest store record. */
+export function mergePatientPatch(state: State, patch: PatientPatch): State {
+  return {
+    ...state,
+    patients: state.patients.map((patient) =>
+      patient.id === patch.id ? { ...patient, ...patch } : patient,
+    ),
+  };
+}
+
 export const MAX_PATIENTS = 3;
 export const RESET_PASSWORD = "123";
 export const SNOOZE_MIN = 5;
